@@ -40,7 +40,7 @@ ${words} at the beginning.
 
 And these are number (${number}), double (${string1}) and single quoted (${string2}) strings.
 
-This as assigned in a multiline: ${multiline}.
+This was assigned in a multiline: ${multiline}.
 
 
 
@@ -89,3 +89,6 @@ $nested2=$number $nested1 $number
 
 
 \EMBED{lang=perl}$main::nested2;\END_EMBED
+
+
+Predeclared were $VAR1 $VAR2.

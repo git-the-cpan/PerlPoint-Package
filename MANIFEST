@@ -7,9 +7,12 @@ TODO
 
 ppParser.yp
 
-lib/PerlPoint/Parser.pm
-lib/PerlPoint/Constants.pm
 lib/PerlPoint/Backend.pm
+lib/PerlPoint/Constants.pm
+lib/PerlPoint/Parser.pm
+lib/PerlPoint/Tags.pm
+lib/PerlPoint/Tags/Basic.pm
+lib/PerlPoint/Tags/SDF.pm
 
 demo/.pp2sdf
 demo/pp2pod
@@ -17,14 +20,30 @@ demo/pp2pp
 demo/pp2sdf
 demo/pp2tree
 
+doc/doc-functions.pp
+
 doc/parser-active-contents.pp
 
 doc/parser-faq.pp
 doc/faq/Misc/parser-faq-1.pp
 doc/faq/Misc/parser-faq-2.pp
+doc/faq/Misc/parser-faq-3.pp
+doc/faq/Portability/portability-faq-1.pp
+
 
 doc/parser-paragraphs.pp
 doc/parser-tags.pp
+
+doc/tagdoc-example.pp
+doc/tags/image.gif
+doc/tags/tag-B.pp
+doc/tags/tag-C.pp
+doc/tags/tag-I.pp
+doc/tags/tag-IMAGE.pp
+doc/tags/tag-READY.pp
+
+t/PerlPoint/Tags/_macros.pm
+t/PerlPoint/Tags/_tags.pm
 
 t/backend.t
 
@@ -53,11 +72,17 @@ t/empty2.pp
 t/headlines.t
 t/headlines.pp
 
-t/include.t
+t/include1.t
+t/include2.t
+t/include3.t
 t/include.pp
 t/include1.pp
 t/include2.pp
+t/include3.pp
+t/include4.pp
+t/include5.pp
 t/include.perl
+t/include2.perl
 
 t/linehints.t
 t/linehints.pp

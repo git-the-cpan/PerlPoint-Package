@@ -5,6 +5,9 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.14    |28.05.2001| JSTENZEL | added DIRECTIVE_VARRESET;
+#         |12.06.2001| JSTENZEL | added PARSER_... constants;
+# 0.13    |18.03.2001| JSTENZEL | added tag constants;
 # 0.12    |14.03.2001| JSTENZEL | added mailing list hint to POD;
 # 0.11    |20.01.2001| JSTENZEL | added new constant DIRECTIVE_VARSET;
 # 0.10    |07.12.2000| JSTENZEL | new namespace PerlPoint;
@@ -34,7 +37,7 @@ B<PerlPoint::Constants> - public PerlPoint::... module constants
 
 =head1 VERSION
 
-This manual describes version B<0.12>.
+This manual describes version B<0.14>.
 
 =head1 DESCRIPTION
 
@@ -54,7 +57,7 @@ of the using modules B<PerlPoint::Parser> and B<PerlPoint::Backend>.
 package PerlPoint::Constants;
 
 # declare version
-$VERSION=$VERSION=0.12;
+$VERSION=$VERSION=0.14;
 
 # startup actions
 BEGIN
@@ -156,6 +159,10 @@ flags an "unordered list";
 
 flags an "unordered point" paragraph;
 
+=item DIRECTIVE_VARRESET
+
+a backend hint flagging that I<all> variables are deleted;
+
 =item DIRECTIVE_VARSET
 
 a backend hint propagating a variable setting;
@@ -190,15 +197,57 @@ flags a verbatim block paragraph;
                            'DIRECTIVE_ULIST',        # unordered list;
                            'DIRECTIVE_UPOINT',       # unordered list point;
                            'DIRECTIVE_VARSET',       # backend hint: variable setting;
+                           'DIRECTIVE_VARRESET',     # backend hint: reset *all* variables;
                            'DIRECTIVE_VERBATIM',     # verbatim;
 
                            'DIRECTIVE_SIMPLE',       # a pseudo directive (never used directly - MUST be the last here!);
                           );
 
+  # parser constants
+  startupGenerateConstants(
+                           'PARSING_OK',             # all right, proceed;
+                           'PARSING_COMPLETED',      # we know without further parsing that the input was perfect;
+                           'PARSING_ERROR',          # a semantic error occured;
+                           'PARSING_FAILED',         # a syntactical error occured;
+                          );
+
+  # tag constants
+  startupGenerateConstants(
+                           'TAGS_OPTIONAL',          # something is optional;
+                           'TAGS_MANDATORY',         # something is mandatory;
+                           'TAGS_DISABLED',          # something is disabled (not necessary);
+                          );
+
   # release memory
   undef &startupGenerateConstants;
 
+
 =pod
+
+=head2 Parser constants
+
+control how the parser continues processing, usually used by tag hooks.
+
+=over 4
+
+=item PARSING_COMPLETED
+
+We read all we need. Stop parsing successfully.
+
+=item PARSING_ERROR
+
+A semantic error occurred. Parsing will usually be continued to possibly detect even more errors.
+
+=item PARSING_FAILED
+
+A syntactic error occured. Parsing will be stopped immediately.
+
+=item PARSING_OK
+
+Input ok, parsing can be continued.
+
+=back
+
 
 =head2 Trace constants
 
@@ -338,6 +387,7 @@ use Exporter;
            DIRECTIVE_NEW_LINE
            DIRECTIVE_OLIST
            DIRECTIVE_OPOINT
+           DIRECTIVE_VARRESET
            DIRECTIVE_TAG
            DIRECTIVE_TEXT
            DIRECTIVE_ULIST
@@ -363,6 +413,18 @@ use Exporter;
 	   CACHE_ON
 	   CACHE_CLEANUP
           );
+
+%EXPORT_TAGS=(
+              parsing => [qw(PARSING_OK PARSING_COMPLETED PARSING_ERROR PARSING_FAILED)],
+              tags    => [qw(TAGS_OPTIONAL TAGS_MANDATORY TAGS_DISABLED)],
+             );
+
+Exporter::export_ok_tags(
+                         qw(
+                            parsing
+                            tags
+                           )
+                        );
 
 1;
 

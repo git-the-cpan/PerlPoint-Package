@@ -5,6 +5,8 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.09    |14.03.2001| JSTENZEL | added stream processing time report;
+#         |          | JSTENZEL | slight code optimizations;
 # 0.08    |13.03.2001| JSTENZEL | simplified code slightly;
 #         |          | JSTENZEL | added visibility feature to visualize processing;
 #         |14.03.2001| JSTENZEL | added mailing list hint to POD;
@@ -28,7 +30,7 @@ B<PerlPoint::Backend> - frame class to transform PerlPoint::Parser output
 
 =head1 VERSION
 
-This manual describes version B<0.08>.
+This manual describes version B<0.09>.
 
 =head1 SYNOPSIS
 
@@ -73,7 +75,7 @@ target objects are discovered in the intermediate stream.
 package PerlPoint::Backend;
 
 # declare version
-$VERSION=$VERSION="0.08";
+$VERSION=$VERSION="0.09";
 
 # pragmata
 use strict;
@@ -188,7 +190,12 @@ sub new
   # store trace and display settings
   $me->{trace}=defined $pars{trace} ? $pars{trace} : TRACE_NOTHING;
   $me->{display}=defined $pars{display} ? $pars{display} : DISPLAY_ALL;
-  $me->{vis}=defined $pars{vispro} ? $pars{vispro} : 0;
+  $me->{vis}=(
+                  defined $pars{vispro} 
+              and not $me->{display} & &DISPLAY_NOINFO
+              and not $me->{trace}>TRACE_NOTHING
+              and -t STDERR
+             ) ? $pars{vispro} : 0;
 
   # reply the new object
   $me;
@@ -352,7 +359,7 @@ sub run
   warn "[Info] Perl Point backend \"$me->{name}\" starts.\n" unless $me->{display} & DISPLAY_NOINFO;
 
   # declare variables
-  my ($tokenNr)=0;
+  my ($tokenNr, $started)=(0, time);
 
   # init counter
   $me->{statistics}{&DIRECTIVE_HEADLINE}=0;
@@ -400,11 +407,7 @@ sub run
 
            # let the user know that something is going on
            print STDERR "\r", ' ' x length('[Info] '), '... ', $me->{statistics}{&DIRECTIVE_HEADLINE}, " chapters processed."
-            if     not $me->{display} & &DISPLAY_NOINFO
-               and not $me->{trace}>TRACE_NOTHING
-               and $me->{vis}
-               and -t STDERR
-               and not $me->{statistics}{&DIRECTIVE_HEADLINE} % $me->{vis};
+             if $me->{vis} and not $me->{statistics}{&DIRECTIVE_HEADLINE} % $me->{vis};
           }
 
         # now check if there was a handler declared
@@ -427,7 +430,10 @@ sub run
     }
 
   # inform user
-  warn(($me->{vis} ? "\n" : ''), "[Info] Backend \"$me->{name}\" is ready.\n") unless $me->{display} & DISPLAY_NOINFO;
+  warn(
+       ($me->{vis} ? "\n" : ''), "       Stream processed in ", time-$started, " seconds.\n\n",
+                                 "[Info] Backend \"$me->{name}\" is ready.\n\n"
+      ) unless $me->{display} & DISPLAY_NOINFO;
  }
 
 1;

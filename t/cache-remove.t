@@ -5,6 +5,7 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.03    |20.03.2001| JSTENZEL | adapted to tag templates;
 # 0.02    |09.12.2000| JSTENZEL | new namespace: "PP" => "PerlPoint";
 # 0.01    |16.11.2000| JSTENZEL | new.
 # ---------------------------------------------------------------------------------------
@@ -40,7 +41,7 @@ $parser->run(
              safe    => new Safe,
 	     cache   => CACHE_CLEANUP,
              trace   => TRACE_NOTHING,
-             display => DISPLAY_NOINFO,
+             display => DISPLAY_NOINFO+DISPLAY_NOWARN,
             );
 
 # perform checks: cache file should be removed

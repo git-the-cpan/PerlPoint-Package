@@ -1,4 +1,15 @@
 
+;; = HISTORY SECTION =====================================================================
+
+;; ---------------------------------------------------------------------------------------
+;; version | date     | author   | changes
+;; ---------------------------------------------------------------------------------------
+;; 0.02    |09.06.2001| JSTENZEL | variables can contain umlauts now, adapted;
+;; 0.01    | 2000     | JSTENZEL | new.
+;; ---------------------------------------------------------------------------------------
+
+;; = CODE SECTION ========================================================================
+
 
 ;; This piece of code is an example how Emacs'
 ;; hilit19 module could be extended for a
@@ -13,11 +24,11 @@
    ("^//.*$" nil comment)
 
    ;; variable definition
-   ("^\\$[_A-Za-z0-9]+=" nil define)
+   ("^\\$[_A-Za-z0-9‰ˆ¸ƒ÷‹ﬂ]+=" nil define)
 
    ;; variable usage
-   ("\\$[_A-Za-z0-9]+" nil define)
-   ("\\$\\{[_A-Za-z0-9]+\\}" nil define)
+   ("\\$[_A-Za-z0-9‰ˆ¸ƒ÷‹ﬂ]+" nil define)
+   ("\\$\\{[_A-Za-z0-9‰ˆ¸ƒ÷‹ﬂ]+\\}" nil define)
 
    ;; headline
    ("^=+.+$" nil label)

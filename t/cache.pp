@@ -111,7 +111,7 @@ ${words} at the beginning.
 
 And these are number (${number}), double (${string1}) and single quoted (${string2}) strings.
 
-This as assigned in a multiline: ${multiline}.
+This was assigned in a multiline: ${multiline}.
 
 
 

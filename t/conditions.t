@@ -5,6 +5,12 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.03    |20.03.2001| JSTENZEL | adapted to tag templates;
+#         |24.05.2001| JSTENZEL | adapted to paragraph reformatting: text paragraphs
+#         |          |          | no longer contain a final whitespace string;
+#         |01.06.2001| JSTENZEL | adapted to modified lexing algorithm which takes
+#         |          |          | "words" as long as possible;
+#         |05.06.2001| JSTENZEL | adapted to further optimized lexing;
 # 0.02    |09.12.2000| JSTENZEL | new namespace: "PP" => "PerlPoint";
 # 0.01    |08.10.2000| JSTENZEL | new.
 # ---------------------------------------------------------------------------------------
@@ -24,7 +30,7 @@ use PerlPoint::Parser 0.19;
 use PerlPoint::Constants;
 
 # prepare tests
-BEGIN {plan tests=>113;}
+BEGIN {plan tests=>20;}
 
 # declare variables
 my (@streamData, @results);
@@ -35,11 +41,10 @@ my ($parser)=new PerlPoint::Parser;
 # and call it
 $parser->run(
              stream  => \@streamData,
-             tags    => {},
              files   => ['t/conditions.pp'],
              safe    => new Safe,
              trace   => TRACE_NOTHING,
-             display => DISPLAY_NOINFO,
+             display => DISPLAY_NOINFO+DISPLAY_NOWARN,
             );
 
 # build a backend
@@ -73,42 +78,11 @@ $backend->run(\@streamData);
 ok(shift(@results), $_) foreach (DIRECTIVE_DOCUMENT, DIRECTIVE_START, 'conditions.pp');
 
 ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Conditions');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'allow');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'to');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'maintain');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'all');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'versions');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'of');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'a');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'presentation');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'in');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'one');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'file');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
+ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Conditions allow to maintain all versions of a presentation in one file.');
 ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 
 ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Back');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'to');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'main');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'text');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
+ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Back to main text.');
 ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 
 ok(shift(@results), $_) foreach (DIRECTIVE_DOCUMENT, DIRECTIVE_COMPLETE, 'conditions.pp');

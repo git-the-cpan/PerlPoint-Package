@@ -54,8 +54,8 @@ begin with an \I<indentation> and are completed by the next empty line.
 
       A block.
 
-      I<Another> block.
-      Escape "\>".
+      \I<Another> block.
+      Escape ">" in tags: \\C<<\B<\\\>>>.
 
   Examples completed.
 
@@ -70,9 +70,11 @@ by delimiting them by a special control paragraph:
 
       The first block.
 
-      -
+  -
 
       The second block.
+
+Note that the control paragraph starts at the left margin.
 
 
 ==Verbatim blocks
@@ -185,7 +187,7 @@ Level shifts are accepted between list items \I<only>.
 ==Tables
 
 are supported in a paragraph form, they start with an \B<"@"> character which is
-followed by  the column delimiter:
+followed by the column delimiter:
 
   @|
    column 1   |   column 2   |  column 3
@@ -194,7 +196,49 @@ followed by  the column delimiter:
 
 The first line of such a table is automatically formatted as \I<table headline>.
 
-(There is also a more sophisticated way to describe tables, see the \I<tag> section.)
+If a table row contains less columns than the table headline, the "missed"
+columns are automatically added. This is,
+
+  @|
+  A | B | C
+  1
+  1 |
+  1 | 2
+  1 | 2 |
+  1 | 2 | 3
+
+is streamed exactly as
+
+  @|
+  A | B | C
+  1 |   |
+  1 |   |
+  1 | 2 |
+  1 | 2 |
+  1 | 2 | 3
+
+to make backend handling easier. (Empty HTML table cells, for example, are rendered
+slightly obscure by certain browsers unless they are filled with invisible characters,
+so a converter to HTML can detect such cells because of normalization and handle them
+appropriately.)
+
+Please note that normalization refers to the headline row. If another line contains
+\I<more> columns than the headline, normalization does not care.
+
+In all tables, leading and trailing whitespaces of a cell are
+automatically removed, so you can use as many of them as you want to
+improve the readability of your source. The following table is absolutely
+equivalent to the last example:
+
+  @|
+  A                |       B         |      C
+  1                |                 |
+   1               |                 |
+    1              | 2               |
+     1             |  2              |
+      1            | 2               |      3
+
+There is also a more sophisticated way to describe tables, see the \I<tag> section.
 
 
 ==Conditions
@@ -211,7 +255,7 @@ in one source file:
 
 Or you could enable parts of your document by date:
 
-  ? time>$dateOfTalk
+  ? time>$main::dateOfTalk
 
 Please note that the condition code shares its variables with \I<embedded> and \I<included>
 code.
@@ -229,7 +273,7 @@ values (if declared).
 
   $var=var
 
-  This variable is called $var.
+  This variable is set to $var.
 
 All variables are made available to \I<embedded> and \I<included> Perl code as well as to
 \I<conditions> and can be accessed there as package variables of "main::". Because a
@@ -251,8 +295,9 @@ EOE
 causes \C<\$var> to be different on parser and code side - the parser will still use a
 value of 10, while embedded code works on with a value of 20.
 
-Translator software \I<can> make additional use of variables. Please see your
-translators documentation for details.
+Translator software \I<can> make additional use of variables, especially predeclare
+certain settings (such variables are usually capitalized). Please see your converters
+documentation for details.
 
 
 ==Macro definitions
@@ -304,13 +349,57 @@ Here are a few examples:
 
 EOE
 
+\I<If no parameter is defined in the macro definition, options will not be recognized.>
+The same is true for the body part. \I<Unless \C<"__body__"> is used in the macro
+definition, macro bodies will not be recognized.> This means that with the definition
+
+  +OPTIONLESS:\\B<__body__>
+
+the construction
+
+  \\OPTIONLESS{something=this}<more>
+
+is evaluated as a usage of \C<\\OPTIONLESS> without body, followed by the \I<string>
+\C<"{something=here}">. Likewise, the definition
+
+  +BODYLESS:found __something__
+
+causes
+
+  \\BODYLESS{something=this}<more>
+
+to be recognized as a usage of \C<\\BODYLESS> with option \C<something>, followed
+by the \I<string> \C<"<more\>">. So this will be resolved as \C<"found this">. Finally,
+
+  +JUSTTHENAME:Text phrase.
+
+enforces these constructions
+
+  ... \\JUSTTHENAME, ...
+  ... \\JUSTTHENAME{name=Name}, ...
+  ... \\JUSTTHENAME<text>, ...
+  ... \\JUSTTHENAME{name=Name}<text> ...
+
+to be translated into
+
+  ... Text phrase. ...
+  ... Text phrase.{name=Name} ...
+  ... Text phrase.<text>, ...
+  ... Text phrase.{name=Name}<text> ...
+
+The principle behind all this is to make macro usage \I<easier> and intuative:
+why think of options or a body or of special characters possibly treated as
+option/body part openers unless the macro makes use of an option or body?
+
 An \I<empty> macro text \I<undefines> the macro (if it was already known).
 
   // undeclare the IB alias
   +IB:
 
-Please note that the current implementation of macros is still called experimental because
-there may still be untested cases.
+An alias can be used everywhere a tag can be. Tags and macros are indeed that
+interchangable that macros can be used to overwrite existing tags. The paragraph
 
-An alias can be used everywhere a tag can be.
+  +B:\\I<__body__>
+
+transforms all occurences of \\B tags into \\I ones.
 

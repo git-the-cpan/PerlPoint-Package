@@ -5,6 +5,10 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.05    |20.03.2001| JSTENZEL | adapted to tag templates;
+#         |01.06.2001| JSTENZEL | adapted to modified lexing algorithm which takes
+#         |          |          | "words" as long as possible;
+#         |05.06.2001| JSTENZEL | adapted to further optimized lexing;
 # 0.04    |09.12.2000| JSTENZEL | new namespace: "PP" => "PerlPoint";
 # 0.03    |05.10.2000| JSTENZEL | parser takes a Safe object now;
 # 0.02    |15.04.2000| JSTENZEL | adapted;
@@ -22,11 +26,11 @@ use Carp;
 use Safe;
 use Test;
 use PerlPoint::Backend;
-use PerlPoint::Parser 0.08;
+use PerlPoint::Parser 0.34;
 use PerlPoint::Constants;
 
 # prepare tests
-BEGIN {plan tests=>72;}
+BEGIN {plan tests=>9;}
 
 # declare variables
 my (@streamData, @results);
@@ -37,11 +41,10 @@ my ($parser)=new PerlPoint::Parser;
 # and call it
 $parser->run(
              stream  => \@streamData,
-             tags    => {},
              files   => ['t/simple.pp'],
              safe    => new Safe,
              trace   => TRACE_NOTHING,
-             display => DISPLAY_NOINFO,
+             display => DISPLAY_NOINFO+DISPLAY_NOWARN,
             );
 
 # build a backend
@@ -61,30 +64,9 @@ $backend->run(\@streamData);
 shift(@results) until $results[0] eq DIRECTIVE_SIMPLE;
 
 # these checks are straight forward
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Simple');
+ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Simple tokens are supplied for simple words');
 ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'tokens');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'are');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'supplied');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'for');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'simple');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'words');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'and');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'include');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'words');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'AND');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'whitespaces');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
+ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'and include words AND whitespaces.');
 
 
 

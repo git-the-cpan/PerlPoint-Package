@@ -11,10 +11,12 @@ use ExtUtils::MakeMaker;
 # the package requires modern perl
 require 5.00503;
 
+my $version='0.34';
+
 # write makefile
 $ok=WriteMakefile(
                   NAME         => 'PerlPoint',
-                  VERSION      => '0.33',
+                  VERSION      => $version,
                   PREREQ_PM    => {
 		                   Digest::SHA1 => 1,
                                    IO::File     => 1,
@@ -31,7 +33,7 @@ $ok=WriteMakefile(
 # provide additional informations
 warn <<EOM if $ok;
 
-Welcome to the PerlPoint package!
+Welcome to the PerlPoint package $version!
 
 The installation is well prepared now,
 and you might run "make test" and

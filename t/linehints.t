@@ -5,6 +5,7 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.03    |20.03.2001| JSTENZEL | adapted to tag templates;
 # 0.02    |09.12.2000| JSTENZEL | new namespace: "PP" => "PerlPoint";
 # 0.01    |07.10.2000| JSTENZEL | new.
 # ---------------------------------------------------------------------------------------
@@ -36,10 +37,9 @@ my ($parser)=new PerlPoint::Parser;
 $parser->run(
              linehints => 1,
              stream    => \@streamData,
-             tags      => {},
              files     => ['t/linehints.pp'],
              trace     => TRACE_NOTHING,
-             display   => DISPLAY_NOINFO,
+             display   => DISPLAY_NOINFO+DISPLAY_NOWARN,
             );
 
 # build a backend

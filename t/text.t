@@ -5,6 +5,7 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.04    |20.03.2001| JSTENZEL | adapted to tag templates;
 # 0.03    |09.12.2000| JSTENZEL | new namespace: "PP" => "PerlPoint";
 # 0.02    |05.10.2000| JSTENZEL | parser takes a Safe object now;
 # 0.01    |08.04.2000| JSTENZEL | new.
@@ -36,11 +37,10 @@ my ($parser)=new PerlPoint::Parser;
 # and call it
 $parser->run(
              stream  => \@streamData,
-             tags    => {},
              files   => ['t/text.pp'],
              safe    => new Safe,
              trace   => TRACE_NOTHING,
-             display => DISPLAY_NOINFO,
+             display => DISPLAY_NOINFO + DISPLAY_NOWARN,
             );
 
 # build a backend

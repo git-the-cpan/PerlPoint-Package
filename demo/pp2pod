@@ -3,11 +3,14 @@
 # = HISTORY SECTION =====================================================================
 
 # ---------------------------------------------------------------------------------------
-# version | date   | author | changes
+# version | date   | author   | changes
 # ---------------------------------------------------------------------------------------
-# 0.03    |07.12.00| ste    | new module namespace "PerlPoint";
-# 0.02    |01.06.00| ste    | added comment transformation;
-# 0.01    |27.05.00| ste    | new.
+# 0.04    |26.03.01| JSTENZEL | adapted to new tag templates;
+#         |10.06.01| JSTENZEL | new script namespace "PerlPoint::Converter::pp2pod";
+#         |        | JSTENZEL | more tag adaptations;
+# 0.03    |07.12.00| JSTENZEL | new module namespace "PerlPoint";
+# 0.02    |01.06.00| JSTENZEL | added comment transformation;
+# 0.01    |27.05.00| JSTENZEL | new.
 # ---------------------------------------------------------------------------------------
 
 # = POD SECTION =========================================================================
@@ -18,7 +21,7 @@ B<pp2pod> - a Perl Point demo translator to POD
 
 =head1 VERSION
 
-This manual describes version B<0.03>.
+This manual describes version B<0.04>.
 
 =head1 DESCRIPTION
 
@@ -50,26 +53,37 @@ Copyright (c) Jochen Stenzel (perl@jochen-stenzel.de), 2000. All rights reserved
 =cut
 
 
+# declare script package
+package PerlPoint::Converter::pp2pod;
+
 # declare version
-$VERSION=$VERSION=0.03;
+$VERSION=$VERSION=0.04;
 
 # pragmata
 use strict;
 
 # load modules
 use Carp;
+use Getopt::Long;
+use PerlPoint::Tags;
 use PerlPoint::Backend;
-use PerlPoint::Parser 0.12;
 use PerlPoint::Constants;
-# use Getopt::Long;
-# use Getopt::ArgvFile qw(argvFile);
+use PerlPoint::Parser 0.34;
+use PerlPoint::Tags::Basic;
+use Getopt::ArgvFile qw(argvFile);
 
 
 # declare variables
-my (@streamData, @openLists, %tagHash);
+my (@streamData, @openLists, %options);
 
-# declare list of accepted tag openers
-@tagHash{qw(B C I IMG E)}=();
+# get options
+argvFile(home=>1, default=>1);
+GetOptions(\%options,
+           "tagset=s@",         # add a tag set to the scripts own tag declarations;
+          );
+
+# import tags
+PerlPoint::Tags::addTagSets(@{$options{tagset}}) if exists $options{tagset};
 
 # build parser
 my ($parser)=new PerlPoint::Parser;
@@ -77,7 +91,6 @@ my ($parser)=new PerlPoint::Parser;
 # and call it
 $parser->run(
              stream  => \@streamData,
-             tags    => \%tagHash,
              files   => \@ARGV,
              trace   => TRACE_NOTHING,
              display => DISPLAY_NOINFO,

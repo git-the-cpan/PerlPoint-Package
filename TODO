@@ -2,12 +2,15 @@
 =Preface
 
 These are just \I<ideas>. Possibly not everything in this list
-will be implemented. Further ideas are welcome.
+will be implemented, and probably these notes do not describe
+all features which might be on the way ;-). Further ideas are welcome.
+If you you like an idea especially, please let us now to accelerate
+implementation if possible.
 
 
 =General
 
-* add an intro to PerlPoint
+* add an intro/tutorial to PerlPoint
 
 
 =List shifting
@@ -18,18 +21,9 @@ will be implemented. Further ideas are welcome.
   and opening a subordered list);
 
 
-=Tables
-
-* Allow nested tables? (Syntax!)
-
-* allow truly embedded tables?!:
-
-   bla bla \\table{colsep=+ rowsep=|} c11 + c12 | c21 + c22 \\end_table blu bla
-
-
 =Parser
 
-* subchapter element feature (just an idea ...);
+* subchapter element feature (just an idea, needs an additional pass);
 
 
 =pp2pod

@@ -1,5 +1,443 @@
 
 
+=0.34
+
+\B<This is a major release.> It needs adapted translators. Old fashioned
+converters will stop working after installation of package version 0.34.
+
+
+==Bugfixes
+
+* Lorenz detected that \B<\C<0>>'s were not allowed in macro names:
+  fixed (this integrates patch \C<0.3301>);
+
+* Verbatim blocks were documented as something left completely
+  untouched by PerlPoint but variables \I<were> replaced,
+  fixed implicitly with new line reading behaviour (see below).
+
+* Multiline tags in examples are correct PerlPoint but were
+  mistranslated into equivalently multilined SDF tags. Because
+  SDF tags cannot enclose line breaks pp2sdf needs to automatically
+  \I<close> open tags at the end of an example line and to \I<reopen>
+  them in the subsequent line, which is arranged now.
+
+  \I<The example code>
+
+      My tag \\I<encloses
+      line breaks>.
+
+  \I<formerly transformed into>
+
+  E:  My tag {{I:encloses
+  E:  line breaks}}.
+
+  \I<is now made the valid SDF code>
+
+  E:  My tag {{I:encloses\B<}}>
+  E:  \B<{{I:>line breaks}}.
+
+* A bug in an internal stack handling caused several operations to
+  be performed when a macro was replaced, including line number
+  updates and removal of whitespaces following the macro (context
+  dependend). The fix "saves" such whitespaces and accelerates
+  processing, especially if macros are used extensively in a
+  document processed with activated cache.
+
+* Internal table data were not completely reset at the end of a table,
+  thus causing addition of incorrect elements to the stream
+  representation of subsequent tables. Fixed.
+
+* Backslashes in conditions were removed, fixed.
+
+* One column tables were handled incorrectly.
+
+* Headlines couldn't begin with a character that opens a paragraph.
+
+
+==Features
+
+===Tags and macros
+
+* \B<New tag declaration by modules:> options and body can be declared
+  optional, mandatory or disabled, and this influences the parser
+  in searching for parts or not, checking mandatory parts, and
+  invoking user (translator/tag author!) declared functions to
+  check options or body more detailed. Please have a look at the
+  documentation of the new module \B<PerlPoint::Tags> for all the
+  details. This modification improves tag parsing significantly,
+  making it much more flexible. Additionally, there's now a convenient
+  way to share tag definitions between converters and to allow users
+  to use tags unsupported by the current converter but accepted
+  by another one. See next point.
+
+* Translators not declaring tags as mentioned above can be forced
+  by the user to \I<accept> foreign tags syntactically. As a side
+  effect, the experimental \C<\\ACCEPT_ALL> became obsolete and is
+  no longer supported.
+
+* Macros are adapted to the new tag evaluation: they as well are
+  now evaluated depending on their definitions: the parser will
+  no longer recognize an option part unless the definition makes
+  use of parameters, likewise a body is only detected if it was
+  mentioned in the macro definition by \C<__body__>. This rule
+  makes macro usage more intuative and allows simpler embedding
+  into the documents text.
+
+* New basic tag \B<\\READY> uses the new definition features to
+  complete parsing immediately. This means that remaining parts
+  of a document will be \I<ignored>. This can be useful if only
+  parts at the beginning of a document are of interest in certain
+  circumstances:
+
+   ? flagSet(overviewMode)
+
+   \\B<Short Overview>
+
+   This document will give you an impression.
+
+   // ready in overview mode
+   \B<\\READY>
+
+   ? 1
+
+   // usual document
+
+
+===Performance
+
+* Modified lexing to recognize the longest "words" possible.
+  Previous versions supplied real words or even single characters.
+  The "longest possible word" is the complete string before the
+  next character (or string) with a special meaning in the current
+  context. This change accelerates parsing incredibly: there are
+  less lexer calls and less parser states to walk through (and this
+  state machine is by far the slowest part in source processing).
+  Parsing is speed up by about five or seven times, depending on
+  a documents structure. This acceleration is even more impressive
+  if only a few parts were changed and the cache is in use. More,
+  because there are less parts in the stream now, backend processing
+  is significantly accelerated as well!
+
+* Accelerated comment and verbatim block reading: these paragraphs
+  were lexed and parsed for no purpose, so now they are read and
+  streamed line by line.
+
+* Accelerated the parser by replacing a clean object method calls
+  of the used Parse::Yapp parser object by accessing the objects
+  internal USER hash entry directly. This of course breaks encapsulation
+  but is suggested by the Parse::Yapp manual for reasons of efficiency.
+
+
+===Cache
+
+* Improved cache: the usage of variables and macros does no longer
+  prevent a paragraph from being cached, so the cache becomes more
+  effective. In our real life documents, the cache hit rate is
+  increased from about 50 or 60% to about 75%. The cache detects
+  a paragraph hit if the paragraph checksum matches \I<and> the
+  new variables / macro definition checksum match as well. Thanks
+  to \I<Stefan Sautter> who suggested this improvement.
+
+* More cache improvements: until now, it was a little bit dangerous
+  to use something looking like a tag or macro but being none of
+  them, at least if the cache was activated. The cache detected
+  that there was no macro and stored a checksum for the paragraph.
+  Everything worked well until this macro really was defined. Now
+  it would have to be replaced where it was used! But because there
+  was no change in the checksum, and there was no macro in the
+  paragraph before, the cache detected a hit, reusing the \I<old>
+  paragraph stream. So in fact, the new macro definition seemed
+  to be ignored in the paragraph until the cache was disabled or
+  rebuilt. This is all history now - if something looks like a
+  macro in a paragraph, the cache will activate the new macro
+  checksum feature, so whenever a used nonmacro becomes a macro
+  there will be no cache hit after that change (but of course,
+  the \I<new> stream is cached, so the next parsing will profit from
+  the cache again).
+
+* Even more cache improvements: the cache now stores the parser
+  version which built it and the constant declarations version
+  which was used. Likewise, the version of the used Storable
+  module is saved. These data are used to automatically rebuild
+  a cache after cache structure changes. (To demonstrate this
+  feature, version 0.34 introduces an incompatible, modified
+  cache structure and all existing cache files will be rebuilt
+  automatically. Well, or because of the cache improvements
+  described above. ;-)
+
+
+===Docs
+
+* Extended the documentation building set by adding detailed tag
+  documentation. As usual, this is intended to make it easier for
+  translator authors to document their tool and can be integrated
+  into and adapted to their documents. Second, these short documents
+  are hopefully used as templates to document all PerlPoint parts
+  a consistent way.
+
+* Added a portability discussion and more to the FAQ.
+
+* Macros are no longer called experimental.
+
+* It is now documented that macros overwrite tags of the same name.
+
+* It is now documented that "empty lines" containing whitespaces are
+  not recognized as empty by Perls paragraph mode which makes the cache
+  fail especially in examples (subsequent example parts "disappear").
+  Maybe future versions can improve this by either implementing an own
+  "paragraph mode" or handling example caching differently.
+
+
+===Tables
+
+* Table paragraphs are now "normalized": if a table row contains
+  less columns than the headline row, the missed columns are
+  automatically added (this helps converters to detect empty columns).
+
+  @|
+  A | B | C
+  1
+  1 |
+  1 | 2
+  1 | 2 |
+  1 | 2 | 3
+
+  is streamed now exactly as
+
+  @|
+  A | B | C
+  1 |   |
+  1 |   |
+  1 | 2 |
+  1 | 2 |
+  1 | 2 | 3
+
+* Tables built by tag (\C<\\TABLE, \\END_TABLE>) are normalized
+  analogously to table paragraphs (see above).
+
+* Table fields are trimmed now: leading and trailing whitespaces are
+  deleted by the parser (previous versions did pass them to the stream).
+
+* Tables made by tag were streamed different to tables made by paragraph,
+  because as tags they are usually embedded into a text paragraph.
+  Although "correct", it makes no sense to provide the extra text
+  paragraph information in the stream. That's why the extra text
+  information is stripped away now. In other words, the following
+  tables are streamed the same way (except of headline formatting):
+
+  // table by paragraph
+  @|
+  A | B | C
+  1 | 2 | 3
+
+  // table by tag
+  \\TABLE
+  A | B | C
+  1 | 2 | 3
+  \\END_TABLE
+
+* It is now possible to close a tag made table an unusual but correct
+  way by placing the closing tag at the end of the final table row.
+  It's a tag, so this must be possible! And now it is.
+
+  \\TABLE
+  A | B | C
+  1 | 2 | 3\B<\\END_TABLE>
+
+* Tag declared tables can be \I<inlined> now, declaring a string as
+  row separator by the new option \B<\C<rowseparator>>. This means
+  that you can write
+
+  Look at this table! \B<\\TABLE{rowseparator="+++"} A | B | C +++ 1 | 2
+  | 3 \\END_TABLE> Incredible data!
+
+* Inlined tables make it easy to write a macro that is replaced by
+  a table:
+
+  +TWO_VALS:\B<\\TABLE{rowseparator="&"}
+            1st      | 2nd &
+            __val1__ | __val2__
+            \\END_TABLE>
+
+* Without an explicit setting, the row separator defaults to a newline
+  (as before).
+
+* Inlining tables enables us to \I<nest> tables. In fact, this is
+  still blocked by the parser \I<by default> but \I<can> easily be
+  permitted by setting the new parser option \B<\C<nestedTables>>
+  to a true value. The only question is how to handle nested tables
+  converting PerlPoint to languages which do \I<not> support them,
+  like SDF, and that's why it is made optional and is recommended
+  to be implemented as a \I<user> choice.
+
+  \\TABLE{rowseparator="+++"} column 1 | column 2 |
+  \B<\\TABLE{rowseparator="%%%"} n1 | n2 %%% n3 | n4 \\END_TABLE>
+  +++ xxxx | yyyy | zzzzz +++ uuuu | vvvv | wwwww \\END_TABLE
+
+
+===Variables
+
+* Converters now can \I<predeclare variables> to pass converter (call)
+  specific informations to the document. Predeclared variables can
+  be used like user assigned PerlPoint variables. To help users
+  recognize them, they are capitalized by convention.
+
+* The parser as well makes use of variable predeclaration. His
+  settings can be overwritten by converters if necessary. For converter
+  authors convenience, predeclared parser variables begin with an
+  underscore. The first implemented settings are \B<\C<\$_STARTDIR>> which
+  contains the absolute path of the startup directory where parsing
+  was initiated, as provided by Cwd::cwd(), and \B<\C<\$_PARSER_VERSION>>
+  providing the version of PerlPoint::Parser being used.
+
+* \B<\C<\\INCLUDE>> got another special option called \C<"localize">, enabling
+  document authors to declare variables to be restored when the included source
+  is processed completely. This idea was born while building documents from
+  numerous \I<partial> documents by different authors, each of them setting
+  something like \C<$documentAuthor> or \C<$authorMailAddress> by convention.
+  These settings are really helpful but should obviously be restored to their
+  original values after leaving the included source! And that's exactly what
+  this new option does. Just pass a comma separated list of the variables
+  to be "localized" (the term is borrowed from Perl, of course) or pass
+  the keyword \C<"__ALL__"> to restore the current variables \I<completely>.
+
+  \\INCLUDE{type=pp file="nested.pp" \B<localize="docAuthor, docMail">}
+
+  \\INCLUDE{type=pp file="nested.pp" \B<localize=__ALL__>}
+
+* To make variable restoration possible in backends as well, all changes are
+  propagated if \C<var2stream> is set. A new directive is introduced to flag
+  that all variables are reset (or deleted): \B<\C<DIRECTIVE_VARRESET>>.
+
+* The new variable \B<\C<\$_SOURCE_LEVEL>> reflects the sourcefile nesting
+  level. Files passed to a translator reside on level 1, this number
+  is increased with every source nesting. Let's say certain document
+  data should only be processed if the source is parsed as a top
+  level document, this can be done by checking this new variable:
+
+   ? varValue('\B<_SOURCE_LEVEL>')==1
+
+* Umlauts became valid parts of variable names. (If you are using
+  the Emacs \C<hilit19> extension provided in the \C<utilities>
+  subdirectory, please update to the adapted version.)
+
+   $München=Munich
+
+   He comes from $München.
+
+
+===Active contents
+
+* Although \B<Safe> is a great idea and gives detailed control about
+  code embedded into a PerlPoint source, it unfortunately limits code
+  execution. The greatest disadvantage is that you cannot use modules
+  in executed code, especially if they include C libraries. At least
+  I could not find out how. So, to provide both security \I<and> full
+  Perl access, I decided to implement "unlimited code execution"
+  additionally, which in fact means using \C<eval()> and \C<do()>
+  instead of \B<Safe> \I<on request>. Just pass a true non reference
+  value to option \C<safe> of method \C<run()>. It is suggested to
+  make converters that flexible that a \I<user> can decide if he wishes
+  to execute active contents on his system, and on which security level.
+  Using \C<eval()> and \C<do()> would be the lowest level from a
+  security point of view. So, we already have the convention to provide
+  options \C<-activeContents> and \C<-safeOpcode> by all converters.
+  Let's say that the opcode \B<\C<ALL>> switches to code execution by
+  \C<eval()> and \C<do()>.
+
+* Another related convention: converters should avoid using namespace
+  \C<main::> which might possibly be polluted by active contents in case
+  a user chooses "unlimited code execution". As a refuge, the namespace
+  hierarchy \C<PerlPoint::Converter::> is reserved by convention from
+  now on. A converter \C<pp2xyz> should use \C<PerlPoint::Converter::pp2xyz>.
+
+
+===Misc
+
+* installation message now contains package version;
+
+* slight internal optimizations;
+
+* Dealing with tags, tag parsing was optimized in general:
+  it is no longer necessary to guard "<" characters in a tag body.
+  (Unfortunately, this is not true yet for ">". ;-)
+
+<<EOE
+
+  # up to 0.34
+  \I<\<>
+  \B<5\<=\>10>
+
+  # with 0.34 and above
+  \I<<>
+  \B<5<=\>10>
+
+EOE
+
+* Added support for \I<hierarchical> internal links: if several headline
+  titles are identical, it is complicated to point to one of them. An
+  hierarchical link includes the "path" of the headline, which means
+  all its superlevels, separated by a pipe character.
+
+  \\SECTIONREF{name="\B<Level 1 | Level 2 | Target>"}
+  \\SECTIONREF{name="\B<Level 1 | Level 2 | Level 3 | Target>"}
+
+* Implemented first functions of a simplified condition interface
+  which is intended to allow non (Perl) programming users to learn
+  and perform common checks easily. The first function \B<\C<flagSet()>>
+  checks if a certain setting was made. Dealing with Safe was tricky again
+  (and therefore this function has no parameter check), but finally
+  there's a working version!
+
+  old:
+
+   ? exists $PerlPoint->{userSettings}{myFlag}
+
+  new:
+
+   ? \B<flagSet(>myFlag\B<)>
+
+* There's another function \B<\C<varValue()>> providing the value of
+  a passed variable, so now you can write conditions like
+
+   ? \B<varValue(>'privateVar'\B<)> eq 'confidental'
+
+* Text (and derived) paragraph stream representations no longer contain
+  a final whitespace (which was made from the final carriage return character
+  before the paragraph closing empty line). (This might be called a bugfix
+  as well, but the trailing whitespace was never noticed as a bug and caused
+  no trouble.)
+
+* new headline level offset keyword "CURRENT_LEVEL" in PP file imports;
+
+
+==pp2sdf
+
+* Adapted to all modifications mentioned above where appropriate.
+  Option \C<-allTags> is deprecated.
+
+* Predeclares variables \B<\$CONVERTER_NAME> and
+  \B<\$CONVERTER_VERSION>.
+
+* Unnecessary paragraph prefix backslashes are avoided in examples
+  and inlined HTML paragraph startups now.
+
+* Now emulates the behaviour of \C<pp2html> to implicitly make
+  a headline an anchor which can be used as a hyperlink target.
+
+* Now supports \C<pp2html> tags \C<\\A>, \C<\\L>, \C<\\PAGEREF>,
+  \C<\\SECTIONREF>, \C<\\U> and \C<\\XREF>, .
+  This support is not perfect yet for \C<\\L> and \C<\\PAGEREF>,
+  but even there a quite useful approximation which should work
+  better than the old behaviour which did in fact replace all
+  these tags by \I<nothing>.
+  This crossconverter support is as well an example how the new
+  tag definitions can be used to interchange tag syntax declarations.
+
+* pp2sdf is no longer called alpha code.
+
+
+
 =0.33
 
 ==Bugfixes
@@ -107,7 +545,7 @@
 ==Features
 
 * added a \B<vim> syntax highlighting file to the \C<utilities>
-  directory, provided by Lorenz Domke (lorenz.domke@gmx.de);
+  directory, provided by \I<Lorenz Domke> (lorenz.domke@gmx.de);
 
 * Ordered lists now provide the startup level, additionally
   to the first point which already did this if the list was
@@ -465,7 +903,7 @@ EOE
   versions in several languages by one source file, for example;
 
 * bugfix in table handling: table stream structure was wrong
-  (the bug was discovered by \I<L. Domke>);
+  (the bug was discovered by \I<Lorenz Domke> (lorenz.domke@gmx.de));
 
 
 =0.18
@@ -497,8 +935,8 @@ EOE
 * Bugfix release: if a paragraph started with a tag, paragraph
   openers (like "*", "#", "-" and so on), they were handled as
   special characters until the tag was closed, which made them
-  invalid inside the tag. Thanks to \I<L. Domke> for the bug
-  report.
+  invalid inside the tag. Thanks to \I<Lorenz Domke>
+  (lorenz.domke@gmx.de) for the bug report.
 
 * There was also a bug in tag handling which could be fixed by
   the way.
@@ -526,7 +964,7 @@ EOE
 =0.15
 
 * this is just another attempt to make the package 5.005 clean ...
-  thanks to \I<L. Domke> for his tests;
+  thanks to \I<Lorenz Domke> (lorenz.domke@gmx.de) for his tests;
 
 * added the Changelog part of 0.14 which was prepared but not
   delivered with 0.14;
@@ -579,8 +1017,8 @@ EOE
 
 =0.10
 
-* fixed various block bugs detected by \I<Lorenz Domke>:
-  verbatim block opener was supplied in stream in 0.09,
+* fixed various block bugs detected by \I<Lorenz Domke>
+  (lorenz.domke@gmx.de): verbatim block opener was supplied in stream in 0.09,
   first indentation in blocks was not supplied;
 
 
