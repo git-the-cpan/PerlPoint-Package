@@ -246,6 +246,43 @@ Including external scripts can accelerate PerlPoint authoring significantly,
 especially if the included files are still subject to changes.
 
 
+===Using input filters
+
+Included files can be preprocessed by user defined \I<input filters>, which is
+a generic way to make \I<any> file a PerlPoint source. A filter is set up by using
+the special option \C<\X<ifilter>>.
+
+  Let's say you want to process a POD source.
+  This is simple:
+
+  \\INCLUDE{file="perlpod.pod" \B<ifilter="pod2pp"> type=pp}
+
+Oh, well, we need a \C<pod2pp()> function to make this work. It could be defined
+in embedded or included Perl code above the example snippet, like this:
+
+  \\EMBED{lang=perl}
+
+  # load lib
+  use Pod::PerlPoint;
+
+  # process what we got and supply the result
+  sub pod2pp
+   {
+    my ($pod2pp, $perlpoint)=(new Pod::PerlPoint());
+    $pod2pp->output_string(\$perlpoint);
+    $pod2pp->parse_string_document(\I<@main::_ifilterText>);
+    $perlpoint;
+   }
+
+  \\END_EMBED
+
+As you can see, the source to be translated is provided in an array \C<\X<@main::_ifilterText>>.
+(A second variable \C<\X<$main::_ifilterType>> provides the target language, if required.) The
+result should be supplied as a list.
+
+Filters can be used for any file type, not only \C<pp>. Just make sure that your code supplies
+whatever is appropriate for your \C<type> option.
+
 
 ==Embedded code
 
@@ -325,6 +362,24 @@ time and include them, scan the disk and include a formatted listing, download
 data from a webserver and make it part of your presentation, autoformat complex
 data, include formatted source code, keep your presentation up to date in any
 way and so on.
+
+
+===Using input filters
+
+Embedded code can be preprocessed by a user defined \I<input filter>.  A filter
+is set up by using the special option \C<\X<ifilter>>.
+
+  Let's say you want to process a piece of POD.
+
+  \\EMBED{\B<ifilter="pod2pp"> lang=pp}
+
+Again, we need a \C<pod2pp()> function to make this work. Fortunately, as the function
+interface is the same, we can use the same filter that we defined to translate POD \I<files>
+\REF{name="Special purpose tags | File inclusion | Using input filters" type=linked}<above>.
+
+Filters can be used for any target language, not only \C<pp>. Just make sure that your code
+supplies whatever is appropriate for your \C<type> option.
+
 
 
 ==Tables by tag

@@ -4,6 +4,101 @@
 
 // -- end of "preface"
 
+=0.38
+
+This is maintenance update for paragraph filters. If you are using
+paragraph filters, it is strongly recommended to upgrade.
+
+But hopefully the new features make it worth to update for others, too ;-)
+The POD input feature, for example. Or any language you like. Read below.
+
+There are no incompatibilities between \REF{name="0.37"}<0.37> and 0.38.
+All PerlPoint sources which passed 0.37 should pass 0.38 as well. All
+converters should continue to work.
+
+
+==Bugfixes
+
+* Paragraph filters did remove guarded backslashes (\C<\\\\>) and
+  guarded ">" characters (\C<\\>>). Improved.
+
+* Paragraph filters restored the original source with bodies for
+  bodyless tags, fixed.
+
+* Paragraph filters did not reinsert all backslashes (they handled
+  the first occurence only) when restoring the original source.
+
+* Paragraph filters inserted backslashes into verbatim paragraphs
+  when restoring the original source (thanks to Lorenz for the report).
+
+* Empty headlines could cause errors and infinite parser loops.
+
+* \C<pp2sdf>: removed occasional warnings displayed without real
+  reason. Fixed a \C<splice()> usage bug.
+
+
+
+==Changes
+
+* Tags are streamed with an additional information. Both opening and closing
+  directives now provide a body hint telling a backend programmer if the tag
+  has a body or not.
+
+* The lexer makes use of precompiled patterns now, but it seems not to affect
+  the performance of parsing.
+
+* \C<\\INCLUDE>, \C<\\EMBED> and \C<\\TABLE> now support the \C<_cnd_> option,
+  like tags defined externally.
+
+* Embedded parts and included files can be preprocessed by the new "input
+  filters" - snippets of PerlPoint author defined Perl code transforming
+  the included or embedded parts before they are processed as usual. This
+  is a generic implementation of sourcefile import.
+
+  For example, it is possible to process POD sources
+  directly now. Here is a simple filter that does the job:
+
+  \\EMBED{lang=perl}
+
+  use Pod::PerlPoint 0.03;
+
+  sub pod2pp
+   {
+    my ($pod2pp, $result)=(new Pod::PerlPoint());
+    $pod2pp->output_string(\\$result);
+    $pod2pp->parse_string_document(@main::_ifilterText);
+    $result;
+   }
+
+  \\END_EMBED
+
+
+* Or try the new demo source file, \C<demo/perlpods.pp>, with your favourite
+  PerlPoint converter. (Make sure the cache is deactivated and you are using
+  \C<-active -safe ALL>. Depending on your system, this is a CPU, memory and
+  time consuming job producing over 12.000 pages when processed with perl 5.8.0.)
+
+* Demo converters \C<pp2pod>, \C<pp2pp> and \C<pp2tree> got the usual interface
+  (supporting traces etc.).
+
+* New trace switch \C<\X<TRACE_TMPFILES>> avoids removal of temporary files
+  (which are new as well - and written when on includes files via input filters).
+
+
+
+==pp2sdf
+
+* Brackets (\C<[]>) seem to have a special meaning in SDF:
+  \C<sdf> evaluates their contents by \C<eval()>, which causes
+  a lot of confusion in (Perl) example paragraphs - as a
+  workaround, all opening brackets in blocks are now written
+  as \C<\\[>.
+
+* Anchor and links names (in \C<id=> and \C<jump=> specifications)
+  are enclosed by Perls \C<q()> operator now, in the hope to
+  avoid trouble with quotes in the anchor. (But what about
+  parantheses in an anchor name now? It seems to work.)
+
 
 
 =0.37

@@ -35,11 +35,14 @@
   filtered
 
   verbatim block.
+
+  With special characters like "\" and ">".
+  All right?
 EOE
 
 
 
-||numberLines||A filtered text.
+||numberLines||A filtered text with special characters like "\\" and ">".
 
 
 

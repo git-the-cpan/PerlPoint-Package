@@ -5,7 +5,8 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
-# 0.06    |27.09.2002| JSTENZEL | switched to Test::More;
+# 0.07    |31.08.2002| JSTENZEL | adapted to extended tag streaming (body hint);
+# 0.06    |27.09.2001| JSTENZEL | switched to Test::More;
 #         |          | JSTENZEL | tests were really basic, improved;
 #         |          | JSTENZEL | adapted to shortcuts;
 #         |15.04.2002| JSTENZEL | adapted to chapter docstream hints;
@@ -203,6 +204,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'I');
  is(ref($pars), 'HASH');
  is(join(' ', sort keys %$pars), '');
 }
+is(shift(@results), 1);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'a tag');
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'I');
 {
@@ -210,6 +212,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'I');
  is(ref($pars), 'HASH');
  is(join(' ', sort keys %$pars), '');
 }
+is(shift(@results), 1);
 is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 1);
 
 is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 1, 'And another one which is so long that we need a shortcut', 'Abbreviated');

@@ -5,6 +5,7 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.08    |31.08.2002| JSTENZEL | adapted to extended tag streaming (body hint);
 # 0.07    |< 14.04.02| JSTENZEL | blocks got rid of a trailing newline;
 #         |          | JSTENZEL | added paragraph filter tests using new do() strategy;
 #         |          | JSTENZEL | adapted to headline shortcuts;
@@ -214,12 +215,14 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
  is(ref($pars), 'HASH');
  is(join(' ', sort keys %$pars), '');
 }
+is(shift(@results), 0);
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
 {
  my $pars=shift(@results);
  is(ref($pars), 'HASH');
  is(join(' ', sort keys %$pars), '');
 }
+is(shift(@results), 0);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Guarded: ');
@@ -232,24 +235,28 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
  is(ref($pars), 'HASH');
  is(join(' ', sort keys %$pars), '');
 }
+is(shift(@results), 0);
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
 {
  my $pars=shift(@results);
  is(ref($pars), 'HASH');
  is(join(' ', sort keys %$pars), '');
 }
+is(shift(@results), 0);
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TOAST');
 {
  my $pars=shift(@results);
  is(ref($pars), 'HASH');
  is(join(' ', sort keys %$pars), '');
 }
+is(shift(@results), 0);
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TOAST');
 {
  my $pars=shift(@results);
  is(ref($pars), 'HASH');
  is(join(' ', sort keys %$pars), '');
 }
+is(shift(@results), 0);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
 is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
@@ -261,6 +268,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TOAST');
  is(ref($pars), 'HASH');
  is(join(' ', sort keys %$pars), '');
 }
+is(shift(@results), 1);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'toast');
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TOAST');
 {
@@ -268,6 +276,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TOAST');
  is(ref($pars), 'HASH');
  is(join(' ', sort keys %$pars), '');
 }
+is(shift(@results), 1);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Sequence: ');
@@ -277,6 +286,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
  is(ref($pars), 'HASH');
  is(join(' ', sort keys %$pars), '');
 }
+is(shift(@results), 1);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'test');
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
 {
@@ -284,12 +294,14 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
  is(ref($pars), 'HASH');
  is(join(' ', sort keys %$pars), '');
 }
+is(shift(@results), 1);
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TOAST');
 {
  my $pars=shift(@results);
  is(ref($pars), 'HASH');
  is(join(' ', sort keys %$pars), '');
 }
+is(shift(@results), 1);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'toast');
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TOAST');
 {
@@ -297,6 +309,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TOAST');
  is(ref($pars), 'HASH');
  is(join(' ', sort keys %$pars), '');
 }
+is(shift(@results), 1);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Nested: ');
@@ -306,6 +319,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
  is(ref($pars), 'HASH');
  is(join(' ', sort keys %$pars), '');
 }
+is(shift(@results), 4);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'tested ');
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TOAST');
 {
@@ -313,6 +327,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TOAST');
  is(ref($pars), 'HASH');
  is(join(' ', sort keys %$pars), '');
 }
+is(shift(@results), 1);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'toast');
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TOAST');
 {
@@ -320,12 +335,14 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TOAST');
  is(ref($pars), 'HASH');
  is(join(' ', sort keys %$pars), '');
 }
+is(shift(@results), 1);
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
 {
  my $pars=shift(@results);
  is(ref($pars), 'HASH');
  is(join(' ', sort keys %$pars), '');
 }
+is(shift(@results), 4);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
 is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
@@ -339,6 +356,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
  is($pars->{par1}, 'p1');
  is($pars->{par2}, 'p2');
 }
+is(shift(@results), 0);
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
 {
  my $pars=shift(@results);
@@ -347,6 +365,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
  is($pars->{par1}, 'p1');
  is($pars->{par2}, 'p2');
 }
+is(shift(@results), 0);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Sequence: ');
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
@@ -356,6 +375,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
  is(join(' ', sort keys %$pars), 't');
  is($pars->{t}, 'test');
 }
+is(shift(@results), 0);
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
 {
  my $pars=shift(@results);
@@ -363,6 +383,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
  is(join(' ', sort keys %$pars), 't');
  is($pars->{t}, 'test');
 }
+is(shift(@results), 0);
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TOAST');
 {
  my $pars=shift(@results);
@@ -370,6 +391,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TOAST');
  is(join(' ', sort keys %$pars), 't');
  is($pars->{t}, 'toast');
 }
+is(shift(@results), 0);
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TOAST');
 {
  my $pars=shift(@results);
@@ -377,6 +399,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TOAST');
  is(join(' ', sort keys %$pars), 't');
  is($pars->{t}, 'toast');
 }
+is(shift(@results), 0);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
 is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
@@ -389,6 +412,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
  is(join(' ', sort keys %$pars), 't');
  is($pars->{t}, 'test');
 }
+is(shift(@results), 1);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'test');
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
 {
@@ -397,6 +421,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
  is(join(' ', sort keys %$pars), 't');
  is($pars->{t}, 'test');
 }
+is(shift(@results), 1);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Sequence: ');
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
@@ -406,6 +431,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
  is(join(' ', sort keys %$pars), 't');
  is($pars->{t}, 'test');
 }
+is(shift(@results), 1);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'test');
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
 {
@@ -414,6 +440,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
  is(join(' ', sort keys %$pars), 't');
  is($pars->{t}, 'test');
 }
+is(shift(@results), 1);
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TOAST');
 {
  my $pars=shift(@results);
@@ -421,6 +448,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TOAST');
  is(join(' ', sort keys %$pars), 't');
  is($pars->{t}, 'toast');
 }
+is(shift(@results), 1);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'toast');
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TOAST');
 {
@@ -429,6 +457,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TOAST');
  is(join(' ', sort keys %$pars), 't');
  is($pars->{t}, 'toast');
 }
+is(shift(@results), 1);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Nested: ');
@@ -439,6 +468,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
  is(join(' ', sort keys %$pars), 't');
  is($pars->{t}, 'test');
 }
+is(shift(@results), 4);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'tested ');
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TOAST');
 {
@@ -447,6 +477,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TOAST');
  is(join(' ', sort keys %$pars), 't');
  is($pars->{t}, 'toast');
 }
+is(shift(@results), 1);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'toast');
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TOAST');
 {
@@ -455,6 +486,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TOAST');
  is(join(' ', sort keys %$pars), 't');
  is($pars->{t}, 'toast');
 }
+is(shift(@results), 1);
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
 {
  my $pars=shift(@results);
@@ -462,6 +494,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
  is(join(' ', sort keys %$pars), 't');
  is($pars->{t}, 'test');
 }
+is(shift(@results), 4);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
 is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 1, 'Tag in a headline', '');
@@ -477,6 +510,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
  is(ref($pars), 'HASH');
  is(join(' ', sort keys %$pars), '');
 }
+is(shift(@results), 1);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'headline');
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
 {
@@ -484,6 +518,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
  is(ref($pars), 'HASH');
  is(join(' ', sort keys %$pars), '');
 }
+is(shift(@results), 1);
 # is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
 is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 1);
 is(shift(@results), $_) foreach (DIRECTIVE_ULIST, DIRECTIVE_START, (0) x 5);
@@ -494,6 +529,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
  is(ref($pars), 'HASH');
  is(join(' ', sort keys %$pars), '');
 }
+is(shift(@results), 1);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Tags');
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
 {
@@ -501,6 +537,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
  is(ref($pars), 'HASH');
  is(join(' ', sort keys %$pars), '');
 }
+is(shift(@results), 1);
 is(shift(@results), $_) foreach (DIRECTIVE_UPOINT, DIRECTIVE_COMPLETE);
 is(shift(@results), $_) foreach (DIRECTIVE_ULIST, DIRECTIVE_COMPLETE, (0) x 5);
 is(shift(@results), $_) foreach (DIRECTIVE_OLIST, DIRECTIVE_START, 1, (0) x 4);
@@ -511,6 +548,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TOAST');
  is(ref($pars), 'HASH');
  is(join(' ', sort keys %$pars), '');
 }
+is(shift(@results), 1);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'in');
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TOAST');
 {
@@ -518,6 +556,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TOAST');
  is(ref($pars), 'HASH');
  is(join(' ', sort keys %$pars), '');
 }
+is(shift(@results), 1);
 is(shift(@results), $_) foreach (DIRECTIVE_OPOINT, DIRECTIVE_COMPLETE);
 is(shift(@results), $_) foreach (DIRECTIVE_OLIST, DIRECTIVE_COMPLETE, 1, (0) x 4);
 is(shift(@results), $_) foreach (DIRECTIVE_DLIST, DIRECTIVE_START, (0) x 5);
@@ -530,6 +569,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'FONT');
  is(join(' ', sort keys %$pars), 'color');
  is($pars->{color}, 'blue')
 }
+is(shift(@results), 1);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'item');
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'FONT');
 {
@@ -538,6 +578,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'FONT');
  is(join(' ', sort keys %$pars), 'color');
  is($pars->{color}, 'blue')
 }
+is(shift(@results), 1);
 is(shift(@results), $_) foreach (DIRECTIVE_DPOINT_ITEM, DIRECTIVE_COMPLETE);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'list ');
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
@@ -546,6 +587,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
  is(ref($pars), 'HASH');
  is(join(' ', sort keys %$pars), '');
 }
+is(shift(@results), 5);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'po');
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TOAST');
 {
@@ -553,6 +595,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TOAST');
  is(ref($pars), 'HASH');
  is(join(' ', sort keys %$pars), '');
 }
+is(shift(@results), 1);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'i');
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TOAST');
 {
@@ -560,6 +603,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TOAST');
  is(ref($pars), 'HASH');
  is(join(' ', sort keys %$pars), '');
 }
+is(shift(@results), 1);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'nts');
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
 {
@@ -567,6 +611,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
  is(ref($pars), 'HASH');
  is(join(' ', sort keys %$pars), '');
 }
+is(shift(@results), 5);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
 is(shift(@results), $_) foreach (DIRECTIVE_DPOINT, DIRECTIVE_COMPLETE);
 is(shift(@results), $_) foreach (DIRECTIVE_DLIST, DIRECTIVE_COMPLETE, (0) x 5);
@@ -582,6 +627,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
  is(ref($pars), 'HASH');
  is(join(' ', sort keys %$pars), '');
 }
+is(shift(@results), 1);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'block');
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
 {
@@ -589,6 +635,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
  is(ref($pars), 'HASH');
  is(join(' ', sort keys %$pars), '');
 }
+is(shift(@results), 1);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
 is(shift(@results), $_) foreach (DIRECTIVE_BLOCK, DIRECTIVE_COMPLETE);
 is(shift(@results), $_) foreach (DIRECTIVE_VERBATIM, DIRECTIVE_START);
@@ -609,6 +656,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
  is($pars->{addr}, 'http://www.perl.com');
  is($pars->{t}, 'test');
 }
+is(shift(@results), 1);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'test');
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
 {
@@ -618,6 +666,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
  is($pars->{addr}, 'http://www.perl.com');
  is($pars->{t}, 'test');
 }
+is(shift(@results), 1);
 is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 
 # perform checks: text

@@ -1,4 +1,13 @@
 
+# = HISTORY SECTION =====================================================================
+
+# ---------------------------------------------------------------------------------------
+# version | date     | author   | changes
+# ---------------------------------------------------------------------------------------
+# 0.02    |04.12.2002| JSTENZEL | adapted to improved special character handling;
+# ---------------------------------------------------------------------------------------
+
+
 # Paragraph filter tests.
 # -----------------------
 
@@ -62,12 +71,17 @@ is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "  02:\n");
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "  03: filtered\n");
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "  04:\n");
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "  05: verbatim block.\n");
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "  06:\n");
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "  07: With special characters like \"\\\" and \">\".\n");
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "  08: All right?\n");
 is(shift(@results), $_) foreach (DIRECTIVE_VERBATIM, DIRECTIVE_COMPLETE);
 
 # text
 is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '01');
-is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ': A filtered text.');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ': A filtered text with special characters like "');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '\\" and "');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '>".');
 is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 
 # list
@@ -114,6 +128,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'I');
  is(ref($pars), 'HASH');
  is(join(' ', sort keys %$pars), '');
 }
+is(shift(@results), 1);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'This should work!');
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'I');
 {
@@ -121,6 +136,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'I');
  is(ref($pars), 'HASH');
  is(join(' ', sort keys %$pars), '');
 }
+is(shift(@results), 1);
 is(shift(@results), $_) foreach (DIRECTIVE_BLOCK, DIRECTIVE_COMPLETE);
 
 # unfiltered text
@@ -131,6 +147,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'B');
  is(ref($pars), 'HASH');
  is(join(' ', sort keys %$pars), '');
 }
+is(shift(@results), 1);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'A Tag');
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'B');
 {
@@ -138,6 +155,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'B');
  is(ref($pars), 'HASH');
  is(join(' ', sort keys %$pars), '');
 }
+is(shift(@results), 1);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'starts the successor paragraph (should cause no trouble).');
 is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
@@ -172,6 +190,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'B');
  is(ref($pars), 'HASH');
  is(join(' ', sort keys %$pars), '');
 }
+is(shift(@results), 1);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'A Tag');
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'B');
 {
@@ -179,6 +198,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'B');
  is(ref($pars), 'HASH');
  is(join(' ', sort keys %$pars), '');
 }
+is(shift(@results), 1);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'starts the successor paragraph (should cause no trouble).');
 is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);

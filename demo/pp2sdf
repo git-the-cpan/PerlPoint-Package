@@ -5,6 +5,19 @@
 # ---------------------------------------------------------------------------------------
 # version | date   | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.11    |30.08.02| JSTENZEL | brackets ("[]") seem to have a special meaning in SDF:
+#         |        |          | sdf evaluates their contents by eval(), which causes
+#         |        |          | a lot of confusion in (Perl) example paragraphs - as a
+#         |        |          | workaround, all opening brackets in blocks are now
+#         |        |          | written as "\[";
+#         |        | JSTENZEL | anchor and links names (in "id=" and "jump=" specifications)
+#         |        |          | are enclosed by Perls q() operator now, in the hope to
+#         |        |          | avoid trouble with quotes in the anchor (but what about
+#         |        |          | parantheses in an anchor name now - they seem to work;
+#         |15.12.02| JSTENZEL | bugfix in handleHeadline: splice() could be called without
+#         |        |          | need (and cause warnings then);
+#         |02.01.03| JSTENZEL | more common trace option translation;
+#         |        | JSTENZEL | added TRACE_TMPFILES recognition;
 # 0.10    |up to   | JSTENZEL | bugfix: \SEQ did not set an anchor when necessary;
 #         |14.04.02| JSTENZEL | avoiding backslash prefixing of paragraphs starting
 #         |        |          | with SDF tags unspecified yet: resulting from PerlPoint
@@ -89,7 +102,7 @@ B<pp2sdf> - translates PerlPoint to SDF
 
 =head1 VERSION
 
-This manual describes version B<0.10>.
+This manual describes version B<0.11>.
 
 =head1 DESCRIPTION
 
@@ -393,8 +406,9 @@ Makes the body a named anchor.
 
  Example:
 
-  \A{name="an anchor"}<text> becomes "{{N[id="an anchor"]text}}".
+  \A{name="an anchor"}<text> becomes "{{N[id=q(an anchor)]text}}".
 
+Using C<q()> avoids sdf trouble caused by quotes in an anchor.
 
 =item L
 
@@ -403,8 +417,9 @@ Any other options besides C<url> are ignored.
 
  Example:
 
-  \L{url=link}<Look there!> becomes "{{CMD[jump="link"]Look there!}}".
+  \L{url=link}<Look there!> becomes "{{CMD[jump=q(link)]Look there!}}".
 
+Using C<q()> avoids sdf trouble caused by quotes in the link.
 
 =item PAGEREF
 
@@ -413,10 +428,12 @@ This text is made a hyperlink to the referenced chapter.
 
  Example:
 
-  \PAGEREF{name=chapter} becomes "{{CMD[jump="#chapter"]chapter".
+  \PAGEREF{name=chapter} becomes "{{CMD[jump=q(#chapter)]chapter".
 
 B<pp2sdf> currently does not replace the title by chapter numbers as usually intended
 by a page reference. This might be improved by later versions.
+
+Using C<q()> avoids sdf trouble caused by quotes in the link.
 
 
 =item SECTIONREF
@@ -426,7 +443,9 @@ This text is made a hyperlink to the referenced chapter.
 
  Example:
 
-  \SECTIONREF{name=chapter} becomes "{{CMD[jump="#chapter"]chapter".
+  \SECTIONREF{name=chapter} becomes "{{CMD[jump=q(#chapter)]chapter".
+
+Using C<q()> avoids sdf trouble caused by quotes in the link.
 
 
 =item XREF
@@ -440,7 +459,9 @@ The tag body is made a hyperlink to an internal target, usually declared by an \
 
 is translated into
 
- "Do not miss {{CMD[jump="#chapter"]this".
+ "Do not miss {{CMD[jump=q(#chapter)]this".
+
+Using C<q()> avoids sdf trouble caused by quotes in the link.
 
 
 =item U
@@ -546,7 +567,7 @@ Each headline is implicitly made an anchor named like the headline itself. For e
 
 is converted into
 
- H1[id="Headline level 1"]Headline level 1
+ H1[id=q(Headline level 1)]Headline level 1
 
 , making it easy to set links to certain headlines which is usually done by using the
 C<PAGEREF>, C<SECTIONREF> and C<XREF> tags.
@@ -705,7 +726,7 @@ distribution for more details.
 package PerlPoint::Converter::pp2sdf;
 
 # declare version
-$VERSION=$VERSION=0.10;
+$VERSION=$VERSION=0.11;
 
 # pragmata
 use strict;
@@ -863,11 +884,12 @@ $parser->run(
                                 + (exists $options{noinfo} ? DISPLAY_NOINFO : 0)
                                 + (exists $options{nowarn} ? DISPLAY_NOWARN : 0),
              trace           =>   TRACE_NOTHING
-                                + ((exists $options{trace} and $options{trace} &  1) ? TRACE_PARAGRAPHS : 0)
-                                + ((exists $options{trace} and $options{trace} &  2) ? TRACE_LEXER      : 0)
-                                + ((exists $options{trace} and $options{trace} &  4) ? TRACE_PARSER     : 0)
-                                + ((exists $options{trace} and $options{trace} &  8) ? TRACE_SEMANTIC   : 0)
-                                + ((exists $options{trace} and $options{trace} & 16) ? TRACE_ACTIVE     : 0),
+                                + ((exists $options{trace} and $options{trace} & TRACE_PARAGRAPHS) ? TRACE_PARAGRAPHS : 0)
+                                + ((exists $options{trace} and $options{trace} & TRACE_LEXER)      ? TRACE_LEXER      : 0)
+                                + ((exists $options{trace} and $options{trace} & TRACE_PARSER)     ? TRACE_PARSER     : 0)
+                                + ((exists $options{trace} and $options{trace} & TRACE_SEMANTIC)   ? TRACE_SEMANTIC   : 0)
+                                + ((exists $options{trace} and $options{trace} & TRACE_ACTIVE)     ? TRACE_ACTIVE     : 0)
+                                + ((exists $options{trace} and $options{trace} & TRACE_TMPFILES)   ? TRACE_TMPFILES   : 0),
             ) or exit(1);
 
 
@@ -974,6 +996,10 @@ sub handleSimple
 		 # complete block lines as necessary
 		 if ($flags{block})
 		   {
+                    # brackets seem to have a special meaning in SDF,
+                    # (sdf evaluates their contents via eval()), so guard them
+                    s/\[/\\[/g;
+
 		    if (@openTags)
 		      {
 		       # reopen automatically closed tags, if any
@@ -1038,7 +1064,7 @@ sub handleHeadline
   if ($mode==DIRECTIVE_START)
     {
      # open headline
-     present(qq(H$level\[id="));
+     present("H$level\[id=q(");
 
      # mark that we process a headline now
      $flags{headlineString}='';
@@ -1048,13 +1074,14 @@ sub handleHeadline
     {
      # update headline path and numbers
      $headlinePath[$level]=$flags{headlineString};
-     splice(@headlineNumbers, $level+1); $headlineNumbers[$level]++;
+     splice(@headlineNumbers, $level+1) if $level<$#headlineNumbers;
+     $headlineNumbers[$level]++;
 
      # complete headline, including an additional composite anchor
      present(
-             qq("]{{N[id="),
+             ")]{{N[id=q(",
              join('|', map {defined($_) ? $_ : ''} @headlinePath[1..$level]),
-             qq("]$flags{headlineString}}}\n\n)
+             ")]$flags{headlineString}}}\n\n",
             );
 
      # reset flags
@@ -1230,7 +1257,7 @@ sub handleTag
        {
 	my $target=$settings->{name};
 	$target=~s/\s*\|\s*/\|/g;
-	present("{{CMD[jump=\"#$target\"]", (reverse split(/\|/, $target))[0], "}}");
+	present("{{CMD[jump=q(#$target)]", (reverse split(/\|/, $target))[0], "}}");
        }
 
      # ok, well done
@@ -1243,7 +1270,7 @@ sub handleTag
        {
 	my $target=$settings->{name};
 	$target=~s/\s*\|\s*/\|/g;
-	present("{{CMD[jump=\"#$target\"]");
+	present("{{CMD[jump=q(#$target)]");
        }
      else
        {present("}}");}
@@ -1272,7 +1299,7 @@ sub handleTag
            # Yes, there is a body. This is equal to XREF. Act mode dependend.
            if ($mode==DIRECTIVE_START)
              {
-              present("{{CMD[jump=\"#$target\"]");
+              present("{{CMD[jump=q(#$target)]");
              }
            else
              {present("}}");}
@@ -1280,7 +1307,7 @@ sub handleTag
         else
           {
            # No body: this means the referenced value becomes the linked text.
-           present("{{CMD[jump=\"#$target\"]$settings->{__value__}}}") if $mode==DIRECTIVE_START;
+           present("{{CMD[jump=q(#$target)]$settings->{__value__}}}") if $mode==DIRECTIVE_START;
           }
        }
      else
@@ -1292,7 +1319,7 @@ sub handleTag
   elsif ($tag eq 'A')
     {
      # act mode dependend
-     present(qq({{N[id="$settings->{name}"])) if $mode==DIRECTIVE_START;
+     present(qq({{N[id=q($settings->{name})])) if $mode==DIRECTIVE_START;
      present("}}") if $mode==DIRECTIVE_COMPLETE;
 
      # ok, well done
@@ -1301,7 +1328,7 @@ sub handleTag
   elsif ($tag eq 'L')
     {
      # act mode dependend (we only need to add a "suffix" to the body)
-     present("{{CMD[jump=\"$settings->{url}\"]") if $mode==DIRECTIVE_START;
+     present("{{CMD[jump=q($settings->{url})]") if $mode==DIRECTIVE_START;
      present("}}") if $mode==DIRECTIVE_COMPLETE;
 #     present(" ({{URL:$settings->{url}}})") if $mode==DIRECTIVE_COMPLETE;
 
@@ -1339,7 +1366,13 @@ sub handleTag
                       $localHeadlinePath[$level]=$title;
 
                       # supply the path of the upcoming chapter
-                      join('', qq({{CMD[jump="#), join('|', map {defined($_) ? $_ : ''} @localHeadlinePath[1..$level]), qq("]$title}}));
+                      join('',
+                           "{{CMD[jump=q(#",
+                           join('|',
+                                map {defined($_) ? $_ : ''} @localHeadlinePath[1..$level],
+                               ),
+                           ")]$title}}",
+                          );
                      }
              }
 
@@ -1387,7 +1420,7 @@ sub handleTag
      # act mode dependend (all we have to do is to present a number
      # and to optionally set an anchor)
      present(
-             exists $settings->{name} ? qq({{N[id="$settings->{name}"]) : '',
+             exists $settings->{name} ? qq({{N[id=q($settings->{name})]) : '',
              $settings->{__nr__},
              exists $settings->{name} ? q(}}) : '',
             ) if $mode==DIRECTIVE_START;

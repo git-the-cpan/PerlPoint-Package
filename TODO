@@ -4,13 +4,62 @@
 These are just \I<ideas>. Possibly not everything in this list
 will be implemented, and probably these notes do not describe
 all features which might be on the way ;-). Further ideas are welcome.
+
 If you you like an idea especially, please let us now to accelerate
-implementation if possible.
+implementation if possible. If you like it so much that you want to
+implement it yourself, this might be possible - please contact us.
 
 
 =General
 
 * add a tutorial to PerlPoint
+
+* Bodyless macro call before a new chapter inserts an additional headline (delayed "=")
+  when the macro opens an included file and produces additional paragraphs.
+
+* add tests for the \C<_cnd>_ option (both for generic tags declared by modules and the builtin
+  ones like \C<\\INCLUDE>, \C<\\EMBED> and \C<\\TABLE>)
+
+* Add a pod2pp. It seems that a good way to do so is to copy the way \C<Pod::Text> works
+  to write a \C<Pod::PerlPoint>, which could provide a \C<pod2perlpoint()> function. After
+  doing so we'll be able to use that function both for a standalone translator (that
+  just makes use of the function) and filters that could translate POD snippets right
+  into PerlPoint (see the "Include file filters" section below).
+
+* publish a collection of example macros
+
+* publish a collection of example filters
+
+* publish a collection of example code
+
+* improve the SourceForge project homepage, include areas for user provides macros, filters,
+  code, examples etc.
+
+
+=Include file filters
+
+* add a "filtered" type to \C<\\INCLUDE>, to transform other formats on the fly
+  - for example, there could be a filter making POD files available directly
+
+  \\INCLUDE{type="filtered:pod2pp" ...}
+
+* the specified filter name would be the name of a function declared in an
+  \C<\\EMBED> section
+
+* the result is treated as PerlPoint
+
+* if active contents is disabled, such paragraphs would be skipped
+
+* like any other types of included files, filtered files need to be enabled by
+  the -filter option
+
+  pp2... -filter 'filtered:pod2pp'
+
+* this would be a flexible, cool and transparent way to embed existing files in other formats
+
+* it is already possible today by writing a macro that invokes Perl code to load and transform
+  a file, but providing it as a feature of \C<\\INCLUDE> makes usage more transparent and would
+  allow to combine it with other features of include like \C<headlinebase>
 
 
 =List shifting

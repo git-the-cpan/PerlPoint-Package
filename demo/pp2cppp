@@ -5,6 +5,8 @@
 # ---------------------------------------------------------------------------------------
 # version | date   | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.03    |02.01.03| JSTENZEL | more common trace options translation;
+#         |        | JSTENZEL | added TRACE_TMPFILES recognition;
 # 0.02    |16.08.01| JSTENZEL | fixed call of <parser>->run() by adapting it to new tag
 #         |        |          | declarations finally (but the bug caused no error);
 # 0.01    |16.06.01| JSTENZEL | derived from my pp2sdf.
@@ -18,7 +20,7 @@ B<pp2cppp> - translates PerlPoint to Clinton Pierce's Perl Projector
 
 =head1 VERSION
 
-This manual describes version B<0.02>.
+This manual describes version B<0.03>.
 
 =head1 DESCRIPTION
 
@@ -363,7 +365,7 @@ distribution for more details.
 package PerlPoint::Converter::pp2cppp;
 
 # declare version
-$VERSION=$VERSION=0.02;
+$VERSION=$VERSION=0.03;
 
 # pragmata
 use strict;
@@ -490,11 +492,12 @@ $parser->run(
                                 + (exists $options{noinfo} ? DISPLAY_NOINFO : 0)
                                 + (exists $options{nowarn} ? DISPLAY_NOWARN : 0),
              trace           =>   TRACE_NOTHING
-                                + ((exists $options{trace} and $options{trace} &  1) ? TRACE_PARAGRAPHS : 0)
-                                + ((exists $options{trace} and $options{trace} &  2) ? TRACE_LEXER      : 0)
-                                + ((exists $options{trace} and $options{trace} &  4) ? TRACE_PARSER     : 0)
-                                + ((exists $options{trace} and $options{trace} &  8) ? TRACE_SEMANTIC   : 0)
-                                + ((exists $options{trace} and $options{trace} & 16) ? TRACE_ACTIVE     : 0),
+                                + ((exists $options{trace} and $options{trace} & TRACE_PARAGRAPHS) ? TRACE_PARAGRAPHS : 0)
+                                + ((exists $options{trace} and $options{trace} & TRACE_LEXER)      ? TRACE_LEXER      : 0)
+                                + ((exists $options{trace} and $options{trace} & TRACE_PARSER)     ? TRACE_PARSER     : 0)
+                                + ((exists $options{trace} and $options{trace} & TRACE_SEMANTIC)   ? TRACE_SEMANTIC   : 0)
+                                + ((exists $options{trace} and $options{trace} & TRACE_ACTIVE)     ? TRACE_ACTIVE     : 0)
+                                + ((exists $options{trace} and $options{trace} & TRACE_TMPFILES)   ? TRACE_TMPFILES   : 0),
             ) or exit(1);
 
 # build a backend

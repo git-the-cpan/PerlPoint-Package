@@ -3,7 +3,7 @@
 #
 # This file is part of the "PerlPoint::Package" module package.
 # PerlPoint::Package is free software, you can redistribute it
-# and/or modify it under the same terms as Perl itself.
+# and/or modify it under the terms of the Artistic License.
 
 # load module
 use ExtUtils::MakeMaker;
@@ -11,7 +11,7 @@ use ExtUtils::MakeMaker;
 # the package requires modern perl
 require 5.00503;
 
-my $version='0.37';
+my $version='0.38';
 
 # write makefile
 $ok=WriteMakefile(
@@ -21,6 +21,7 @@ $ok=WriteMakefile(
                   PREREQ_PM    => {
 		                   Digest::SHA1      => 1,
                                    File::Spec        => 0.8,
+                                   File::Temp        => 0.12,
                                    IO::File          => 1,
                                    Storable          => 1,
                                    Test::Harness     => 1.25,

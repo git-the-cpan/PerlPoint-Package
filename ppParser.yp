@@ -14,6 +14,26 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.38    |07.06.2002| JSTENZEL | restoring doubled backslashes in filtered paragraphs,
+#         |          |          | restoring ">" characters as if they were guarded;
+#         |04.07.2002| JSTENZEL | simplified several array field access codes;
+#         |          | JSTENZEL | bugfix: empty headlines caused an infinite loop
+#         |          |          | when trailing whitespaces should be removed;
+#         |          | JSTENZEL | bugfix: empty headlines caused a failure when headline
+#         |          |          | anchors should be stored, skipping them now;
+#         |20.08.2002| JSTENZEL | improved tag streaming: stream now contains a body hint;
+#         |          | JSTENZEL | bugfix: paragraph filters restored tag bodies even if
+#         |          |          | there was no body;
+#         |          | JSTENZEL | old caches need to be updated - adapted compatibility hint;
+#         |27.08.2002| JSTENZEL | started to use precompiled lexer patterns;
+#         |31.08.2002| JSTENZEL | \INCLUDE, \EMBED and \TABLE now support the _cnd_ option,
+#         |          |          | like tags defined externally;
+#         |04.12.2002| JSTENZEL | bugfix in pfilter retranslation: backslash reinsertion was
+#         |          |          | not performed multiply;
+#         |          | JSTENZEL | pfilter retranslation: backslash reinsertion now suppressed
+#         |          |          | in verbatim blocks;
+#         |01.01.2003| JSTENZEL | added input filter support to \EMBED, via option "ifilter";
+#         |02.01.2003| JSTENZEL | added input filter support to \INCLUDE, same interface;
 # 0.37    |up to     | JSTENZEL | flagSet() now takes a list of flag names;
 #         |14.04.2002| JSTENZEL | names of included files are resolved to avoid trouble
 #         |          |          | with links (and to avoid error messages);
@@ -435,7 +455,7 @@ B<PerlPoint::Parser> - a PerlPoint Parser
 
 =head1 VERSION
 
-This manual describes version B<0.37>.
+This manual describes version B<0.38>.
 
 =head1 SYNOPSIS
 
@@ -1062,13 +1082,29 @@ already assigned values. Option "localize" works like Perls C<local()>:
 such changes will be reversed after the nested source will have been
 processed completely, so the original values will be restored. You can
 specify a comma separated list of variable names or the special string
-"__ALL__" which flags that I<all> current settings shall be restored.
+C<__ALL__> which flags that I<all> current settings shall be restored.
 
  \INCLUDE{type=PP file="nested.pp" localize=myVar}
 
  \INCLUDE{type=PP file="nested.pp" localize="var1, var2, var3"}
 
  \INCLUDE{type=PP file="nested.pp" localize=__ALL__}
+
+
+PerlPoint authors can declare an I<input filter> to preprocess the
+included file. This is done via option I<ifilter>:
+
+  \INCLUDE{type=pp file="source.pod" ifilter="pod2pp()"}
+  
+An input filter is a snippet of user defined Perl code, taking the
+included file via C<@main::_ifilterText> and the target type via
+C<$main::_ifilterType>. It should supply its result as an array
+of strings which will then be processed instead of the original file.
+
+Input filters are Active Content. If Active Content is disabled,
+\INCLUDE tags using input filters will be ignored I<completely>.
+
+
 
 A PerlPoint file can be included wherever a tag is allowed, but sometimes
 it has to be arranged slightly: if you place the inclusion directive at
@@ -1141,14 +1177,33 @@ directly in a text like this:
   These \EMBED{lang=HTML}<i>italics</i>\END_EMBED
   are formatted by HTML code.
 
-Please note that the EMBED tag does not accept a tag body to avoid
-ambiguities.
+Please note that the EMBED tag does not accept a tag body (to avoid
+ambiguities).
 
 Both tag and embedded text are made part of the intermediate stream.
 It is the backends task to deal with it. The only exception of this rule
 is the embedding of I<Perl> code, which is evaluated by the parser.
 The reply of this code is made part of the input stream and parsed as
 usual.
+
+PerlPoint authors can declare an I<input filter> to preprocess the
+embedded text. This is done via option I<ifilter>:
+
+  \EMBED{lang=pp ifilter="pod2pp()"}
+  
+  =head1 POD formatted part
+
+  This part was written in POD.
+
+  \END_EMBED
+
+An input filter is a snippet of user defined Perl code, taking the
+embedded text via C<@main::_ifilterText> and the target language via
+C<$main::_ifilterType>. It should supply its result as an array of
+strings which will then be processed as usual.
+
+Input filters are Active Contents. If Active Contents is disabled,
+embedded parts using input filters will be ignored I<completely>.
 
 It is possible to filter the languages you wish to embed (with exception
 of "PP"), see below for details.
@@ -1344,7 +1399,7 @@ B<Example:>
  require 5.00503;
 
  # declare module version
- $PerlPoint::Parser::VERSION=0.37;
+ $PerlPoint::Parser::VERSION=0.38;
  $PerlPoint::Parser::VERSION=$PerlPoint::Parser::VERSION; # to suppress a warning of exclusive usage only;
 
  # pragmata
@@ -1355,6 +1410,7 @@ B<Example:>
  use IO::File;
  use File::Basename;
  use File::Spec::Functions;
+ use File::Temp qw(tempfile);
  use PerlPoint::Anchors 0.02;
  use PerlPoint::Backend 0.10;
  use Cwd qw(:DEFAULT abs_path);
@@ -1418,7 +1474,24 @@ B<Example:>
  $readCompletely=0;
 
  # prepare a common pattern
- my $patternWUmlauts=qr([\w‰ˆ¸ƒ÷‹ﬂ]+);
+ my $patternWUmlauts=qr/[\w‰ˆ¸ƒ÷‹ﬂ]+/;
+
+ # prepare lexer patterns
+ my $patternNlbBackslash=qr/(?<!\\)/;
+ my %lexerPatterns=(
+                    tag              => qr/$patternNlbBackslash\\([A-Z_0-9]+)/,
+                    space            => qr/(\s+)/,
+                    pfilterDelimiter => qr/$patternNlbBackslash((\|){1,2})/,
+                    table            => qr/$patternNlbBackslash\\(TABLE)/,
+                    endTable         => qr/$patternNlbBackslash\\(END_TABLE)/,
+                    embed            => qr/$patternNlbBackslash\\(EMBED)/,
+                    endEmbed         => qr/$patternNlbBackslash\\(END_EMBED)/,
+                    include          => qr/$patternNlbBackslash\\(INCLUDE)/,
+                    nonWhitespace    => qr/$patternNlbBackslash(\S)/,
+                    colon            => qr/$patternNlbBackslash(:)/,
+                    namedVar         => qr/$patternNlbBackslash\$($patternWUmlauts)/,
+                    symVar           => qr/$patternNlbBackslash\${($patternWUmlauts)}/,
+                   );
 
  # declare paragraphs which are embedded
  my %embeddedParagraphs;
@@ -1605,7 +1678,7 @@ built_paragraph : optional_paragraph_filter
 
                       # Disable storage of a checksum. (A filter can make the paragraph depending
                       # on something outside the paragraph - the paragraph becomes dynamic.)
-                      $flags{checksummed}=0 if $_[1];
+                      $flags{checksummed}=0;
                      }
                    }
                   original_paragraph
@@ -1732,7 +1805,7 @@ headline : headline_level
              warn "[Trace] $sourceFile, line $_[5][1]: Headline completed.\n" if $flags{trace} & TRACE_PARAGRAPHS;
 
              # remove trailing whitespaces (the final one represents the final newline)
-             pop(@{$_[3][0]}) while $_[3][0][$#{$_[3][0]}]=~/^\s*$/;
+             pop(@{$_[3][0]}) while @{$_[3][0]} and $_[3][0][-1]=~/^\s*$/;
 
              # abbreviation declared?
              if ($_[4][0])
@@ -2009,7 +2082,7 @@ opoint : opoint_opener
            splice(@{$_[3][0]}, 1, 1) while not ref($_[3][0][1]) and $_[3][0][1]=~/^\s*$/;
 
            # reply data (they are already well prepared except that they are marked as text)
-           $_[3][0][0][STREAM_DIR_TYPE]=$_[3][0][$#{$_[3][0]}][STREAM_DIR_TYPE]=&DIRECTIVE_OPOINT;
+           $_[3][0][0][STREAM_DIR_TYPE]=$_[3][0][-1][STREAM_DIR_TYPE]=&DIRECTIVE_OPOINT;
 
            # update list level hints as necessary
            $olistLevels[0]=(($flags{olist} or $_[1][0]) and @olistLevels) ? $olistLevels[0]+1 : 1;
@@ -2018,7 +2091,7 @@ opoint : opoint_opener
 	   if ($_[1][0] and not $flags{olist} and $olistLevels[0]>1)
 	     {
 	      push(@{$_[3][0][0]}, $olistLevels[0]);
-	      push(@{$_[3][0][$#{$_[3][0]}]}, $olistLevels[0]);
+	      push(@{$_[3][0][-1]}, $olistLevels[0]);
 	     }
 
            # update ordered list flag
@@ -2076,10 +2149,10 @@ upoint : '*'
            splice(@{$_[3][0]}, 1, 1) while not ref($_[3][0][1]) and $_[3][0][1]=~/^\s*$/;
 
            # remove trailing whitespaces from point text (it represents the final newline character)
-           splice(@{$_[3][0]}, -2, 1) while not ref($_[3][0][$#{$_[3][0]}-1]) and $_[3][0][$#{$_[3][0]}-1]=~/^\s*$/;
+           splice(@{$_[3][0]}, -2, 1) while not ref($_[3][0][-2]) and $_[3][0][-2]=~/^\s*$/;
 
            # reply data (they are already well prepared except that they are marked as text)
-           $_[3][0][0][STREAM_DIR_TYPE]=$_[3][0][$#{$_[3][0]}][STREAM_DIR_TYPE]=&DIRECTIVE_UPOINT;
+           $_[3][0][0][STREAM_DIR_TYPE]=$_[3][0][-1][STREAM_DIR_TYPE]=&DIRECTIVE_UPOINT;
 
 	   # update checksums, if possible
            $flags{checksummed}=0 unless $flags{virtualParagraphStart};
@@ -2110,7 +2183,7 @@ dpoint : dlist_opener
            # reply data (they are already well prepared except that they are marked as text, and that the definition item stream needs to be added)
            my ($hints1, $hints2)=({nr=>++$directiveCounter}, {nr=>++$directiveCounter});
            $_[3][0][0]=[$hints1, DIRECTIVE_DPOINT, DIRECTIVE_START];
-           $_[3][0][$#{$_[3][0]}]=[$hints1, DIRECTIVE_DPOINT, DIRECTIVE_COMPLETE];
+           $_[3][0][-1]=[$hints1, DIRECTIVE_DPOINT, DIRECTIVE_COMPLETE];
 
            # insert the definition item stream
            splice(@{$_[3][0]}, 1, 0,
@@ -2809,32 +2882,9 @@ tag : Tag_name
         # Tag condition set?
         if (exists $pars{_cnd_})
          {
-          # scopy
-          my $result;
-
-          #  Does the caller want to evaluate the code?
-          if ($safeObject)
-            {
-             # update active contents base data, if necessary
-             if ($flags{activeBaseData})
-              {
-               no strict 'refs';
-               ${join('::', ref($safeObject) ? $safeObject->root : 'main', 'PerlPoint')}=dclone($flags{activeBaseData});
-              }
-
-             # make the code a string and evaluate it
-             warn "[Trace] $sourceFile, line $_[5][1]: Evaluating this code:\n\n$pars{_cnd_}\n\n\n" if $flags{trace} & TRACE_ACTIVE;
-
-             # invoke perl to compute the result
-             $result=ref($safeObject) ? $safeObject->reval($pars{_cnd_}) : eval(join(' ', '{package main; no strict;', $pars{_cnd_}, '}'));
-
-             # check result
-             warn "[Error ", ++$semErr, "] $sourceFile, line $_[5][1]: tag condition could not be evaluated: $@.\n" if $@;
-            }
-
           # ok, if the condition was true or could not be evaluated, return just the body
           # (so that the tag or macro is ignored)
-          unless ($safeObject and not $@ and $result)
+          unless (_evalTagCondition($pars{_cnd_}, $sourceFile, $_[5][1]))
            {return([[@{$_[5][0]} ? @{$_[5][0]} : ()], $_[5][1]]);}
           else
            {
@@ -2939,11 +2989,11 @@ tag : Tag_name
              [
               [
                # opener directive
-               [\%hints, DIRECTIVE_TAG, DIRECTIVE_START, $_[1][0], \%pars],
+               [\%hints, DIRECTIVE_TAG, DIRECTIVE_START, $_[1][0], \%pars, scalar(@{$_[5][0]})],
                # the list of enclosed literals, if any
                @{$_[5][0]} ? @{$_[5][0]} : (),
                # final directive
-               [\%hints, DIRECTIVE_TAG, DIRECTIVE_COMPLETE, $_[1][0], \%pars]
+               [\%hints, DIRECTIVE_TAG, DIRECTIVE_COMPLETE, $_[1][0], \%pars, scalar(@{$_[5][0]})]
               ],
               $_[5][1]
              ];
@@ -2985,13 +3035,15 @@ tag : Tag_name
              }
 
            # Bodyless macros need special care - the parser already got the subsequent token to
-           # recognize that the macro was complete. Now, the macro replacement is reinserted into the stream
-           # where it will be read by the next lexer operation which is enforced when the parser needs a token
-           # again - and this will happen after processing the already receicved token which stood behind the
-           # bodyless macro. Letting the parser process the read token this way, this token would be streamed
-           # (in most cases) *before* the macro replacement, while it was intented to come after it. So, if we
-           # detect this case, we move this token *behind* the macro replacement. As for the parser, we replace
-           # this token by something streamed to "nothing", currently an empty string declared as "Word" token.
+           # recognize that the macro was complete. Now, the macro replacement is reinserted into
+           # the stream where it will be read by the next lexer operation which is enforced when
+           # the parser needs a token again - and this will happen after processing the already
+           # received token which stood behind the bodyless macro. Letting the parser process the
+           # read token this way, this token would be streamed (in most cases) *before* the macro
+           # replacement, while it was intented to come after it. So, if we detect this case, we
+           # move this token *behind* the macro replacement. As for the parser, we replace
+           # this token by something streamed to "nothing", currently an empty string declared
+           # as "Word" token.
            my $delayedToken;
            unless (@{$_[5][0]})
              {
@@ -3169,6 +3221,20 @@ table : Table
              # the list already consists of key/value pairs
              %pars=@{$_[3][0]}
             }
+
+          # Tag condition set?
+          if (exists $pars{_cnd_})
+           {
+            # ok, if the condition was true or could not be evaluated,
+            # stop processing of this tag (there is no body, so return an empty stream)
+            unless (_evalTagCondition($pars{_cnd_}, $sourceFile, $_[6][1]))
+             {return([[()], $_[6][1]]);}
+            else
+             {
+              # strip off this special option before the tag or macro is furtherly processed
+              delete $pars{_cnd_};
+             }
+           }
 
           # add row separator information unless it was defined by the user itself
           $pars{rowseparator}='\n' unless exists $pars{rowseparator};
@@ -3358,8 +3424,82 @@ embedded : Embed
                 %pars=@{$_[3][0]}
                }
 
+             # Tag condition set?
+             if (exists $pars{_cnd_})
+              {
+               # ok, if the condition was true or could not be evaluated,
+               # stop processing of this tag (there is no body, so return an empty stream)
+               unless (_evalTagCondition($pars{_cnd_}, $sourceFile, $_[6][1]))
+                {return([[()], $_[6][1]]);}
+               else
+                {
+                 # strip off this special option before the tag or macro is furtherly processed
+                 delete $pars{_cnd_};
+                }
+              }
+
+             # Input filter to call?
+             if (    exists $pars{ifilter}
+                 and (   not $flags{filter}
+                      or lc($pars{lang}) eq 'pp'
+                      or (    exists $pars{lang}
+                          and $pars{lang}=~/^$flags{filter}$/i
+                         )
+                     )
+                )
+               {
+                # Can we invoke the filter code?
+                unless ($safeObject)
+                  {
+                   # What a pity - but probably the unfiltered source is not what the backend
+                   # expects, so we need to ignore the embedded code completely for now. As
+                   # usually, this is done without warning.
+                   return([[()], $_[6][1]]);
+                  }
+                else
+                  {
+                   # OK, we can try to invoke the filter.
+
+                   # inform user
+                   warn qq([Warn] $sourceFile, line $_[1][1]: Running input filter.\n) if $flags{trace} & TRACE_ACTIVE;
+
+                   # update active contents base data, if necessary
+                   if ($flags{activeBaseData})
+                     {
+                      no strict 'refs';
+                      ${join('::', ref($safeObject) ? $safeObject->root : 'main', 'PerlPoint')}=dclone($flags{activeBaseData});
+                     }
+
+                   # We provide the text in a special variable @main::_ifilterText,
+                   # and the target type in a special variable $main::_ifilterType.
+                   {
+                    no strict 'refs';
+                    @{join('::', ref($safeObject) ? $safeObject->root : 'main', '_ifilterText')}=@{$_[5][0]};
+                    ${join('::', ref($safeObject) ? $safeObject->root : 'main', '_ifilterType')}=$pars{lang};
+                   }
+
+                   # run the filter and catch what it supplies
+                   $_[5][0]=[ref($safeObject) ? $safeObject->reval($pars{ifilter}) : eval(join(' ', '{package main; no strict;', $pars{ifilter}, '}'))];
+
+                   # check result
+                   if ($@)
+                     {
+                      # inform user, if necessary
+                      warn "[Error ", ++$semErr, qq(] $sourceFile, line $_[1][1]: input filter failed: $@.\n);
+
+                      # ignore this part
+                      return([[()], $_[6][1]]);
+                     }
+                  }
+               }
+
              # check if we have to stream this code
-             unless (not $flags{filter} or lc($pars{lang}) eq 'pp' or (exists $pars{lang} and $pars{lang}=~/^$flags{filter}$/i))
+             unless (   not $flags{filter}
+                     or lc($pars{lang}) eq 'pp'
+                     or (    exists $pars{lang}
+                         and $pars{lang}=~/^$flags{filter}$/i
+                        )
+                    )
                {
                 # caller wants to skip the embedded code: we have to supply something, but it should be nothing
                 [[()], $_[6][1]];
@@ -3469,6 +3609,20 @@ included : Include
              $errors++, warn "[Error ", ++$semErr, "] $sourceFile, line $_[3][1]: You forgot to specify the type of your included file.\n" unless exists $tagpars{type};
              $errors++, warn "[Error ", ++$semErr, "] $sourceFile, line $_[3][1]: You forgot to specify the name of your included file.\n" unless exists $tagpars{file};
 
+             # Tag condition set?
+             if (exists $tagpars{_cnd_})
+              {
+               # ok, if the condition was true or could not be evaluated,
+               # stop processing of this tag (there is no body, so return an empty stream)
+               unless (_evalTagCondition($tagpars{_cnd_}, $sourceFile, $_[3][1]))
+                {return([[()], $_[3][1]]);}
+               else
+                {
+                 # strip off this special option before the tag or macro is furtherly processed
+                 delete $tagpars{_cnd_};
+                }
+              }
+
              # search specified directories for the file if necessary
              unless (-e $tagpars{file})
                {
@@ -3507,11 +3661,89 @@ included : Include
                 # check the filename
                 if (-r $tagpars{file})
                   {
+                   # store the files name and directory for later reference
+                   # (we could refer do that later, but using intermediate buffers
+                   # allows to keep the original values when switching the file in
+                   # background which happens with input filters)
+                   my $orgname=$tagpars{file};
+
+                   # Input filter to call?
+                   if (    exists $tagpars{ifilter}
+                       and (   not $flags{filter}
+                            or lc($tagpars{type}) eq 'pp'
+                            or (    exists $tagpars{type}
+                                and $tagpars{type}=~/^$flags{filter}$/i
+                               )
+                           )
+                      )
+                     {
+                      # Can we invoke the filter code?
+                      unless ($safeObject)
+                        {
+                         # What a pity - but probably the unfiltered source is not what the backend
+                         # expects, so we need to ignore the embedded code completely for now. As
+                         # usually, this is done without warning.
+                         return([[()], $_[3][1]]);
+                        }
+                      else
+                        {
+                         # OK, we can try to invoke the filter.
+
+                         # inform user
+                         warn qq([Warn] $sourceFile, line $_[1][1]: Running input filter.\n) if $flags{trace} & TRACE_ACTIVE;
+
+                         # update active contents base data, if necessary
+                         if ($flags{activeBaseData})
+                         {
+                          no strict 'refs';
+                          ${join('::', ref($safeObject) ? $safeObject->root : 'main', 'PerlPoint')}=dclone($flags{activeBaseData});
+                         }
+
+                         # open original file
+                         open(my $orgHandle, $tagpars{file});
+                         binmode($orgHandle);
+
+                         # We provide the text in a special variable @main::_ifilterText,
+                         # and the target type in a special variable $main::_ifilterType.
+                         {
+                          no strict 'refs';
+                          @{join('::', ref($safeObject) ? $safeObject->root : 'main', '_ifilterText')}=<$orgHandle>;
+                          ${join('::', ref($safeObject) ? $safeObject->root : 'main', '_ifilterType')}=$tagpars{type};
+                         }
+
+                         # close original file
+                         close($orgHandle);
+
+                         # run the filter in the files directory and catch what it supplies
+                         my $startDir=cwd();
+                         chdir(dirname($orgname));
+                         my @ifiltered=ref($safeObject) ? $safeObject->reval($tagpars{ifilter}) : eval(join(' ', '{package main; no strict;', $tagpars{ifilter}, '}'));
+                         chdir($startDir);
+
+                         # check result
+                         if ($@)
+                           {
+                            # inform user, if necessary
+                            warn "[Error ", ++$semErr, qq(] $sourceFile, line $_[1][1]: input filter failed: $@.\n);
+
+                            # ignore this part
+                            return([[()], $_[3][1]]);
+                           }
+
+                         # ok, now "replace" the original file by a temporary one
+                         my ($tmpHandle, $tmpFilename)=tempfile(UNLINK => ($flags{trace} & TRACE_TMPFILES ? 0 : 1));
+                         $tagpars{file}=$tmpFilename;
+
+                         print $tmpHandle @ifiltered;
+                         close($tmpHandle);
+                        }
+                     }
+
                    # check specified file type
                    if ($tagpars{type}=~/^pp$/i)
                      {
                       # update nesting stack
-                      push(@nestedSourcefiles, $tagpars{file});
+                      push(@nestedSourcefiles, $orgname);
 
 		      # update source file nesting level hint
 		      predeclareVariables({_SOURCE_LEVEL=>scalar(@nestedSourcefiles)});
@@ -3558,7 +3790,7 @@ included : Include
                       $lineNrs{$inHandle}=0;
 
                       # change directory with file
-                      chdir(dirname($tagpars{file}));
+                      chdir(dirname($orgname));
 
                       # open a new input stack
                       unshift(@inputStack, []);
@@ -4306,17 +4538,17 @@ sub lexer
      # reply next token: scan for Ils if necessary
      $found=$1, s/^$1//,
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Ils in line $lineNrs{$inHandle}.\n")),
-     return('Ils', [$found, $lineNrs{$inHandle}]) if $parserState==STATE_PFILTERED and /^(\s+)/;
+     return('Ils', [$found, $lineNrs{$inHandle}]) if $parserState==STATE_PFILTERED and /^$lexerPatterns{space}/;
 
      # reply next token: scan for spaces
      $found=$1, s/^$1//,
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Space in line $lineNrs{$inHandle}.\n")),
-     return('Space', [$found, $lineNrs{$inHandle}]) if /^(\s+)/;
+     return('Space', [$found, $lineNrs{$inHandle}]) if /^$lexerPatterns{space}/;
 
      # reply next token: scan for paragraph filter delimiters ("||" and "|")
      $found=$1, s/^\Q$1//,
      (($flags{trace} & TRACE_LEXER) and warn(qq([Trace] Lexer: Paragraph filter delimiter "$found" in line $lineNrs{$inHandle}.\n))),
-     return($found, [$found, $lineNrs{$inHandle}]) if /^(?<!\\)((\|){1,2})/ and $specials{pfilter};
+     return($found, [$found, $lineNrs{$inHandle}]) if /^$lexerPatterns{pfilterDelimiter}/ and $specials{pfilter};
 
      # reply next token: scan for here doc openers
      $found=$1, s/^<<$1//,
@@ -4326,58 +4558,58 @@ sub lexer
      # reply next token: scan for SPECIAL tagnames: \TABLE
      $found=$1, s/^\\$1//,
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Table starts in line $lineNrs{$inHandle}.\n")),
-     return('Table', [$found, $lineNrs{$inHandle}]) if $specials{tag} and /^(?<!\\)\\(TABLE)/;
+     return('Table', [$found, $lineNrs{$inHandle}]) if $specials{tag} and /^$lexerPatterns{table}/;
      
      # reply next token: scan for SPECIAL tagnames: \END_TABLE
      $found=$1, s/^\\$1//,
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Table completed in line $lineNrs{$inHandle}.\n")),
-     return('Tabled', [$found, $lineNrs{$inHandle}])  if $specials{tag} and /^(?<!\\)\\(END_TABLE)/;
+     return('Tabled', [$found, $lineNrs{$inHandle}])  if $specials{tag} and /^$lexerPatterns{endTable}/;
      
      # reply next token: scan for SPECIAL tagnames: \EMBED
      $found=$1, s/^\\$1//,
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Embedding starts in line $lineNrs{$inHandle}.\n")),
-     return('Embed', [$found, $lineNrs{$inHandle}]) if $specials{tag} and /^(?<!\\)\\(EMBED)/;
+     return('Embed', [$found, $lineNrs{$inHandle}]) if $specials{tag} and /^$lexerPatterns{embed}/;
      
      # reply next token: scan for SPECIAL tagnames: \END_EMBED
      $found=$1, s/^\\$1//,
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Embedding completed in line $lineNrs{$inHandle}.\n")),
-     return('Embedded', [$found, $lineNrs{$inHandle}]) if $specials{embedded} and /^(?<!\\)\\(END_EMBED)/;
+     return('Embedded', [$found, $lineNrs{$inHandle}]) if $specials{embedded} and /^$lexerPatterns{endEmbed}/;
      
      # reply next token: scan for SPECIAL tagnames: \INCLUDE
      $found=$1, s/^\\$1//,
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Including starts in line $lineNrs{$inHandle}.\n")),
-     return('Include', [$found, $lineNrs{$inHandle}]) if $specials{tag} and /^(?<!\\)\\(INCLUDE)/;
+     return('Include', [$found, $lineNrs{$inHandle}]) if $specials{tag} and /^$lexerPatterns{include}/;
      
      # reply next token: scan for tagnames
      $found=$1, s/^\\$1//,
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Tag opener $found in line $lineNrs{$inHandle}.\n")),
-     return('Tag_name', [$found, $lineNrs{$inHandle}]) if $specials{tag} and /^(?<!\\)\\([A-Z_0-9]+)/ and (exists $tagsRef->{$1} or exists $macros{$1});
+     return('Tag_name', [$found, $lineNrs{$inHandle}]) if $specials{tag} and /^$lexerPatterns{tag}/ and (exists $tagsRef->{$1} or exists $macros{$1});
      
      # reply next token: scan for special characters
      $found=$1, s/^\Q$1//,
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Special $found in line $lineNrs{$inHandle}.\n")),
-     return($found, [$found, $lineNrs{$inHandle}]) if /^(?<!\\)(\S)/ and exists $specials{$1} and $specials{$1};
+     return($found, [$found, $lineNrs{$inHandle}]) if /^$patternNlbBackslash(\S)/ and exists $specials{$1} and $specials{$1};
 
      # reply next token: scan for definition list items
      $found=$1, s/^$1//,
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Colon in line $lineNrs{$inHandle}.\n")),
-     return('Colon', [$found, $lineNrs{$inHandle}]) if $specials{colon} and /^(?<!\\)(:)/;
+     return('Colon', [$found, $lineNrs{$inHandle}]) if $specials{colon} and /^$lexerPatterns{colon}/;
 
      # reply next token: search for named variables
      $found=$1, s/^\$$1//,
-     (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Named variable \"$found\" in line $lineNrs{$inHandle}.\n")),
-     return('Named_variable', [$found, $lineNrs{$inHandle}]) if /^(?<!\\)\$($patternWUmlauts)/;
+     (($flags{trace} & TRACE_LEXER) and warn(qq([Trace] Lexer: Named variable "$found" in line $lineNrs{$inHandle}.\n))),
+     return('Named_variable', [$found, $lineNrs{$inHandle}]) if /^$lexerPatterns{namedVar}/;
 
      # reply next token: search for symbolic variables
      $found=$1, s/^\${$1}//,
-     (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Symbolic variable \"$found\" in line $lineNrs{$inHandle}.\n")),
-     return('Symbolic_variable', [$found, $lineNrs{$inHandle}]) if /^(?<!\\)\${($patternWUmlauts)}/;
+     (($flags{trace} & TRACE_LEXER) and warn(qq([Trace] Lexer: Symbolic variable "$found" in line $lineNrs{$inHandle}.\n))),
+     return('Symbolic_variable', [$found, $lineNrs{$inHandle}]) if /^$lexerPatterns{symVar}/;
 
      # flag that this paragraph *might* use macros someday, if there is still something being no tag and no
      # macro, but looking like a tag or a macro (somebody could *later* declare it a real macro, so the cache
      # needs to check macro definitions)
      $flags{checksummed}[3]=1
-       if     $specials{tag} and /^(?<!\\)\\([A-Z_0-9]+)/
+       if     $specials{tag} and /^$lexerPatterns{tag}/
           and not (exists $flags{checksummed} and not $flags{checksummed});
 
      # remove guarding \\, if necessary
@@ -4406,18 +4638,51 @@ sub lexer
         # warn("---------> $_\n");
         $found=$1, s/^\Q$1//,
         # warn("=====> $found\n"),
-        (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Word \"$found\" in line $lineNrs{$inHandle}.\n")),
+        (($flags{trace} & TRACE_LEXER) and warn(qq([Trace] Lexer: Word "$found" in line $lineNrs{$inHandle}.\n))),
         return('Word', [$found, $lineNrs{$inHandle}]) if /^(.+?)($special|($))/;
        }
 
      # reply next token: scan for word or single character (declared as "Word" as well)
      $found=$1, s/^\Q$1//,
-     (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Word \"$found\" in line $lineNrs{$inHandle}.\n")),
+     (($flags{trace} & TRACE_LEXER) and warn(qq([Trace] Lexer: Word "$found" in line $lineNrs{$inHandle}.\n))),
      return('Word', [$found, $lineNrs{$inHandle}]) if /^($patternWUmlauts)/ or /^(\S)/;
 
      # everything should be handled - this code should never be executed!
-     die "[BUG] $sourceFile, line $lineNrs{$inHandle}: No symbol found in \"$_\"!\n";
+     die qq([BUG] $sourceFile, line $lineNrs{$inHandle}: No symbol found in "$_"!\n);
     }
+ }
+
+# evaluate a tag condition (can possibly be generalized: this is just a piece of code)
+sub _evalTagCondition
+ {
+  # get parameters
+  my ($code, $file, $line)=@_;
+
+  # declare variables
+  my ($rc);
+
+  #  Does the caller want to evaluate the code?
+  if ($safeObject)
+    {
+     # update active contents base data, if necessary
+     if ($flags{activeBaseData})
+       {
+        no strict 'refs';
+        ${join('::', ref($safeObject) ? $safeObject->root : 'main', 'PerlPoint')}=dclone($flags{activeBaseData});
+       }
+
+     # make the code a string and evaluate it
+     warn "[Trace] $sourceFile, line $_[5][1]: Evaluating this code:\n\n$code\n\n\n" if $flags{trace} & TRACE_ACTIVE;
+
+     # invoke perl to compute the result
+     $rc=ref($safeObject) ? $safeObject->reval($code) : eval(join(' ', '{package main; no strict;', $code, '}'));
+
+     # check result
+     warn "[Error ", ++$semErr, "] $file, line $line: tag condition could not be evaluated: $@.\n" if $@;
+    }
+
+  # supply result
+  $rc;
  }
 
 # reference lexed: reply appropriate token
@@ -5302,7 +5567,7 @@ sub run
   if (exists $pars{filter})
     {
      eval "'lang'=~/$pars{filter}/";
-     confess "[BUG] Invalid filter expression \"$pars{filter}\": $@.\n" if $@;
+     confess qq([BUG] Invalid filter expression "$pars{filter}": $@.\n) if $@;
     }
 
   # variables
@@ -5527,7 +5792,7 @@ EOC
         # clean up old format caches
         unless (
                     exists $checksums->{sha1_base64('version')}
-                and $checksums->{sha1_base64('version')}>=0.37
+                and $checksums->{sha1_base64('version')}>=0.38
 
                 and exists $checksums->{sha1_base64('constants')}
                 and $checksums->{sha1_base64('constants')}==$PerlPoint::Constants::VERSION
@@ -5612,6 +5877,9 @@ EOC
        {
         # get data
         my ($level, $title)=@$_;
+
+        # skip empty headlines
+        next unless $title;
 
         # update headline path and numbers
         $headlinePath[$level]=$title;
@@ -5971,6 +6239,9 @@ sub pfilterCall
   # build retranslator, if necessary
   unless ($retranslator)
     {
+     # scopy
+     my ($verbatimFlag)=(0);
+
      # the retranslator is a backend object
      $retranslator=new PerlPoint::Backend(
                                           name    => 'retranslator',
@@ -5984,8 +6255,12 @@ sub pfilterCall
                                                  # get parameters
                                                  my ($opcode, $mode, @contents)=@_;
 
-                                                 # add contents to the source text collection
-                                                 $retranslationBuffer.=join('', @contents);
+                                                 # add contents to the source text collection,
+                                                 # double backslashes (if they are here, they were guarded originally),
+                                                 # and restore ">" characters as if they were guarded
+                                                 (my $text=join('', @contents));
+                                                 $text=~s/([\\>])/\\$1/g unless $verbatimFlag;
+                                                 $retranslationBuffer.=$text;
                                                 }
                             );
 
@@ -6005,8 +6280,8 @@ sub pfilterCall
                                                    my ($opcode, $mode)=@_;
 
                                                    # cover contents
-                                                   $retranslationBuffer.="<<EOE\n" if $mode==DIRECTIVE_START;
-                                                   $retranslationBuffer.="EOE\n"   if $mode==DIRECTIVE_COMPLETE;
+                                                   $verbatimFlag=1, $retranslationBuffer.="<<EOE\n" if $mode==DIRECTIVE_START;
+                                                   $verbatimFlag=0, $retranslationBuffer.="EOE\n"   if $mode==DIRECTIVE_COMPLETE;
                                                   }
                             );
 
@@ -6050,13 +6325,13 @@ sub pfilterCall
      $retranslator->register(DIRECTIVE_TAG, sub
                                              {
                                               # get parameters
-                                              my ($opcode, $mode, $tag, $settings)=@_;
+                                              my ($opcode, $mode, $tag, $settings, $bodyHint)=@_;
 
                                               # table tags need special care, is it one?
                                               unless ($tag=~/^TABLE/)
                                                 {
                                                  # act mode dependend
-                                                 $retranslationBuffer.=$mode==DIRECTIVE_START ? join('', "\\$tag", (defined $settings and %$settings) ? join('', '{', join(' ', map {qq($_="$settings->{$_}")} grep(!/^__/, keys %$settings)), '}') : (), '<') : '>';
+                                                 $retranslationBuffer.=$mode==DIRECTIVE_START ? join('', "\\$tag", (defined $settings and %$settings) ? join('', '{', join(' ', map {qq($_="$settings->{$_}")} grep(!/^__/, keys %$settings)), '}') : (), ($bodyHint ? '<' : ())) : ($bodyHint ? '>' : ());
                                                 }
                                               else
                                                 {

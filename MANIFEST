@@ -24,6 +24,8 @@ demo/.pp2sdf
 demo/pp2sdf
 demo/pp2tree
 
+demo/perlpods.pp
+
 doc/getting-started.pp
 doc/getting-started.pod
 
@@ -101,6 +103,10 @@ t/empty2.pp
 
 t/headlines.t
 t/headlines.pp
+
+t/ifilters.t
+t/ifilters.pp
+t/ifilters.lang
 
 t/include1.t
 t/include2.t

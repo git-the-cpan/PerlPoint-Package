@@ -7,7 +7,8 @@
 # ---------------------------------------------------------------------------------------
 # 0.16    |< 02.03.02| JSTENZEL | added DIRCTIVE_DSTREAM_ENTRYPOINT constant;
 #         |02.03.2002| JSTENZEL | added DSTREAM_... constants;
-#         |29.09.2001| JSTENZEL | added STREAM_DOCSTREAMS;
+#         |29.09.2002| JSTENZEL | added STREAM_DOCSTREAMS;
+#         |02.01.2003| JSTENZEL | added TRACE_TMPFILES;
 # 0.15    |10.08.2001| JSTENZEL | added STREAM_... constants;
 #         |          | JSTENZEL | reorganized POD slightly;
 #         |14.08.2001| JSTENZEL | added missed doc of TAG_... constants;
@@ -426,6 +427,10 @@ They activate trace code.
 
 =over 4
 
+=item TRACE_ACTIVE
+
+activates the traces of active contents evaluation.
+
 =item TRACE_BACKEND
 
 activates backend traces;
@@ -452,9 +457,9 @@ activates the traces of the syntactical analysis.
 
 activates the traces of the semantic analysis.
 
-=item TRACE_ACTIVE
+=item TRACE_TMPFILES
 
-activates the traces of active contents evaluation.
+deactivates the removal of temporary files.
 
 =back
 
@@ -468,6 +473,7 @@ activates the traces of active contents evaluation.
   use constant 'TRACE_SEMANTIC'   =>  8;
   use constant 'TRACE_ACTIVE'     => 16;
   use constant 'TRACE_BACKEND'    => 32;
+  use constant 'TRACE_TMPFILES'   => 64;
 
 =pod
 
@@ -571,13 +577,14 @@ use Exporter;
 
            DIRECTIVE_SIMPLE
 
-           TRACE_NOTHING
-           TRACE_PARAGRAPHS
-           TRACE_LEXER
-           TRACE_PARSER
-           TRACE_SEMANTIC
            TRACE_ACTIVE
            TRACE_BACKEND
+           TRACE_LEXER
+           TRACE_NOTHING
+           TRACE_PARAGRAPHS
+           TRACE_PARSER
+           TRACE_SEMANTIC
+           TRACE_TMPFILES
 
            DISPLAY_ALL
            DISPLAY_NOINFO

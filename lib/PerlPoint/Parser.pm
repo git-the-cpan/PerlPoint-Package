@@ -486,6 +486,26 @@ sub _Parse {
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.38    |07.06.2002| JSTENZEL | restoring doubled backslashes in filtered paragraphs,
+#         |          |          | restoring ">" characters as if they were guarded;
+#         |04.07.2002| JSTENZEL | simplified several array field access codes;
+#         |          | JSTENZEL | bugfix: empty headlines caused an infinite loop
+#         |          |          | when trailing whitespaces should be removed;
+#         |          | JSTENZEL | bugfix: empty headlines caused a failure when headline
+#         |          |          | anchors should be stored, skipping them now;
+#         |20.08.2002| JSTENZEL | improved tag streaming: stream now contains a body hint;
+#         |          | JSTENZEL | bugfix: paragraph filters restored tag bodies even if
+#         |          |          | there was no body;
+#         |          | JSTENZEL | old caches need to be updated - adapted compatibility hint;
+#         |27.08.2002| JSTENZEL | started to use precompiled lexer patterns;
+#         |31.08.2002| JSTENZEL | \INCLUDE, \EMBED and \TABLE now support the _cnd_ option,
+#         |          |          | like tags defined externally;
+#         |04.12.2002| JSTENZEL | bugfix in pfilter retranslation: backslash reinsertion was
+#         |          |          | not performed multiply;
+#         |          | JSTENZEL | pfilter retranslation: backslash reinsertion now suppressed
+#         |          |          | in verbatim blocks;
+#         |01.01.2003| JSTENZEL | added input filter support to \EMBED, via option "ifilter";
+#         |02.01.2003| JSTENZEL | added input filter support to \INCLUDE, same interface;
 # 0.37    |up to     | JSTENZEL | flagSet() now takes a list of flag names;
 #         |14.04.2002| JSTENZEL | names of included files are resolved to avoid trouble
 #         |          |          | with links (and to avoid error messages);
@@ -907,7 +927,7 @@ B<PerlPoint::Parser> - a PerlPoint Parser
 
 =head1 VERSION
 
-This manual describes version B<0.37>.
+This manual describes version B<0.38>.
 
 =head1 SYNOPSIS
 
@@ -1534,13 +1554,29 @@ already assigned values. Option "localize" works like Perls C<local()>:
 such changes will be reversed after the nested source will have been
 processed completely, so the original values will be restored. You can
 specify a comma separated list of variable names or the special string
-"__ALL__" which flags that I<all> current settings shall be restored.
+C<__ALL__> which flags that I<all> current settings shall be restored.
 
  \INCLUDE{type=PP file="nested.pp" localize=myVar}
 
  \INCLUDE{type=PP file="nested.pp" localize="var1, var2, var3"}
 
  \INCLUDE{type=PP file="nested.pp" localize=__ALL__}
+
+
+PerlPoint authors can declare an I<input filter> to preprocess the
+included file. This is done via option I<ifilter>:
+
+  \INCLUDE{type=pp file="source.pod" ifilter="pod2pp()"}
+  
+An input filter is a snippet of user defined Perl code, taking the
+included file via C<@main::_ifilterText> and the target type via
+C<$main::_ifilterType>. It should supply its result as an array
+of strings which will then be processed instead of the original file.
+
+Input filters are Active Content. If Active Content is disabled,
+\INCLUDE tags using input filters will be ignored I<completely>.
+
+
 
 A PerlPoint file can be included wherever a tag is allowed, but sometimes
 it has to be arranged slightly: if you place the inclusion directive at
@@ -1613,14 +1649,33 @@ directly in a text like this:
   These \EMBED{lang=HTML}<i>italics</i>\END_EMBED
   are formatted by HTML code.
 
-Please note that the EMBED tag does not accept a tag body to avoid
-ambiguities.
+Please note that the EMBED tag does not accept a tag body (to avoid
+ambiguities).
 
 Both tag and embedded text are made part of the intermediate stream.
 It is the backends task to deal with it. The only exception of this rule
 is the embedding of I<Perl> code, which is evaluated by the parser.
 The reply of this code is made part of the input stream and parsed as
 usual.
+
+PerlPoint authors can declare an I<input filter> to preprocess the
+embedded text. This is done via option I<ifilter>:
+
+  \EMBED{lang=pp ifilter="pod2pp()"}
+  
+  =head1 POD formatted part
+
+  This part was written in POD.
+
+  \END_EMBED
+
+An input filter is a snippet of user defined Perl code, taking the
+embedded text via C<@main::_ifilterText> and the target language via
+C<$main::_ifilterType>. It should supply its result as an array of
+strings which will then be processed as usual.
+
+Input filters are Active Contents. If Active Contents is disabled,
+embedded parts using input filters will be ignored I<completely>.
 
 It is possible to filter the languages you wish to embed (with exception
 of "PP"), see below for details.
@@ -1816,7 +1871,7 @@ B<Example:>
  require 5.00503;
 
  # declare module version
- $PerlPoint::Parser::VERSION=0.37;
+ $PerlPoint::Parser::VERSION=0.38;
  $PerlPoint::Parser::VERSION=$PerlPoint::Parser::VERSION; # to suppress a warning of exclusive usage only;
 
  # pragmata
@@ -1827,6 +1882,7 @@ B<Example:>
  use IO::File;
  use File::Basename;
  use File::Spec::Functions;
+ use File::Temp qw(tempfile);
  use PerlPoint::Anchors 0.02;
  use PerlPoint::Backend 0.10;
  use Cwd qw(:DEFAULT abs_path);
@@ -1890,7 +1946,24 @@ B<Example:>
  $readCompletely=0;
 
  # prepare a common pattern
- my $patternWUmlauts=qr([\w‰ˆ¸ƒ÷‹ﬂ]+);
+ my $patternWUmlauts=qr/[\w‰ˆ¸ƒ÷‹ﬂ]+/;
+
+ # prepare lexer patterns
+ my $patternNlbBackslash=qr/(?<!\\)/;
+ my %lexerPatterns=(
+                    tag              => qr/$patternNlbBackslash\\([A-Z_0-9]+)/,
+                    space            => qr/(\s+)/,
+                    pfilterDelimiter => qr/$patternNlbBackslash((\|){1,2})/,
+                    table            => qr/$patternNlbBackslash\\(TABLE)/,
+                    endTable         => qr/$patternNlbBackslash\\(END_TABLE)/,
+                    embed            => qr/$patternNlbBackslash\\(EMBED)/,
+                    endEmbed         => qr/$patternNlbBackslash\\(END_EMBED)/,
+                    include          => qr/$patternNlbBackslash\\(INCLUDE)/,
+                    nonWhitespace    => qr/$patternNlbBackslash(\S)/,
+                    colon            => qr/$patternNlbBackslash(:)/,
+                    namedVar         => qr/$patternNlbBackslash\$($patternWUmlauts)/,
+                    symVar           => qr/$patternNlbBackslash\${($patternWUmlauts)}/,
+                   );
 
  # declare paragraphs which are embedded
  my %embeddedParagraphs;
@@ -1932,1169 +2005,1226 @@ sub new {
 [
 	{#State 0
 		ACTIONS => {
-			'Empty_line' => 1,
-			"+" => 3,
-			"||" => 6,
-			'Paragraph_cache_hit' => 8,
-			"?" => 10
+			'Empty_line' => 3,
+			"+" => 5,
+			'Paragraph_cache_hit' => 11,
+			"?" => 2,
+			"||" => 4
 		},
 		DEFAULT => -3,
 		GOTOS => {
-			'alias_definition' => 5,
-			'document' => 2,
-			'non_filterable_paragraph' => 7,
-			'restored_paragraph' => 9,
-			'built_paragraph' => 11,
-			'paragraph' => 13,
-			'condition' => 12,
-			'optional_paragraph_filter' => 4
+			'non_filterable_paragraph' => 1,
+			'built_paragraph' => 9,
+			'document' => 6,
+			'optional_paragraph_filter' => 10,
+			'restored_paragraph' => 7,
+			'condition' => 13,
+			'paragraph' => 12,
+			'alias_definition' => 8
 		}
 	},
 	{#State 1
-		DEFAULT => -22
+		DEFAULT => -12
 	},
 	{#State 2
-		ACTIONS => {
-			'' => 14,
-			'Empty_line' => 1,
-			"+" => 3,
-			"||" => 6,
-			'Paragraph_cache_hit' => 8,
-			"?" => 10
-		},
-		DEFAULT => -3,
+		DEFAULT => -33,
 		GOTOS => {
-			'alias_definition' => 5,
-			'non_filterable_paragraph' => 7,
-			'restored_paragraph' => 9,
-			'built_paragraph' => 11,
-			'paragraph' => 15,
-			'condition' => 12,
-			'optional_paragraph_filter' => 4
+			'@4-1' => 14
 		}
 	},
 	{#State 3
+		DEFAULT => -22
+	},
+	{#State 4
+		DEFAULT => -4,
+		GOTOS => {
+			'@1-1' => 15
+		}
+	},
+	{#State 5
 		DEFAULT => -148,
 		GOTOS => {
 			'@30-1' => 16
 		}
 	},
-	{#State 4
-		DEFAULT => -10,
-		GOTOS => {
-			'@2-1' => 17
-		}
-	},
-	{#State 5
-		DEFAULT => -24
-	},
 	{#State 6
-		DEFAULT => -4,
+		ACTIONS => {
+			'' => 17,
+			'Paragraph_cache_hit' => 11,
+			"||" => 4,
+			'Empty_line' => 3,
+			"+" => 5,
+			"?" => 2
+		},
+		DEFAULT => -3,
 		GOTOS => {
-			'@1-1' => 18
+			'non_filterable_paragraph' => 1,
+			'built_paragraph' => 9,
+			'optional_paragraph_filter' => 10,
+			'restored_paragraph' => 7,
+			'paragraph' => 18,
+			'condition' => 13,
+			'alias_definition' => 8
 		}
 	},
 	{#State 7
-		DEFAULT => -12
-	},
-	{#State 8
-		DEFAULT => -25
-	},
-	{#State 9
 		DEFAULT => -9
 	},
+	{#State 8
+		DEFAULT => -24
+	},
+	{#State 9
+		DEFAULT => -8
+	},
 	{#State 10
-		DEFAULT => -33,
+		DEFAULT => -10,
 		GOTOS => {
-			'@4-1' => 19
+			'@2-1' => 19
 		}
 	},
 	{#State 11
-		DEFAULT => -8
+		DEFAULT => -25
 	},
 	{#State 12
-		DEFAULT => -23
-	},
-	{#State 13
 		DEFAULT => -1
 	},
+	{#State 13
+		DEFAULT => -23
+	},
 	{#State 14
-		DEFAULT => -0
+		ACTIONS => {
+			'Table' => 37,
+			'Include' => 36,
+			'Space' => 23,
+			'Embed' => 29,
+			'Named_variable' => 21,
+			'Table_separator' => 32,
+			'Word' => 27,
+			'Tag_name' => 34,
+			'Symbolic_variable' => 33,
+			'StreamedPart' => 28
+		},
+		GOTOS => {
+			'basic' => 20,
+			'basics' => 30,
+			'embedded' => 31,
+			'table' => 22,
+			'element' => 35,
+			'included' => 24,
+			'table_separator' => 25,
+			'tag' => 26
+		}
 	},
 	{#State 15
-		DEFAULT => -2
+		ACTIONS => {
+			'Word' => 38
+		},
+		GOTOS => {
+			'paragraph_filters' => 39
+		}
 	},
 	{#State 16
 		ACTIONS => {
-			'Word' => 20
+			'Word' => 40
 		}
 	},
 	{#State 17
-		ACTIONS => {
-			'EOL' => 23,
-			"\@" => 21,
-			"#" => 55,
-			'Block_cache_hit' => 56,
-			'Named_variable' => 28,
-			'Colon' => 31,
-			'Symbolic_variable' => 59,
-			'Upoint_cache_hit' => 61,
-			'Embed' => 35,
-			'Ils' => 36,
-			'Opoint_cache_hit' => 37,
-			"*" => 40,
-			'Include' => 42,
-			'Table_separator' => 43,
-			'Headline_cache_hit' => 64,
-			'StreamedPart' => 65,
-			'Heredoc_open' => 66,
-			'Table' => 45,
-			"=" => 47,
-			'Space' => 70,
-			"/" => 71,
-			'Word' => 48,
-			"~" => 73,
-			'Tag_name' => 72,
-			'Dpoint_cache_hit' => 50
-		},
-		GOTOS => {
-			'original_paragraph' => 24,
-			'included' => 22,
-			'olist' => 25,
-			'headline' => 52,
-			'verbatim' => 26,
-			'dpoint' => 27,
-			'opoint' => 54,
-			'list_part' => 53,
-			'block' => 57,
-			'opoint_opener' => 29,
-			'upoint' => 30,
-			'dlist' => 32,
-			'embedded' => 58,
-			'basic' => 33,
-			'tag' => 60,
-			'element' => 34,
-			'text' => 38,
-			'list' => 39,
-			'table_paragraph' => 41,
-			'headline_level' => 44,
-			'dstream_entrypoint' => 63,
-			'table_separator' => 62,
-			'compound_block' => 67,
-			'comment' => 46,
-			'variable_assignment' => 69,
-			'table' => 68,
-			'literal' => 49,
-			'dlist_opener' => 74,
-			'ulist' => 51
-		}
+		DEFAULT => 0
 	},
 	{#State 18
-		ACTIONS => {
-			'Word' => 75
-		},
-		GOTOS => {
-			'paragraph_filters' => 76
-		}
+		DEFAULT => -2
 	},
 	{#State 19
 		ACTIONS => {
-			'Table' => 45,
-			'Symbolic_variable' => 59,
-			'Space' => 70,
-			'Table_separator' => 43,
-			'Include' => 42,
-			'Word' => 48,
-			'Tag_name' => 72,
-			'Named_variable' => 78,
-			'StreamedPart' => 65,
-			'Embed' => 35
+			'Colon' => 41,
+			'Named_variable' => 59,
+			"\@" => 42,
+			'Upoint_cache_hit' => 60,
+			"~" => 43,
+			'Dpoint_cache_hit' => 44,
+			'Space' => 23,
+			"*" => 47,
+			'Word' => 27,
+			'EOL' => 65,
+			'StreamedPart' => 28,
+			'Opoint_cache_hit' => 67,
+			'Embed' => 29,
+			'Table_separator' => 32,
+			'Ils' => 52,
+			'Block_cache_hit' => 70,
+			"/" => 68,
+			'Symbolic_variable' => 33,
+			'Tag_name' => 34,
+			"=" => 71,
+			'Headline_cache_hit' => 53,
+			'Table' => 37,
+			'Include' => 36,
+			"#" => 75,
+			'Heredoc_open' => 78
 		},
 		GOTOS => {
-			'included' => 22,
-			'table' => 68,
-			'embedded' => 58,
-			'basic' => 79,
-			'basics' => 77,
-			'table_separator' => 62,
-			'tag' => 60,
-			'element' => 34
+			'basic' => 56,
+			'dlist' => 58,
+			'verbatim' => 57,
+			'table' => 22,
+			'dlist_opener' => 61,
+			'upoint' => 45,
+			'literal' => 46,
+			'olist' => 62,
+			'ulist' => 63,
+			'text' => 64,
+			'opoint_opener' => 48,
+			'included' => 24,
+			'table_separator' => 25,
+			'tag' => 26,
+			'headline_level' => 49,
+			'list' => 50,
+			'dstream_entrypoint' => 66,
+			'compound_block' => 51,
+			'embedded' => 31,
+			'variable_assignment' => 69,
+			'element' => 35,
+			'opoint' => 54,
+			'table_paragraph' => 72,
+			'comment' => 73,
+			'dpoint' => 55,
+			'original_paragraph' => 74,
+			'list_part' => 76,
+			'block' => 77,
+			'headline' => 79
 		}
 	},
 	{#State 20
-		DEFAULT => -149,
-		GOTOS => {
-			'@31-3' => 80
-		}
+		DEFAULT => -97
 	},
 	{#State 21
-		DEFAULT => -140,
-		GOTOS => {
-			'@25-1' => 81
-		}
-	},
-	{#State 22
-		DEFAULT => -111
-	},
-	{#State 23
-		DEFAULT => -94
-	},
-	{#State 24
-		DEFAULT => -11
-	},
-	{#State 25
-		ACTIONS => {
-			"#" => 55,
-			'Opoint_cache_hit' => 37
-		},
-		DEFAULT => -38,
-		GOTOS => {
-			'opoint_opener' => 29,
-			'opoint' => 82
-		}
-	},
-	{#State 26
-		DEFAULT => -15
-	},
-	{#State 27
-		DEFAULT => -45
-	},
-	{#State 28
-		ACTIONS => {
-			"=" => 83
-		},
 		DEFAULT => -106
 	},
+	{#State 22
+		DEFAULT => -100
+	},
+	{#State 23
+		DEFAULT => -105
+	},
+	{#State 24
+		DEFAULT => -111
+	},
+	{#State 25
+		DEFAULT => -101
+	},
+	{#State 26
+		DEFAULT => -109
+	},
+	{#State 27
+		DEFAULT => -104
+	},
+	{#State 28
+		DEFAULT => -108
+	},
 	{#State 29
-		DEFAULT => -47,
+		DEFAULT => -143,
 		GOTOS => {
-			'@5-1' => 84
+			'@27-1' => 80
 		}
 	},
 	{#State 30
-		DEFAULT => -43
+		ACTIONS => {
+			'Embed' => 29,
+			'Empty_line' => 82,
+			'Named_variable' => 21,
+			'Table_separator' => 32,
+			'Symbolic_variable' => 33,
+			'Tag_name' => 34,
+			'Table' => 37,
+			'Include' => 36,
+			'Space' => 23,
+			'Word' => 27,
+			'StreamedPart' => 28
+		},
+		GOTOS => {
+			'basic' => 81,
+			'embedded' => 31,
+			'included' => 24,
+			'table_separator' => 25,
+			'table' => 22,
+			'tag' => 26,
+			'element' => 35
+		}
 	},
 	{#State 31
-		DEFAULT => -58,
-		GOTOS => {
-			'@8-1' => 85
-		}
+		DEFAULT => -110
 	},
 	{#State 32
-		ACTIONS => {
-			'Colon' => 31,
-			'Dpoint_cache_hit' => 50
-		},
-		DEFAULT => -40,
-		GOTOS => {
-			'dpoint' => 86,
-			'dlist_opener' => 74
-		}
+		DEFAULT => -139
 	},
 	{#State 33
-		DEFAULT => -93
+		DEFAULT => -107
 	},
 	{#State 34
-		DEFAULT => -99
-	},
-	{#State 35
-		DEFAULT => -143,
+		DEFAULT => -120,
 		GOTOS => {
-			'@27-1' => 87
+			'@18-1' => 83
 		}
 	},
+	{#State 35
+		DEFAULT => -99
+	},
 	{#State 36
-		DEFAULT => -65,
+		DEFAULT => -146,
 		GOTOS => {
-			'@10-1' => 88
+			'@29-1' => 84
 		}
 	},
 	{#State 37
-		DEFAULT => -49
+		DEFAULT => -136,
+		GOTOS => {
+			'@23-1' => 85
+		}
 	},
 	{#State 38
-		DEFAULT => -14
+		DEFAULT => -6
 	},
 	{#State 39
 		ACTIONS => {
-			"#" => 55,
-			'Colon' => 31,
-			'Opoint_cache_hit' => 37,
-			'Upoint_cache_hit' => 61,
-			"*" => 40,
-			"<" => 92,
-			">" => 93,
-			'Dpoint_cache_hit' => 50
-		},
-		DEFAULT => -20,
-		GOTOS => {
-			'olist' => 25,
-			'list_shift' => 90,
-			'dpoint' => 27,
-			'list_part' => 91,
-			'opoint' => 54,
-			'list_shifter' => 89,
-			'opoint_opener' => 29,
-			'upoint' => 30,
-			'dlist' => 32,
-			'dlist_opener' => 74,
-			'ulist' => 51
+			"|" => 87,
+			"||" => 86
 		}
 	},
 	{#State 40
-		DEFAULT => -52,
+		DEFAULT => -149,
 		GOTOS => {
-			'@6-1' => 94
+			'@31-3' => 88
 		}
 	},
 	{#State 41
-		DEFAULT => -18
+		DEFAULT => -58,
+		GOTOS => {
+			'@8-1' => 89
+		}
 	},
 	{#State 42
-		DEFAULT => -146,
+		DEFAULT => -140,
 		GOTOS => {
-			'@29-1' => 95
+			'@25-1' => 90
 		}
 	},
 	{#State 43
-		DEFAULT => -139
+		DEFAULT => -76,
+		GOTOS => {
+			'@15-1' => 91
+		}
 	},
 	{#State 44
+		DEFAULT => -57
+	},
+	{#State 45
+		DEFAULT => -43
+	},
+	{#State 46
+		DEFAULT => -68,
+		GOTOS => {
+			'@11-1' => 92
+		}
+	},
+	{#State 47
+		DEFAULT => -52,
+		GOTOS => {
+			'@6-1' => 93
+		}
+	},
+	{#State 48
+		DEFAULT => -47,
+		GOTOS => {
+			'@5-1' => 94
+		}
+	},
+	{#State 49
 		ACTIONS => {
 			"=" => 96
 		},
 		DEFAULT => -26,
 		GOTOS => {
-			'@3-1' => 97
-		}
-	},
-	{#State 45
-		DEFAULT => -136,
-		GOTOS => {
-			'@23-1' => 98
-		}
-	},
-	{#State 46
-		DEFAULT => -16
-	},
-	{#State 47
-		DEFAULT => -29
-	},
-	{#State 48
-		DEFAULT => -104
-	},
-	{#State 49
-		DEFAULT => -68,
-		GOTOS => {
-			'@11-1' => 99
+			'@3-1' => 95
 		}
 	},
 	{#State 50
-		DEFAULT => -57
+		ACTIONS => {
+			'Colon' => 41,
+			"<" => 97,
+			'Dpoint_cache_hit' => 44,
+			"*" => 47,
+			">" => 99,
+			'Upoint_cache_hit' => 60,
+			'Opoint_cache_hit' => 67,
+			"#" => 75
+		},
+		DEFAULT => -20,
+		GOTOS => {
+			'list_shifter' => 100,
+			'dlist' => 58,
+			'list_shift' => 98,
+			'dlist_opener' => 61,
+			'upoint' => 45,
+			'opoint' => 54,
+			'olist' => 62,
+			'dpoint' => 55,
+			'ulist' => 63,
+			'opoint_opener' => 48,
+			'list_part' => 101
+		}
 	},
 	{#State 51
 		ACTIONS => {
-			'Upoint_cache_hit' => 61,
-			"*" => 40
+			"-" => 102,
+			'Ils' => 52,
+			'Block_cache_hit' => 70
 		},
-		DEFAULT => -39,
+		DEFAULT => -19,
 		GOTOS => {
-			'upoint' => 100
+			'block_flagnew' => 103,
+			'block' => 104
 		}
 	},
 	{#State 52
-		DEFAULT => -13
+		DEFAULT => -65,
+		GOTOS => {
+			'@10-1' => 105
+		}
 	},
 	{#State 53
-		DEFAULT => -35
+		DEFAULT => -28
 	},
 	{#State 54
 		DEFAULT => -41
 	},
 	{#State 55
-		ACTIONS => {
-			"#" => 101
-		},
-		DEFAULT => -50
+		DEFAULT => -45
 	},
 	{#State 56
-		DEFAULT => -67
+		DEFAULT => -93
 	},
 	{#State 57
-		DEFAULT => -60
+		DEFAULT => -15
 	},
 	{#State 58
-		DEFAULT => -110
+		ACTIONS => {
+			'Colon' => 41,
+			'Dpoint_cache_hit' => 44
+		},
+		DEFAULT => -40,
+		GOTOS => {
+			'dpoint' => 106,
+			'dlist_opener' => 61
+		}
 	},
 	{#State 59
-		DEFAULT => -107
+		ACTIONS => {
+			"=" => 107
+		},
+		DEFAULT => -106
 	},
 	{#State 60
-		DEFAULT => -109
-	},
-	{#State 61
 		DEFAULT => -54
 	},
+	{#State 61
+		DEFAULT => -55,
+		GOTOS => {
+			'@7-1' => 108
+		}
+	},
 	{#State 62
-		DEFAULT => -101
+		ACTIONS => {
+			'Opoint_cache_hit' => 67,
+			"#" => 75
+		},
+		DEFAULT => -38,
+		GOTOS => {
+			'opoint' => 109,
+			'opoint_opener' => 48
+		}
 	},
 	{#State 63
-		DEFAULT => -17
+		ACTIONS => {
+			"*" => 47,
+			'Upoint_cache_hit' => 60
+		},
+		DEFAULT => -39,
+		GOTOS => {
+			'upoint' => 110
+		}
 	},
 	{#State 64
-		DEFAULT => -28
+		DEFAULT => -14
 	},
 	{#State 65
-		DEFAULT => -108
+		DEFAULT => -94
 	},
 	{#State 66
-		DEFAULT => -70,
-		GOTOS => {
-			'@12-1' => 102
-		}
+		DEFAULT => -17
 	},
 	{#State 67
-		ACTIONS => {
-			'Block_cache_hit' => 56,
-			'Ils' => 36,
-			"-" => 105
-		},
-		DEFAULT => -19,
-		GOTOS => {
-			'block' => 104,
-			'block_flagnew' => 103
-		}
+		DEFAULT => -49
 	},
 	{#State 68
-		DEFAULT => -100
+		ACTIONS => {
+			"/" => 111
+		}
 	},
 	{#State 69
 		DEFAULT => -21
 	},
 	{#State 70
-		DEFAULT => -105
+		DEFAULT => -67
 	},
 	{#State 71
-		ACTIONS => {
-			"/" => 106
-		}
+		DEFAULT => -29
 	},
 	{#State 72
-		DEFAULT => -120,
-		GOTOS => {
-			'@18-1' => 107
-		}
+		DEFAULT => -18
 	},
 	{#State 73
-		DEFAULT => -76,
-		GOTOS => {
-			'@15-1' => 108
-		}
+		DEFAULT => -16
 	},
 	{#State 74
-		DEFAULT => -55,
-		GOTOS => {
-			'@7-1' => 109
-		}
+		DEFAULT => -11
 	},
 	{#State 75
-		DEFAULT => -6
+		ACTIONS => {
+			"#" => 112
+		},
+		DEFAULT => -50
 	},
 	{#State 76
-		ACTIONS => {
-			"||" => 110,
-			"|" => 111
-		}
+		DEFAULT => -35
 	},
 	{#State 77
-		ACTIONS => {
-			'Empty_line' => 113,
-			'Table_separator' => 43,
-			'Include' => 42,
-			'Named_variable' => 78,
-			'StreamedPart' => 65,
-			'Table' => 45,
-			'Symbolic_variable' => 59,
-			'Space' => 70,
-			'Word' => 48,
-			'Tag_name' => 72,
-			'Embed' => 35
-		},
-		GOTOS => {
-			'included' => 22,
-			'table' => 68,
-			'embedded' => 58,
-			'basic' => 112,
-			'table_separator' => 62,
-			'tag' => 60,
-			'element' => 34
-		}
+		DEFAULT => -60
 	},
 	{#State 78
-		DEFAULT => -106
+		DEFAULT => -70,
+		GOTOS => {
+			'@12-1' => 113
+		}
 	},
 	{#State 79
-		DEFAULT => -97
+		DEFAULT => -13
 	},
 	{#State 80
 		ACTIONS => {
-			"{" => 114
+			"{" => 115
+		},
+		GOTOS => {
+			'used_tagpars' => 114
+		}
+	},
+	{#State 81
+		DEFAULT => -98
+	},
+	{#State 82
+		DEFAULT => -34
+	},
+	{#State 83
+		ACTIONS => {
+			"{" => 115
 		},
 		DEFAULT => -123,
 		GOTOS => {
 			'used_tagpars' => 116,
-			'optional_tagpars' => 115
-		}
-	},
-	{#State 81
-		ACTIONS => {
-			'Word' => 117
-		},
-		GOTOS => {
-			'words' => 118
-		}
-	},
-	{#State 82
-		DEFAULT => -42
-	},
-	{#State 83
-		DEFAULT => -72,
-		GOTOS => {
-			'@13-2' => 119
+			'optional_tagpars' => 117
 		}
 	},
 	{#State 84
 		ACTIONS => {
-			'EOL' => 23,
-			'Table_separator' => 43,
-			'Include' => 42,
-			'Named_variable' => 78,
-			'StreamedPart' => 65,
-			'Table' => 45,
-			'Symbolic_variable' => 59,
-			'Space' => 70,
-			'Word' => 48,
-			'Tag_name' => 72,
-			'Embed' => 35
+			"{" => 115
 		},
 		GOTOS => {
-			'included' => 22,
-			'text' => 120,
-			'table' => 68,
-			'embedded' => 58,
-			'basic' => 33,
-			'table_separator' => 62,
-			'literal' => 49,
-			'tag' => 60,
-			'element' => 34
+			'used_tagpars' => 118
 		}
 	},
 	{#State 85
 		ACTIONS => {
-			'Symbolic_variable' => 59,
-			'Space' => 70,
-			'Include' => 42,
-			'Word' => 48,
-			'Tag_name' => 72,
-			'Named_variable' => 78,
-			'StreamedPart' => 65,
-			'Embed' => 35
+			"{" => 115
 		},
 		GOTOS => {
-			'included' => 22,
-			'embedded' => 58,
-			'tag' => 60,
-			'elements' => 122,
-			'element' => 121
+			'used_tagpars' => 119
 		}
 	},
 	{#State 86
-		DEFAULT => -46
+		DEFAULT => -5
 	},
 	{#State 87
 		ACTIONS => {
-			"{" => 114
-		},
-		GOTOS => {
-			'used_tagpars' => 123
+			'Word' => 120
 		}
 	},
 	{#State 88
 		ACTIONS => {
-			'EOL' => 23,
-			'Table_separator' => 43,
-			'Include' => 42,
-			'Named_variable' => 78,
-			'StreamedPart' => 65,
-			'Table' => 45,
-			'Symbolic_variable' => 59,
-			'Space' => 70,
-			'Word' => 48,
-			'Tag_name' => 72,
-			'Embed' => 35
+			"{" => 115
 		},
+		DEFAULT => -123,
 		GOTOS => {
-			'included' => 22,
-			'text' => 124,
-			'table' => 68,
-			'embedded' => 58,
-			'basic' => 33,
-			'table_separator' => 62,
-			'literal' => 49,
-			'tag' => 60,
-			'element' => 34
+			'used_tagpars' => 116,
+			'optional_tagpars' => 121
 		}
 	},
 	{#State 89
-		DEFAULT => -78,
+		ACTIONS => {
+			'Include' => 36,
+			'Space' => 23,
+			'Embed' => 29,
+			'Named_variable' => 21,
+			'Word' => 27,
+			'Symbolic_variable' => 33,
+			'Tag_name' => 34,
+			'StreamedPart' => 28
+		},
 		GOTOS => {
-			'@16-1' => 125
+			'elements' => 122,
+			'embedded' => 31,
+			'included' => 24,
+			'tag' => 26,
+			'element' => 123
 		}
 	},
 	{#State 90
 		ACTIONS => {
-			'Colon' => 31,
-			"*" => 40,
-			"#" => 55,
-			'Upoint_cache_hit' => 61,
-			'Dpoint_cache_hit' => 50,
-			'Opoint_cache_hit' => 37
+			'Word' => 124
 		},
 		GOTOS => {
-			'olist' => 25,
-			'dpoint' => 27,
-			'list_part' => 126,
-			'opoint' => 54,
-			'opoint_opener' => 29,
-			'upoint' => 30,
-			'dlist' => 32,
-			'dlist_opener' => 74,
-			'ulist' => 51
+			'words' => 125
 		}
 	},
 	{#State 91
-		DEFAULT => -36
+		ACTIONS => {
+			'Word' => 124
+		},
+		GOTOS => {
+			'words' => 126
+		}
 	},
 	{#State 92
-		DEFAULT => -82
+		ACTIONS => {
+			'Embed' => 29,
+			'Named_variable' => 21,
+			'Table_separator' => 32,
+			'Symbolic_variable' => 33,
+			'Tag_name' => 34,
+			'Table' => 37,
+			'Include' => 36,
+			'Space' => 23,
+			'Word' => 27,
+			'EOL' => 65,
+			'StreamedPart' => 28
+		},
+		DEFAULT => -83,
+		GOTOS => {
+			'basic' => 56,
+			'embedded' => 31,
+			'table' => 22,
+			'literals' => 127,
+			'element' => 35,
+			'literal' => 128,
+			'table_separator' => 25,
+			'included' => 24,
+			'tag' => 26,
+			'optional_literals' => 129
+		}
 	},
 	{#State 93
-		DEFAULT => -81
+		ACTIONS => {
+			'Embed' => 29,
+			'Named_variable' => 21,
+			'Table_separator' => 32,
+			'Symbolic_variable' => 33,
+			'Tag_name' => 34,
+			'Table' => 37,
+			'Include' => 36,
+			'Space' => 23,
+			'Word' => 27,
+			'EOL' => 65,
+			'StreamedPart' => 28
+		},
+		GOTOS => {
+			'basic' => 56,
+			'embedded' => 31,
+			'table' => 22,
+			'element' => 35,
+			'literal' => 46,
+			'text' => 130,
+			'included' => 24,
+			'table_separator' => 25,
+			'tag' => 26
+		}
 	},
 	{#State 94
 		ACTIONS => {
-			'EOL' => 23,
-			'Table_separator' => 43,
-			'Include' => 42,
-			'Named_variable' => 78,
-			'StreamedPart' => 65,
-			'Table' => 45,
-			'Symbolic_variable' => 59,
-			'Space' => 70,
-			'Word' => 48,
-			'Tag_name' => 72,
-			'Embed' => 35
+			'Embed' => 29,
+			'Named_variable' => 21,
+			'Table_separator' => 32,
+			'Symbolic_variable' => 33,
+			'Tag_name' => 34,
+			'Table' => 37,
+			'Include' => 36,
+			'Space' => 23,
+			'Word' => 27,
+			'EOL' => 65,
+			'StreamedPart' => 28
 		},
 		GOTOS => {
-			'included' => 22,
-			'text' => 127,
-			'table' => 68,
-			'embedded' => 58,
-			'basic' => 33,
-			'table_separator' => 62,
-			'literal' => 49,
-			'tag' => 60,
-			'element' => 34
+			'basic' => 56,
+			'embedded' => 31,
+			'table' => 22,
+			'element' => 35,
+			'literal' => 46,
+			'text' => 131,
+			'included' => 24,
+			'table_separator' => 25,
+			'tag' => 26
 		}
 	},
 	{#State 95
 		ACTIONS => {
-			"{" => 114
+			'Table' => 37,
+			'Include' => 36,
+			'Space' => 23,
+			'Embed' => 29,
+			'Named_variable' => 21,
+			'Table_separator' => 32,
+			'Word' => 27,
+			'Symbolic_variable' => 33,
+			'Tag_name' => 34,
+			'StreamedPart' => 28
 		},
 		GOTOS => {
-			'used_tagpars' => 128
+			'basic' => 20,
+			'basics' => 132,
+			'embedded' => 31,
+			'included' => 24,
+			'table_separator' => 25,
+			'table' => 22,
+			'tag' => 26,
+			'element' => 35
 		}
 	},
 	{#State 96
 		DEFAULT => -30
 	},
 	{#State 97
-		ACTIONS => {
-			'Table' => 45,
-			'Symbolic_variable' => 59,
-			'Space' => 70,
-			'Table_separator' => 43,
-			'Include' => 42,
-			'Word' => 48,
-			'Tag_name' => 72,
-			'Named_variable' => 78,
-			'StreamedPart' => 65,
-			'Embed' => 35
-		},
-		GOTOS => {
-			'included' => 22,
-			'table' => 68,
-			'embedded' => 58,
-			'basic' => 79,
-			'basics' => 129,
-			'table_separator' => 62,
-			'tag' => 60,
-			'element' => 34
-		}
+		DEFAULT => -82
 	},
 	{#State 98
 		ACTIONS => {
-			"{" => 114
+			'Opoint_cache_hit' => 67,
+			'Colon' => 41,
+			"*" => 47,
+			"#" => 75,
+			'Upoint_cache_hit' => 60,
+			'Dpoint_cache_hit' => 44
 		},
 		GOTOS => {
-			'used_tagpars' => 130
+			'dlist' => 58,
+			'dlist_opener' => 61,
+			'upoint' => 45,
+			'opoint' => 54,
+			'olist' => 62,
+			'dpoint' => 55,
+			'ulist' => 63,
+			'opoint_opener' => 48,
+			'list_part' => 133
 		}
 	},
 	{#State 99
-		ACTIONS => {
-			'EOL' => 23,
-			'Table_separator' => 43,
-			'Include' => 42,
-			'Named_variable' => 78,
-			'StreamedPart' => 65,
-			'Table' => 45,
-			'Symbolic_variable' => 59,
-			'Space' => 70,
-			'Word' => 48,
-			'Tag_name' => 72,
-			'Embed' => 35
-		},
-		DEFAULT => -83,
-		GOTOS => {
-			'included' => 22,
-			'literals' => 131,
-			'table' => 68,
-			'embedded' => 58,
-			'basic' => 33,
-			'table_separator' => 62,
-			'literal' => 133,
-			'optional_literals' => 132,
-			'tag' => 60,
-			'element' => 34
-		}
+		DEFAULT => -81
 	},
 	{#State 100
-		DEFAULT => -44
+		DEFAULT => -78,
+		GOTOS => {
+			'@16-1' => 134
+		}
 	},
 	{#State 101
-		DEFAULT => -51
+		DEFAULT => -36
 	},
 	{#State 102
-		ACTIONS => {
-			'Empty_line' => 134,
-			'EOL' => 23,
-			'Table_separator' => 43,
-			'Include' => 42,
-			'Named_variable' => 78,
-			'StreamedPart' => 65,
-			'Table' => 45,
-			'Symbolic_variable' => 59,
-			'Space' => 70,
-			'Word' => 48,
-			'Tag_name' => 72,
-			'Embed' => 35
-		},
+		DEFAULT => -63,
 		GOTOS => {
-			'included' => 22,
-			'literals_and_empty_lines' => 136,
-			'table' => 68,
-			'embedded' => 58,
-			'literal_or_empty_line' => 135,
-			'basic' => 33,
-			'table_separator' => 62,
-			'literal' => 137,
-			'tag' => 60,
-			'element' => 34
+			'@9-1' => 135
 		}
 	},
 	{#State 103
 		ACTIONS => {
-			'Block_cache_hit' => 56,
-			'Ils' => 36
+			'Ils' => 52,
+			'Block_cache_hit' => 70
 		},
 		GOTOS => {
-			'compound_block' => 138,
-			'block' => 57
+			'compound_block' => 136,
+			'block' => 77
 		}
 	},
 	{#State 104
 		DEFAULT => -61
 	},
 	{#State 105
-		DEFAULT => -63,
+		ACTIONS => {
+			'Embed' => 29,
+			'Named_variable' => 21,
+			'Table_separator' => 32,
+			'Symbolic_variable' => 33,
+			'Tag_name' => 34,
+			'Table' => 37,
+			'Include' => 36,
+			'Space' => 23,
+			'Word' => 27,
+			'EOL' => 65,
+			'StreamedPart' => 28
+		},
 		GOTOS => {
-			'@9-1' => 139
+			'basic' => 56,
+			'embedded' => 31,
+			'table' => 22,
+			'element' => 35,
+			'literal' => 46,
+			'text' => 137,
+			'included' => 24,
+			'table_separator' => 25,
+			'tag' => 26
 		}
 	},
 	{#State 106
+		DEFAULT => -46
+	},
+	{#State 107
+		DEFAULT => -72,
+		GOTOS => {
+			'@13-2' => 138
+		}
+	},
+	{#State 108
+		ACTIONS => {
+			'Embed' => 29,
+			'Named_variable' => 21,
+			'Table_separator' => 32,
+			'Symbolic_variable' => 33,
+			'Tag_name' => 34,
+			'Table' => 37,
+			'Include' => 36,
+			'Space' => 23,
+			'Word' => 27,
+			'EOL' => 65,
+			'StreamedPart' => 28
+		},
+		GOTOS => {
+			'basic' => 56,
+			'embedded' => 31,
+			'table' => 22,
+			'element' => 35,
+			'literal' => 46,
+			'text' => 139,
+			'included' => 24,
+			'table_separator' => 25,
+			'tag' => 26
+		}
+	},
+	{#State 109
+		DEFAULT => -42
+	},
+	{#State 110
+		DEFAULT => -44
+	},
+	{#State 111
 		DEFAULT => -74,
 		GOTOS => {
 			'@14-2' => 140
 		}
 	},
-	{#State 107
-		ACTIONS => {
-			"{" => 114
-		},
-		DEFAULT => -123,
-		GOTOS => {
-			'used_tagpars' => 116,
-			'optional_tagpars' => 141
-		}
-	},
-	{#State 108
-		ACTIONS => {
-			'Word' => 117
-		},
-		GOTOS => {
-			'words' => 142
-		}
-	},
-	{#State 109
-		ACTIONS => {
-			'EOL' => 23,
-			'Table_separator' => 43,
-			'Include' => 42,
-			'Named_variable' => 78,
-			'StreamedPart' => 65,
-			'Table' => 45,
-			'Symbolic_variable' => 59,
-			'Space' => 70,
-			'Word' => 48,
-			'Tag_name' => 72,
-			'Embed' => 35
-		},
-		GOTOS => {
-			'included' => 22,
-			'text' => 143,
-			'table' => 68,
-			'embedded' => 58,
-			'basic' => 33,
-			'table_separator' => 62,
-			'literal' => 49,
-			'tag' => 60,
-			'element' => 34
-		}
-	},
-	{#State 110
-		DEFAULT => -5
-	},
-	{#State 111
-		ACTIONS => {
-			'Word' => 144
-		}
-	},
 	{#State 112
-		DEFAULT => -98
+		DEFAULT => -51
 	},
 	{#State 113
-		DEFAULT => -34
-	},
-	{#State 114
 		ACTIONS => {
-			'Word' => 146
+			'Embed' => 29,
+			'Empty_line' => 143,
+			'Named_variable' => 21,
+			'Table_separator' => 32,
+			'Symbolic_variable' => 33,
+			'Tag_name' => 34,
+			'Table' => 37,
+			'Include' => 36,
+			'Space' => 23,
+			'Word' => 27,
+			'EOL' => 65,
+			'StreamedPart' => 28
 		},
 		GOTOS => {
-			'tagpar' => 147,
-			'tagpars' => 145
+			'basic' => 56,
+			'literal' => 141,
+			'literals_and_empty_lines' => 144,
+			'embedded' => 31,
+			'included' => 24,
+			'table_separator' => 25,
+			'table' => 22,
+			'tag' => 26,
+			'literal_or_empty_line' => 142,
+			'element' => 35
+		}
+	},
+	{#State 114
+		DEFAULT => -144,
+		GOTOS => {
+			'@28-3' => 145
 		}
 	},
 	{#State 115
-		DEFAULT => -150,
+		ACTIONS => {
+			'Word' => 147
+		},
 		GOTOS => {
-			'@32-5' => 148
+			'tagpars' => 146,
+			'tagpar' => 148
 		}
 	},
 	{#State 116
 		DEFAULT => -124
 	},
 	{#State 117
-		DEFAULT => -114
-	},
-	{#State 118
-		ACTIONS => {
-			'EOL' => 149,
-			'Word' => 150
+		DEFAULT => -121,
+		GOTOS => {
+			'@19-3' => 149
 		}
 	},
+	{#State 118
+		DEFAULT => -147
+	},
 	{#State 119
-		ACTIONS => {
-			'EOL' => 23,
-			'Table_separator' => 43,
-			'Include' => 42,
-			'Named_variable' => 78,
-			'StreamedPart' => 65,
-			'Table' => 45,
-			'Symbolic_variable' => 59,
-			'Space' => 70,
-			'Word' => 48,
-			'Tag_name' => 72,
-			'Embed' => 35
-		},
+		DEFAULT => -137,
 		GOTOS => {
-			'included' => 22,
-			'text' => 151,
-			'table' => 68,
-			'embedded' => 58,
-			'basic' => 33,
-			'table_separator' => 62,
-			'literal' => 49,
-			'tag' => 60,
-			'element' => 34
+			'@24-3' => 150
 		}
 	},
 	{#State 120
-		DEFAULT => -48
+		DEFAULT => -7
 	},
 	{#State 121
-		DEFAULT => -102
+		DEFAULT => -150,
+		GOTOS => {
+			'@32-5' => 151
+		}
 	},
 	{#State 122
 		ACTIONS => {
+			'Include' => 36,
+			'Space' => 23,
 			'Colon' => 152,
-			'Symbolic_variable' => 59,
-			'Space' => 70,
-			'Include' => 42,
-			'Word' => 48,
-			'Tag_name' => 72,
-			'Named_variable' => 78,
-			'StreamedPart' => 65,
-			'Embed' => 35
+			'Embed' => 29,
+			'Named_variable' => 21,
+			'Word' => 27,
+			'Symbolic_variable' => 33,
+			'Tag_name' => 34,
+			'StreamedPart' => 28
 		},
 		GOTOS => {
-			'included' => 22,
-			'embedded' => 58,
-			'tag' => 60,
+			'embedded' => 31,
+			'included' => 24,
+			'tag' => 26,
 			'element' => 153
 		}
 	},
 	{#State 123
-		DEFAULT => -144,
-		GOTOS => {
-			'@28-3' => 154
-		}
+		DEFAULT => -102
 	},
 	{#State 124
-		DEFAULT => -66
+		DEFAULT => -114
 	},
 	{#State 125
 		ACTIONS => {
-			'Number' => 156
-		},
-		DEFAULT => -112,
-		GOTOS => {
-			'optional_number' => 155
+			'Word' => 154,
+			'EOL' => 155
 		}
 	},
 	{#State 126
-		DEFAULT => -37
+		ACTIONS => {
+			'Empty_line' => 156,
+			'Word' => 154
+		}
 	},
 	{#State 127
-		DEFAULT => -53
-	},
-	{#State 128
-		DEFAULT => -147
-	},
-	{#State 129
 		ACTIONS => {
-			'Table_separator' => 43,
-			'Include' => 42,
-			'Named_variable' => 78,
-			'StreamedPart' => 65,
-			'Table' => 45,
-			'Symbolic_variable' => 59,
-			'Space' => 70,
-			'Word' => 48,
-			"~" => 158,
-			'Tag_name' => 72,
-			'Embed' => 35
-		},
-		DEFAULT => -31,
-		GOTOS => {
-			'included' => 22,
-			'table' => 68,
-			'embedded' => 58,
-			'basic' => 112,
-			'table_separator' => 62,
-			'optional_headline_shortcut' => 157,
-			'tag' => 60,
-			'element' => 34
-		}
-	},
-	{#State 130
-		DEFAULT => -137,
-		GOTOS => {
-			'@24-3' => 159
-		}
-	},
-	{#State 131
-		ACTIONS => {
-			'EOL' => 23,
-			'Table_separator' => 43,
-			'Include' => 42,
-			'Named_variable' => 78,
-			'StreamedPart' => 65,
-			'Table' => 45,
-			'Symbolic_variable' => 59,
-			'Space' => 70,
-			'Word' => 48,
-			'Tag_name' => 72,
-			'Embed' => 35
+			'Embed' => 29,
+			'Named_variable' => 21,
+			'Table_separator' => 32,
+			'Symbolic_variable' => 33,
+			'Tag_name' => 34,
+			'Table' => 37,
+			'Include' => 36,
+			'Space' => 23,
+			'Word' => 27,
+			'EOL' => 65,
+			'StreamedPart' => 28
 		},
 		DEFAULT => -84,
 		GOTOS => {
-			'included' => 22,
-			'table' => 68,
-			'embedded' => 58,
-			'basic' => 33,
-			'table_separator' => 62,
-			'literal' => 160,
-			'tag' => 60,
-			'element' => 34
+			'basic' => 56,
+			'literal' => 157,
+			'embedded' => 31,
+			'included' => 24,
+			'table_separator' => 25,
+			'table' => 22,
+			'tag' => 26,
+			'element' => 35
 		}
+	},
+	{#State 128
+		DEFAULT => -85
+	},
+	{#State 129
+		ACTIONS => {
+			'Empty_line' => 158
+		}
+	},
+	{#State 130
+		DEFAULT => -53
+	},
+	{#State 131
+		DEFAULT => -48
 	},
 	{#State 132
 		ACTIONS => {
-			'Empty_line' => 161
+			'Embed' => 29,
+			'Named_variable' => 21,
+			'Table_separator' => 32,
+			"~" => 159,
+			'Symbolic_variable' => 33,
+			'Tag_name' => 34,
+			'Table' => 37,
+			'Include' => 36,
+			'Space' => 23,
+			'Word' => 27,
+			'StreamedPart' => 28
+		},
+		DEFAULT => -31,
+		GOTOS => {
+			'basic' => 81,
+			'embedded' => 31,
+			'optional_headline_shortcut' => 160,
+			'included' => 24,
+			'table_separator' => 25,
+			'table' => 22,
+			'tag' => 26,
+			'element' => 35
 		}
 	},
 	{#State 133
-		DEFAULT => -85
+		DEFAULT => -37
 	},
 	{#State 134
-		DEFAULT => -92
+		ACTIONS => {
+			'Number' => 161
+		},
+		DEFAULT => -112,
+		GOTOS => {
+			'optional_number' => 162
+		}
 	},
 	{#State 135
-		DEFAULT => -89
+		ACTIONS => {
+			'Empty_line' => 163
+		}
 	},
 	{#State 136
 		ACTIONS => {
-			'Empty_line' => 134,
-			'EOL' => 23,
-			'Table_separator' => 43,
-			'Include' => 42,
-			'Named_variable' => 78,
-			'StreamedPart' => 65,
-			'Heredoc_close' => 163,
-			'Table' => 45,
-			'Symbolic_variable' => 59,
-			'Space' => 70,
-			'Word' => 48,
-			'Tag_name' => 72,
-			'Embed' => 35
-		},
-		GOTOS => {
-			'included' => 22,
-			'table' => 68,
-			'embedded' => 58,
-			'literal_or_empty_line' => 162,
-			'basic' => 33,
-			'table_separator' => 62,
-			'literal' => 137,
-			'tag' => 60,
-			'element' => 34
-		}
-	},
-	{#State 137
-		DEFAULT => -91
-	},
-	{#State 138
-		ACTIONS => {
-			'Block_cache_hit' => 56,
-			'Ils' => 36,
-			"-" => 105
+			"-" => 102,
+			'Ils' => 52,
+			'Block_cache_hit' => 70
 		},
 		DEFAULT => -62,
 		GOTOS => {
-			'block' => 104,
-			'block_flagnew' => 103
+			'block_flagnew' => 103,
+			'block' => 104
+		}
+	},
+	{#State 137
+		DEFAULT => -66
+	},
+	{#State 138
+		ACTIONS => {
+			'Embed' => 29,
+			'Named_variable' => 21,
+			'Table_separator' => 32,
+			'Symbolic_variable' => 33,
+			'Tag_name' => 34,
+			'Table' => 37,
+			'Include' => 36,
+			'Space' => 23,
+			'Word' => 27,
+			'EOL' => 65,
+			'StreamedPart' => 28
+		},
+		GOTOS => {
+			'basic' => 56,
+			'embedded' => 31,
+			'table' => 22,
+			'element' => 35,
+			'literal' => 46,
+			'text' => 164,
+			'included' => 24,
+			'table_separator' => 25,
+			'tag' => 26
 		}
 	},
 	{#State 139
-		ACTIONS => {
-			'Empty_line' => 164
-		}
+		DEFAULT => -56
 	},
 	{#State 140
 		ACTIONS => {
-			'Table_separator' => 43,
-			'Include' => 42,
-			'Named_variable' => 78,
-			'StreamedPart' => 65,
-			'Table' => 45,
-			'Symbolic_variable' => 59,
-			'Space' => 70,
-			'Word' => 48,
-			'Tag_name' => 72,
-			'Embed' => 35
+			'Embed' => 29,
+			'Named_variable' => 21,
+			'Table_separator' => 32,
+			'Symbolic_variable' => 33,
+			'Tag_name' => 34,
+			'Table' => 37,
+			'Include' => 36,
+			'Space' => 23,
+			'Word' => 27,
+			'StreamedPart' => 28
 		},
 		DEFAULT => -95,
 		GOTOS => {
-			'included' => 22,
+			'basic' => 20,
 			'basics' => 165,
-			'table_separator' => 62,
-			'optional_basics' => 166,
-			'table' => 68,
-			'embedded' => 58,
-			'basic' => 79,
-			'element' => 34,
-			'tag' => 60
+			'embedded' => 31,
+			'table' => 22,
+			'element' => 35,
+			'included' => 24,
+			'table_separator' => 25,
+			'tag' => 26,
+			'optional_basics' => 166
 		}
 	},
 	{#State 141
-		DEFAULT => -121,
-		GOTOS => {
-			'@19-3' => 167
-		}
+		DEFAULT => -91
 	},
 	{#State 142
-		ACTIONS => {
-			'Empty_line' => 168,
-			'Word' => 150
-		}
+		DEFAULT => -89
 	},
 	{#State 143
-		DEFAULT => -56
+		DEFAULT => -92
 	},
 	{#State 144
-		DEFAULT => -7
+		ACTIONS => {
+			'Embed' => 29,
+			'Empty_line' => 143,
+			'Named_variable' => 21,
+			'Table_separator' => 32,
+			'Symbolic_variable' => 33,
+			'Tag_name' => 34,
+			'Table' => 37,
+			'Include' => 36,
+			'Space' => 23,
+			'Word' => 27,
+			'Heredoc_close' => 168,
+			'EOL' => 65,
+			'StreamedPart' => 28
+		},
+		GOTOS => {
+			'basic' => 56,
+			'literal' => 141,
+			'embedded' => 31,
+			'included' => 24,
+			'table_separator' => 25,
+			'table' => 22,
+			'tag' => 26,
+			'literal_or_empty_line' => 167,
+			'element' => 35
+		}
 	},
 	{#State 145
 		ACTIONS => {
-			'Space' => 170,
-			"}" => 169
+			'Embed' => 29,
+			'Empty_line' => 143,
+			'Named_variable' => 21,
+			'Table_separator' => 32,
+			'Symbolic_variable' => 33,
+			'Tag_name' => 34,
+			'Table' => 37,
+			'Include' => 36,
+			'Space' => 23,
+			'Word' => 27,
+			'EOL' => 65,
+			'StreamedPart' => 28
+		},
+		DEFAULT => -87,
+		GOTOS => {
+			'basic' => 56,
+			'embedded' => 31,
+			'optional_literals_and_empty_lines' => 170,
+			'table' => 22,
+			'literal_or_empty_line' => 142,
+			'element' => 35,
+			'literal' => 141,
+			'literals_and_empty_lines' => 169,
+			'table_separator' => 25,
+			'included' => 24,
+			'tag' => 26
 		}
 	},
 	{#State 146
-		DEFAULT => -128,
-		GOTOS => {
-			'@20-1' => 171
+		ACTIONS => {
+			'Space' => 172,
+			"}" => 171
 		}
 	},
 	{#State 147
-		DEFAULT => -126
-	},
-	{#State 148
-		ACTIONS => {
-			'Colon' => 172
+		DEFAULT => -128,
+		GOTOS => {
+			'@20-1' => 173
 		}
 	},
+	{#State 148
+		DEFAULT => -126
+	},
 	{#State 149
-		DEFAULT => -141,
+		ACTIONS => {
+			"<" => 174
+		},
+		DEFAULT => -133,
 		GOTOS => {
-			'@26-4' => 173
+			'optional_tagbody' => 175
 		}
 	},
 	{#State 150
-		DEFAULT => -115
+		ACTIONS => {
+			'Embed' => 29,
+			'Empty_line' => 143,
+			'Named_variable' => 21,
+			'Table_separator' => 32,
+			'Symbolic_variable' => 33,
+			'Tag_name' => 34,
+			'Table' => 37,
+			'Include' => 36,
+			'Space' => 23,
+			'Word' => 27,
+			'EOL' => 65,
+			'StreamedPart' => 28
+		},
+		DEFAULT => -87,
+		GOTOS => {
+			'basic' => 56,
+			'embedded' => 31,
+			'optional_literals_and_empty_lines' => 176,
+			'table' => 22,
+			'literal_or_empty_line' => 142,
+			'element' => 35,
+			'literal' => 141,
+			'literals_and_empty_lines' => 169,
+			'table_separator' => 25,
+			'included' => 24,
+			'tag' => 26
+		}
 	},
 	{#State 151
-		DEFAULT => -73
+		ACTIONS => {
+			'Colon' => 177
+		}
 	},
 	{#State 152
 		DEFAULT => -59
@@ -3103,446 +3233,389 @@ sub new {
 		DEFAULT => -103
 	},
 	{#State 154
-		ACTIONS => {
-			'Empty_line' => 134,
-			'EOL' => 23,
-			'Table_separator' => 43,
-			'Include' => 42,
-			'Named_variable' => 78,
-			'StreamedPart' => 65,
-			'Table' => 45,
-			'Symbolic_variable' => 59,
-			'Space' => 70,
-			'Word' => 48,
-			'Tag_name' => 72,
-			'Embed' => 35
-		},
-		DEFAULT => -87,
-		GOTOS => {
-			'included' => 22,
-			'literals_and_empty_lines' => 174,
-			'table' => 68,
-			'embedded' => 58,
-			'literal_or_empty_line' => 135,
-			'basic' => 33,
-			'optional_literals_and_empty_lines' => 175,
-			'table_separator' => 62,
-			'literal' => 137,
-			'tag' => 60,
-			'element' => 34
-		}
+		DEFAULT => -115
 	},
 	{#State 155
-		DEFAULT => -79,
+		DEFAULT => -141,
 		GOTOS => {
-			'@17-3' => 176
+			'@26-4' => 178
 		}
 	},
 	{#State 156
-		DEFAULT => -113
+		DEFAULT => -77
 	},
 	{#State 157
-		ACTIONS => {
-			'Empty_line' => 177
-		}
+		DEFAULT => -86
 	},
 	{#State 158
-		ACTIONS => {
-			'Space' => 181,
-			'Word' => 179
-		},
-		GOTOS => {
-			'words_or_spaces' => 180,
-			'word_or_space' => 178
-		}
+		DEFAULT => -69
 	},
 	{#State 159
 		ACTIONS => {
-			'Empty_line' => 134,
-			'EOL' => 23,
-			'Table_separator' => 43,
-			'Include' => 42,
-			'Named_variable' => 78,
-			'StreamedPart' => 65,
-			'Table' => 45,
-			'Symbolic_variable' => 59,
-			'Space' => 70,
-			'Word' => 48,
-			'Tag_name' => 72,
-			'Embed' => 35
+			'Space' => 180,
+			'Word' => 182
 		},
-		DEFAULT => -87,
 		GOTOS => {
-			'included' => 22,
-			'literals_and_empty_lines' => 174,
-			'table' => 68,
-			'embedded' => 58,
-			'literal_or_empty_line' => 135,
-			'basic' => 33,
-			'optional_literals_and_empty_lines' => 182,
-			'table_separator' => 62,
-			'literal' => 137,
-			'tag' => 60,
-			'element' => 34
+			'words_or_spaces' => 181,
+			'word_or_space' => 179
 		}
 	},
 	{#State 160
-		DEFAULT => -86
-	},
-	{#State 161
-		DEFAULT => -69
-	},
-	{#State 162
-		DEFAULT => -90
-	},
-	{#State 163
-		DEFAULT => -71
-	},
-	{#State 164
-		DEFAULT => -64
-	},
-	{#State 165
-		ACTIONS => {
-			'Table_separator' => 43,
-			'Include' => 42,
-			'Named_variable' => 78,
-			'StreamedPart' => 65,
-			'Table' => 45,
-			'Symbolic_variable' => 59,
-			'Space' => 70,
-			'Word' => 48,
-			'Tag_name' => 72,
-			'Embed' => 35
-		},
-		DEFAULT => -96,
-		GOTOS => {
-			'included' => 22,
-			'table' => 68,
-			'embedded' => 58,
-			'basic' => 112,
-			'table_separator' => 62,
-			'tag' => 60,
-			'element' => 34
-		}
-	},
-	{#State 166
 		ACTIONS => {
 			'Empty_line' => 183
 		}
 	},
-	{#State 167
-		ACTIONS => {
-			"<" => 185
-		},
-		DEFAULT => -133,
+	{#State 161
+		DEFAULT => -113
+	},
+	{#State 162
+		DEFAULT => -79,
 		GOTOS => {
-			'optional_tagbody' => 184
+			'@17-3' => 184
 		}
 	},
+	{#State 163
+		DEFAULT => -64
+	},
+	{#State 164
+		DEFAULT => -73
+	},
+	{#State 165
+		ACTIONS => {
+			'Embed' => 29,
+			'Named_variable' => 21,
+			'Table_separator' => 32,
+			'Symbolic_variable' => 33,
+			'Tag_name' => 34,
+			'Table' => 37,
+			'Include' => 36,
+			'Space' => 23,
+			'Word' => 27,
+			'StreamedPart' => 28
+		},
+		DEFAULT => -96,
+		GOTOS => {
+			'basic' => 81,
+			'embedded' => 31,
+			'included' => 24,
+			'table_separator' => 25,
+			'table' => 22,
+			'tag' => 26,
+			'element' => 35
+		}
+	},
+	{#State 166
+		ACTIONS => {
+			'Empty_line' => 185
+		}
+	},
+	{#State 167
+		DEFAULT => -90
+	},
 	{#State 168
-		DEFAULT => -77
+		DEFAULT => -71
 	},
 	{#State 169
-		DEFAULT => -125
+		ACTIONS => {
+			'Embed' => 29,
+			'Empty_line' => 143,
+			'Named_variable' => 21,
+			'Table_separator' => 32,
+			'Symbolic_variable' => 33,
+			'Tag_name' => 34,
+			'Table' => 37,
+			'Include' => 36,
+			'Space' => 23,
+			'Word' => 27,
+			'EOL' => 65,
+			'StreamedPart' => 28
+		},
+		DEFAULT => -88,
+		GOTOS => {
+			'basic' => 56,
+			'literal' => 141,
+			'embedded' => 31,
+			'included' => 24,
+			'table_separator' => 25,
+			'table' => 22,
+			'tag' => 26,
+			'literal_or_empty_line' => 167,
+			'element' => 35
+		}
 	},
 	{#State 170
 		ACTIONS => {
-			'Word' => 146
-		},
-		GOTOS => {
-			'tagpar' => 186
+			'Embedded' => 186
 		}
 	},
 	{#State 171
-		ACTIONS => {
-			"=" => 187
-		}
+		DEFAULT => -125
 	},
 	{#State 172
-		DEFAULT => -151,
+		ACTIONS => {
+			'Word' => 147
+		},
 		GOTOS => {
-			'@33-7' => 188
+			'tagpar' => 187
 		}
 	},
 	{#State 173
 		ACTIONS => {
-			'EOL' => 23,
-			'Table_separator' => 43,
-			'Include' => 42,
-			'Named_variable' => 78,
-			'StreamedPart' => 65,
-			'Table' => 45,
-			'Symbolic_variable' => 59,
-			'Space' => 70,
-			'Word' => 48,
-			'Tag_name' => 72,
-			'Embed' => 35
-		},
-		DEFAULT => -83,
-		GOTOS => {
-			'included' => 22,
-			'literals' => 131,
-			'table' => 68,
-			'embedded' => 58,
-			'basic' => 33,
-			'table_separator' => 62,
-			'literal' => 133,
-			'optional_literals' => 189,
-			'tag' => 60,
-			'element' => 34
+			"=" => 188
 		}
 	},
 	{#State 174
-		ACTIONS => {
-			'Empty_line' => 134,
-			'EOL' => 23,
-			'Table_separator' => 43,
-			'Include' => 42,
-			'Named_variable' => 78,
-			'StreamedPart' => 65,
-			'Table' => 45,
-			'Symbolic_variable' => 59,
-			'Space' => 70,
-			'Word' => 48,
-			'Tag_name' => 72,
-			'Embed' => 35
-		},
-		DEFAULT => -88,
+		DEFAULT => -134,
 		GOTOS => {
-			'included' => 22,
-			'table' => 68,
-			'embedded' => 58,
-			'literal_or_empty_line' => 162,
-			'basic' => 33,
-			'table_separator' => 62,
-			'literal' => 137,
-			'tag' => 60,
-			'element' => 34
+			'@22-1' => 189
 		}
 	},
 	{#State 175
-		ACTIONS => {
-			'Embedded' => 190
-		}
+		DEFAULT => -122
 	},
 	{#State 176
 		ACTIONS => {
-			'Empty_line' => 191
+			'Tabled' => 190
 		}
 	},
 	{#State 177
-		DEFAULT => -27
+		DEFAULT => -151,
+		GOTOS => {
+			'@33-7' => 191
+		}
 	},
 	{#State 178
-		DEFAULT => -116
+		ACTIONS => {
+			'Embed' => 29,
+			'Named_variable' => 21,
+			'Table_separator' => 32,
+			'Symbolic_variable' => 33,
+			'Tag_name' => 34,
+			'Table' => 37,
+			'Include' => 36,
+			'Space' => 23,
+			'Word' => 27,
+			'EOL' => 65,
+			'StreamedPart' => 28
+		},
+		DEFAULT => -83,
+		GOTOS => {
+			'basic' => 56,
+			'embedded' => 31,
+			'table' => 22,
+			'literals' => 127,
+			'element' => 35,
+			'literal' => 128,
+			'table_separator' => 25,
+			'included' => 24,
+			'tag' => 26,
+			'optional_literals' => 192
+		}
 	},
 	{#State 179
-		DEFAULT => -118
+		DEFAULT => -116
 	},
 	{#State 180
+		DEFAULT => -119
+	},
+	{#State 181
 		ACTIONS => {
-			'Space' => 181,
-			'Word' => 179
+			'Space' => 180,
+			'Word' => 182
 		},
 		DEFAULT => -32,
 		GOTOS => {
-			'word_or_space' => 192
+			'word_or_space' => 193
 		}
-	},
-	{#State 181
-		DEFAULT => -119
 	},
 	{#State 182
-		ACTIONS => {
-			'Tabled' => 193
-		}
+		DEFAULT => -118
 	},
 	{#State 183
-		DEFAULT => -75
+		DEFAULT => -27
 	},
 	{#State 184
-		DEFAULT => -122
-	},
-	{#State 185
-		DEFAULT => -134,
-		GOTOS => {
-			'@22-1' => 194
+		ACTIONS => {
+			'Empty_line' => 194
 		}
 	},
+	{#State 185
+		DEFAULT => -75
+	},
 	{#State 186
-		DEFAULT => -127
+		DEFAULT => -145
 	},
 	{#State 187
+		DEFAULT => -127
+	},
+	{#State 188
 		DEFAULT => -129,
 		GOTOS => {
 			'@21-3' => 195
 		}
 	},
-	{#State 188
-		ACTIONS => {
-			'EOL' => 23,
-			'Table_separator' => 43,
-			'Include' => 42,
-			'Named_variable' => 78,
-			'StreamedPart' => 65,
-			'Table' => 45,
-			'Symbolic_variable' => 59,
-			'Space' => 70,
-			'Word' => 48,
-			'Tag_name' => 72,
-			'Embed' => 35
-		},
-		GOTOS => {
-			'included' => 22,
-			'text' => 196,
-			'table' => 68,
-			'embedded' => 58,
-			'basic' => 33,
-			'table_separator' => 62,
-			'literal' => 49,
-			'tag' => 60,
-			'element' => 34
-		}
-	},
 	{#State 189
 		ACTIONS => {
-			'Empty_line' => 197
+			'Embed' => 29,
+			'Named_variable' => 21,
+			'Table_separator' => 32,
+			'Symbolic_variable' => 33,
+			'Tag_name' => 34,
+			'Table' => 37,
+			'Include' => 36,
+			'Space' => 23,
+			'Word' => 27,
+			'EOL' => 65,
+			'StreamedPart' => 28
+		},
+		GOTOS => {
+			'basic' => 56,
+			'literal' => 128,
+			'embedded' => 31,
+			'included' => 24,
+			'table_separator' => 25,
+			'table' => 22,
+			'tag' => 26,
+			'literals' => 196,
+			'element' => 35
 		}
 	},
 	{#State 190
-		DEFAULT => -145
-	},
-	{#State 191
-		DEFAULT => -80
-	},
-	{#State 192
-		DEFAULT => -117
-	},
-	{#State 193
 		DEFAULT => -138
 	},
-	{#State 194
+	{#State 191
 		ACTIONS => {
-			'EOL' => 23,
-			'Table_separator' => 43,
-			'Include' => 42,
-			'Named_variable' => 78,
-			'StreamedPart' => 65,
-			'Table' => 45,
-			'Symbolic_variable' => 59,
-			'Space' => 70,
-			'Word' => 48,
-			'Tag_name' => 72,
-			'Embed' => 35
+			'Embed' => 29,
+			'Named_variable' => 21,
+			'Table_separator' => 32,
+			'Symbolic_variable' => 33,
+			'Tag_name' => 34,
+			'Table' => 37,
+			'Include' => 36,
+			'Space' => 23,
+			'Word' => 27,
+			'EOL' => 65,
+			'StreamedPart' => 28
 		},
 		GOTOS => {
-			'included' => 22,
-			'literals' => 198,
-			'table' => 68,
-			'embedded' => 58,
-			'basic' => 33,
-			'table_separator' => 62,
-			'literal' => 133,
-			'tag' => 60,
-			'element' => 34
+			'basic' => 56,
+			'embedded' => 31,
+			'table' => 22,
+			'element' => 35,
+			'literal' => 46,
+			'text' => 197,
+			'included' => 24,
+			'table_separator' => 25,
+			'tag' => 26
 		}
+	},
+	{#State 192
+		ACTIONS => {
+			'Empty_line' => 198
+		}
+	},
+	{#State 193
+		DEFAULT => -117
+	},
+	{#State 194
+		DEFAULT => -80
 	},
 	{#State 195
 		ACTIONS => {
-			"\"" => 199,
-			'Word' => 201
+			"\"" => 201,
+			'Word' => 199
 		},
 		GOTOS => {
 			'tagvalue' => 200
 		}
 	},
 	{#State 196
-		DEFAULT => -152
+		ACTIONS => {
+			'Table' => 37,
+			'Include' => 36,
+			'Space' => 23,
+			'Embed' => 29,
+			'Named_variable' => 21,
+			'Table_separator' => 32,
+			'Word' => 27,
+			'Symbolic_variable' => 33,
+			'EOL' => 65,
+			'Tag_name' => 34,
+			'StreamedPart' => 28,
+			">" => 202
+		},
+		GOTOS => {
+			'basic' => 56,
+			'literal' => 157,
+			'embedded' => 31,
+			'included' => 24,
+			'table_separator' => 25,
+			'table' => 22,
+			'tag' => 26,
+			'element' => 35
+		}
 	},
 	{#State 197
-		DEFAULT => -142
+		DEFAULT => -152
 	},
 	{#State 198
-		ACTIONS => {
-			'EOL' => 23,
-			'Table_separator' => 43,
-			'Include' => 42,
-			'Named_variable' => 78,
-			'StreamedPart' => 65,
-			'Table' => 45,
-			'Symbolic_variable' => 59,
-			">" => 202,
-			'Space' => 70,
-			'Word' => 48,
-			'Tag_name' => 72,
-			'Embed' => 35
-		},
-		GOTOS => {
-			'included' => 22,
-			'table' => 68,
-			'embedded' => 58,
-			'basic' => 33,
-			'table_separator' => 62,
-			'literal' => 160,
-			'tag' => 60,
-			'element' => 34
-		}
+		DEFAULT => -142
 	},
 	{#State 199
-		ACTIONS => {
-			'Table' => 45,
-			'Symbolic_variable' => 59,
-			'Space' => 70,
-			'Table_separator' => 43,
-			'Include' => 42,
-			'Word' => 48,
-			'Tag_name' => 72,
-			'Named_variable' => 78,
-			'StreamedPart' => 65,
-			'Embed' => 35
-		},
-		GOTOS => {
-			'included' => 22,
-			'table' => 68,
-			'embedded' => 58,
-			'basic' => 79,
-			'basics' => 203,
-			'table_separator' => 62,
-			'tag' => 60,
-			'element' => 34
-		}
+		DEFAULT => -131
 	},
 	{#State 200
 		DEFAULT => -130
 	},
 	{#State 201
-		DEFAULT => -131
+		ACTIONS => {
+			'Table' => 37,
+			'Include' => 36,
+			'Space' => 23,
+			'Embed' => 29,
+			'Named_variable' => 21,
+			'Table_separator' => 32,
+			'Word' => 27,
+			'Symbolic_variable' => 33,
+			'Tag_name' => 34,
+			'StreamedPart' => 28
+		},
+		GOTOS => {
+			'basic' => 20,
+			'basics' => 203,
+			'embedded' => 31,
+			'included' => 24,
+			'table_separator' => 25,
+			'table' => 22,
+			'tag' => 26,
+			'element' => 35
+		}
 	},
 	{#State 202
 		DEFAULT => -135
 	},
 	{#State 203
 		ACTIONS => {
-			'Table' => 45,
-			'Symbolic_variable' => 59,
+			'Embed' => 29,
+			'Named_variable' => 21,
+			'Table_separator' => 32,
+			'Symbolic_variable' => 33,
+			'Tag_name' => 34,
+			'Table' => 37,
+			'Include' => 36,
+			'Space' => 23,
 			"\"" => 204,
-			'Space' => 70,
-			'Table_separator' => 43,
-			'Include' => 42,
-			'Word' => 48,
-			'Tag_name' => 72,
-			'Named_variable' => 78,
-			'StreamedPart' => 65,
-			'Embed' => 35
+			'Word' => 27,
+			'StreamedPart' => 28
 		},
 		GOTOS => {
-			'included' => 22,
-			'table' => 68,
-			'embedded' => 58,
-			'basic' => 112,
-			'table_separator' => 62,
-			'tag' => 60,
-			'element' => 34
+			'basic' => 81,
+			'embedded' => 31,
+			'included' => 24,
+			'table_separator' => 25,
+			'table' => 22,
+			'tag' => 26,
+			'element' => 35
 		}
 	},
 	{#State 204
@@ -3557,7 +3630,7 @@ sub new {
 	[#Rule 1
 		 'document', 1,
 sub
-#line 1478 "ppParser.yp"
+#line 1551 "ppParser.yp"
 {
              # skip empty "paragraphs"
              unless ($_[1][0] eq '' or not @{$_[1][0]})
@@ -3598,7 +3671,7 @@ sub
 	[#Rule 2
 		 'document', 2,
 sub
-#line 1515 "ppParser.yp"
+#line 1588 "ppParser.yp"
 {
              # skip empty "paragraphs"
              unless ($_[2][0] eq '' or not @{$_[2][0]})
@@ -3645,7 +3718,7 @@ sub
 	[#Rule 4
 		 '@1-1', 0,
 sub
-#line 1560 "ppParser.yp"
+#line 1633 "ppParser.yp"
 {
                               # switch to pfiltered mode
                               stateManager(STATE_PFILTER);
@@ -3654,7 +3727,7 @@ sub
 	[#Rule 5
 		 'optional_paragraph_filter', 4,
 sub
-#line 1565 "ppParser.yp"
+#line 1638 "ppParser.yp"
 {
                               # back to default mode
                               stateManager(STATE_PFILTERED);
@@ -3666,7 +3739,7 @@ sub
 	[#Rule 6
 		 'paragraph_filters', 1,
 sub
-#line 1577 "ppParser.yp"
+#line 1650 "ppParser.yp"
 {
                       # start a new filter list
                       [[$_[1][0]], $_[1][1]];
@@ -3675,7 +3748,7 @@ sub
 	[#Rule 7
 		 'paragraph_filters', 3,
 sub
-#line 1582 "ppParser.yp"
+#line 1655 "ppParser.yp"
 {
                       # append to filter list and reply updated list
                       push(@{$_[1][0]}, $_[3][0]);
@@ -3691,7 +3764,7 @@ sub
 	[#Rule 10
 		 '@2-1', 0,
 sub
-#line 1599 "ppParser.yp"
+#line 1672 "ppParser.yp"
 {
                     # filter set?
                     if ($_[1])
@@ -3701,14 +3774,14 @@ sub
 
                       # Disable storage of a checksum. (A filter can make the paragraph depending
                       # on something outside the paragraph - the paragraph becomes dynamic.)
-                      $flags{checksummed}=0 if $_[1];
+                      $flags{checksummed}=0;
                      }
                    }
 	],
 	[#Rule 11
 		 'built_paragraph', 3,
 sub
-#line 1612 "ppParser.yp"
+#line 1685 "ppParser.yp"
 {
                     # reset the "extra token" flag (it already worked when the parser
                     # reaches this point)
@@ -3767,7 +3840,7 @@ sub
 	[#Rule 14
 		 'original_paragraph', 1,
 sub
-#line 1666 "ppParser.yp"
+#line 1739 "ppParser.yp"
 {
                       # check if this paragraph consists of exactly one table only
                       if (
@@ -3830,7 +3903,7 @@ sub
 	[#Rule 26
 		 '@3-1', 0,
 sub
-#line 1716 "ppParser.yp"
+#line 1789 "ppParser.yp"
 {
              # switch to headline mode
              stateManager(STATE_HEADLINE);
@@ -3845,7 +3918,7 @@ sub
 	[#Rule 27
 		 'headline', 5,
 sub
-#line 1727 "ppParser.yp"
+#line 1800 "ppParser.yp"
 {
              # back to default mode
              stateManager(STATE_DEFAULT);
@@ -3854,7 +3927,7 @@ sub
              warn "[Trace] $sourceFile, line $_[5][1]: Headline completed.\n" if $flags{trace} & TRACE_PARAGRAPHS;
 
              # remove trailing whitespaces (the final one represents the final newline)
-             pop(@{$_[3][0]}) while $_[3][0][$#{$_[3][0]}]=~/^\s*$/;
+             pop(@{$_[3][0]}) while @{$_[3][0]} and $_[3][0][-1]=~/^\s*$/;
 
              # abbreviation declared?
              if ($_[4][0])
@@ -3894,7 +3967,7 @@ sub
 	[#Rule 28
 		 'headline', 1,
 sub
-#line 1772 "ppParser.yp"
+#line 1845 "ppParser.yp"
 {
              # update headline level hint
              $flags{headlineLevel}=$_[1][0][0][STREAM_DIR_DATA];
@@ -3909,7 +3982,7 @@ sub
 	[#Rule 29
 		 'headline_level', 1,
 sub
-#line 1786 "ppParser.yp"
+#line 1859 "ppParser.yp"
 {
                    # switch to headline intro mode
                    stateManager(STATE_HEADLINE_LEVEL);
@@ -3921,7 +3994,7 @@ sub
 	[#Rule 30
 		 'headline_level', 2,
 sub
-#line 1794 "ppParser.yp"
+#line 1867 "ppParser.yp"
 {
                    # update counter and reply it
                    [$_[1][0]+1, $_[1][1]];
@@ -3930,7 +4003,7 @@ sub
 	[#Rule 31
 		 'optional_headline_shortcut', 0,
 sub
-#line 1802 "ppParser.yp"
+#line 1875 "ppParser.yp"
 {
                               # nothing declared: supply an empty shortcut string
                               ['', $lineNrs{$inHandle}];
@@ -3939,7 +4012,7 @@ sub
 	[#Rule 32
 		 'optional_headline_shortcut', 2,
 sub
-#line 1807 "ppParser.yp"
+#line 1880 "ppParser.yp"
 {
                               # reply the shortcut string
                               [join('', @{$_[2][0]}), $lineNrs{$inHandle}];
@@ -3948,7 +4021,7 @@ sub
 	[#Rule 33
 		 '@4-1', 0,
 sub
-#line 1815 "ppParser.yp"
+#line 1888 "ppParser.yp"
 {
                # switch to condition mode
                stateManager(STATE_CONDITION);
@@ -3960,7 +4033,7 @@ sub
 	[#Rule 34
 		 'condition', 4,
 sub
-#line 1823 "ppParser.yp"
+#line 1896 "ppParser.yp"
 {
                # back to default mode
                stateManager(STATE_DEFAULT);
@@ -4017,7 +4090,7 @@ sub
 	[#Rule 36
 		 'list', 2,
 sub
-#line 1877 "ppParser.yp"
+#line 1950 "ppParser.yp"
 {
          # update token list and reply it
          push(@{$_[1][0]}, @{$_[2][0]});
@@ -4027,7 +4100,7 @@ sub
 	[#Rule 37
 		 'list', 3,
 sub
-#line 1883 "ppParser.yp"
+#line 1956 "ppParser.yp"
 {
          # update statistics, if necessary (shifters are not passed as standalone paragraphs, so ...)
          $statistics{$_[2][0][0][0]}++;
@@ -4048,7 +4121,7 @@ sub
 	[#Rule 38
 		 'list_part', 1,
 sub
-#line 1903 "ppParser.yp"
+#line 1976 "ppParser.yp"
 {
               # the first point may start by a certain number, check this
               my $start=(defined $_[1][0][0][STREAM_DIR_DATA] and $_[1][0][0][STREAM_DIR_DATA]>1) ? $_[1][0][0][STREAM_DIR_DATA] : 1;
@@ -4071,7 +4144,7 @@ sub
 	[#Rule 39
 		 'list_part', 1,
 sub
-#line 1922 "ppParser.yp"
+#line 1995 "ppParser.yp"
 {
               # reset ordered list flag
               $flags{olist}=0;
@@ -4094,7 +4167,7 @@ sub
 	[#Rule 40
 		 'list_part', 1,
 sub
-#line 1941 "ppParser.yp"
+#line 2014 "ppParser.yp"
 {
               # reset ordered list flag
               $flags{olist}=0;
@@ -4120,7 +4193,7 @@ sub
 	[#Rule 42
 		 'olist', 2,
 sub
-#line 1964 "ppParser.yp"
+#line 2037 "ppParser.yp"
 {
           # update token list and reply it
           push(@{$_[1][0]}, @{$_[2][0]});
@@ -4133,7 +4206,7 @@ sub
 	[#Rule 44
 		 'ulist', 2,
 sub
-#line 1974 "ppParser.yp"
+#line 2047 "ppParser.yp"
 {
           # update token list and reply it
           push(@{$_[1][0]}, @{$_[2][0]});
@@ -4146,7 +4219,7 @@ sub
 	[#Rule 46
 		 'dlist', 2,
 sub
-#line 1984 "ppParser.yp"
+#line 2057 "ppParser.yp"
 {
           # update token list and reply it
           push(@{$_[1][0]}, @{$_[2][0]});
@@ -4156,7 +4229,7 @@ sub
 	[#Rule 47
 		 '@5-1', 0,
 sub
-#line 1993 "ppParser.yp"
+#line 2066 "ppParser.yp"
 {
            # switch to opoint mode
            stateManager(STATE_OPOINT);
@@ -4168,7 +4241,7 @@ sub
 	[#Rule 48
 		 'opoint', 3,
 sub
-#line 2001 "ppParser.yp"
+#line 2074 "ppParser.yp"
 {
            # update statistics (list points are not passed as standalone paragraphs, so ...)
            $statistics{&DIRECTIVE_OPOINT}++;
@@ -4180,7 +4253,7 @@ sub
            splice(@{$_[3][0]}, 1, 1) while not ref($_[3][0][1]) and $_[3][0][1]=~/^\s*$/;
 
            # reply data (they are already well prepared except that they are marked as text)
-           $_[3][0][0][STREAM_DIR_TYPE]=$_[3][0][$#{$_[3][0]}][STREAM_DIR_TYPE]=&DIRECTIVE_OPOINT;
+           $_[3][0][0][STREAM_DIR_TYPE]=$_[3][0][-1][STREAM_DIR_TYPE]=&DIRECTIVE_OPOINT;
 
            # update list level hints as necessary
            $olistLevels[0]=(($flags{olist} or $_[1][0]) and @olistLevels) ? $olistLevels[0]+1 : 1;
@@ -4189,7 +4262,7 @@ sub
 	   if ($_[1][0] and not $flags{olist} and $olistLevels[0]>1)
 	     {
 	      push(@{$_[3][0][0]}, $olistLevels[0]);
-	      push(@{$_[3][0][$#{$_[3][0]}]}, $olistLevels[0]);
+	      push(@{$_[3][0][-1]}, $olistLevels[0]);
 	     }
 
            # update ordered list flag
@@ -4206,7 +4279,7 @@ sub
 	[#Rule 49
 		 'opoint', 1,
 sub
-#line 2035 "ppParser.yp"
+#line 2108 "ppParser.yp"
 {
            # update list level hints as necessary
            $olistLevels[0]=($flags{olist} and @olistLevels) ? $olistLevels[0]+1 : 1;
@@ -4224,19 +4297,19 @@ sub
 	[#Rule 50
 		 'opoint_opener', 1,
 sub
-#line 2053 "ppParser.yp"
+#line 2126 "ppParser.yp"
 {[0, $_[1][1]];}
 	],
 	[#Rule 51
 		 'opoint_opener', 2,
 sub
-#line 2055 "ppParser.yp"
+#line 2128 "ppParser.yp"
 {[1, $_[1][1]];}
 	],
 	[#Rule 52
 		 '@6-1', 0,
 sub
-#line 2060 "ppParser.yp"
+#line 2133 "ppParser.yp"
 {
            # switch to upoint mode
            stateManager(STATE_UPOINT);
@@ -4248,7 +4321,7 @@ sub
 	[#Rule 53
 		 'upoint', 3,
 sub
-#line 2068 "ppParser.yp"
+#line 2141 "ppParser.yp"
 {
            # update statistics (list points are not passed as standalone paragraphs, so ...)
            $statistics{&DIRECTIVE_UPOINT}++;
@@ -4260,10 +4333,10 @@ sub
            splice(@{$_[3][0]}, 1, 1) while not ref($_[3][0][1]) and $_[3][0][1]=~/^\s*$/;
 
            # remove trailing whitespaces from point text (it represents the final newline character)
-           splice(@{$_[3][0]}, -2, 1) while not ref($_[3][0][$#{$_[3][0]}-1]) and $_[3][0][$#{$_[3][0]}-1]=~/^\s*$/;
+           splice(@{$_[3][0]}, -2, 1) while not ref($_[3][0][-2]) and $_[3][0][-2]=~/^\s*$/;
 
            # reply data (they are already well prepared except that they are marked as text)
-           $_[3][0][0][STREAM_DIR_TYPE]=$_[3][0][$#{$_[3][0]}][STREAM_DIR_TYPE]=&DIRECTIVE_UPOINT;
+           $_[3][0][0][STREAM_DIR_TYPE]=$_[3][0][-1][STREAM_DIR_TYPE]=&DIRECTIVE_UPOINT;
 
 	   # update checksums, if possible
            $flags{checksummed}=0 unless $flags{virtualParagraphStart};
@@ -4279,14 +4352,14 @@ sub
 	[#Rule 55
 		 '@7-1', 0,
 sub
-#line 2097 "ppParser.yp"
+#line 2170 "ppParser.yp"
 {
           }
 	],
 	[#Rule 56
 		 'dpoint', 3,
 sub
-#line 2100 "ppParser.yp"
+#line 2173 "ppParser.yp"
 {
            # update statistics (list points are not passed as standalone paragraphs, so ...)
            $statistics{&DIRECTIVE_DPOINT}++;
@@ -4300,7 +4373,7 @@ sub
            # reply data (they are already well prepared except that they are marked as text, and that the definition item stream needs to be added)
            my ($hints1, $hints2)=({nr=>++$directiveCounter}, {nr=>++$directiveCounter});
            $_[3][0][0]=[$hints1, DIRECTIVE_DPOINT, DIRECTIVE_START];
-           $_[3][0][$#{$_[3][0]}]=[$hints1, DIRECTIVE_DPOINT, DIRECTIVE_COMPLETE];
+           $_[3][0][-1]=[$hints1, DIRECTIVE_DPOINT, DIRECTIVE_COMPLETE];
 
            # insert the definition item stream
            splice(@{$_[3][0]}, 1, 0,
@@ -4323,7 +4396,7 @@ sub
 	[#Rule 58
 		 '@8-1', 0,
 sub
-#line 2135 "ppParser.yp"
+#line 2208 "ppParser.yp"
 {
                  # switch to dlist item mode
                  stateManager(STATE_DPOINT_ITEM);
@@ -4335,7 +4408,7 @@ sub
 	[#Rule 59
 		 'dlist_opener', 4,
 sub
-#line 2143 "ppParser.yp"
+#line 2216 "ppParser.yp"
 {
                  # switch to dlist body mode
                  stateManager(STATE_DPOINT);
@@ -4350,7 +4423,7 @@ sub
 	[#Rule 61
 		 'compound_block', 2,
 sub
-#line 2156 "ppParser.yp"
+#line 2229 "ppParser.yp"
 {
                    # this is tricky - to combine both blocks, we have to remove the already
                    # embedded stop/start directives and to supply the ...
@@ -4370,7 +4443,7 @@ sub
 	[#Rule 62
 		 'compound_block', 3,
 sub
-#line 2172 "ppParser.yp"
+#line 2245 "ppParser.yp"
 {
                    # update statistics (for the first part which is completed by the intermediate flag paragraph)
                    $statistics{&DIRECTIVE_BLOCK}++;
@@ -4390,7 +4463,7 @@ sub
 	[#Rule 63
 		 '@9-1', 0,
 sub
-#line 2191 "ppParser.yp"
+#line 2264 "ppParser.yp"
 {
                   # switch to control mode
                   stateManager(STATE_CONTROL);
@@ -4402,7 +4475,7 @@ sub
 	[#Rule 64
 		 'block_flagnew', 3,
 sub
-#line 2199 "ppParser.yp"
+#line 2272 "ppParser.yp"
 {
                   # back to default mode
                   stateManager(STATE_DEFAULT);
@@ -4417,7 +4490,7 @@ sub
 	[#Rule 65
 		 '@10-1', 0,
 sub
-#line 2213 "ppParser.yp"
+#line 2286 "ppParser.yp"
 {
           # switch to block mode
           stateManager(STATE_BLOCK);
@@ -4429,7 +4502,7 @@ sub
 	[#Rule 66
 		 'block', 3,
 sub
-#line 2221 "ppParser.yp"
+#line 2294 "ppParser.yp"
 {
           # trace, if necessary
           warn "[Trace] $sourceFile, line $_[3][1]: Block completed.\n" if $flags{trace} & TRACE_PARAGRAPHS;
@@ -4456,7 +4529,7 @@ sub
 	[#Rule 68
 		 '@11-1', 0,
 sub
-#line 2245 "ppParser.yp"
+#line 2318 "ppParser.yp"
 {
          # enter text mode - unless we are in a block (or point (which already set this mode itself))
          unless (   $parserState==STATE_BLOCK
@@ -4478,7 +4551,7 @@ sub
 	[#Rule 69
 		 'text', 4,
 sub
-#line 2264 "ppParser.yp"
+#line 2337 "ppParser.yp"
 {
          # trace, if necessary
          warn "[Trace] $sourceFile, line $_[4][1]: Text completed.\n" unless    not $flags{trace} & TRACE_PARAGRAPHS
@@ -4523,7 +4596,7 @@ sub
 	[#Rule 70
 		 '@12-1', 0,
 sub
-#line 2308 "ppParser.yp"
+#line 2381 "ppParser.yp"
 {
              # switch to verbatim mode
              stateManager(STATE_VERBATIM);
@@ -4541,7 +4614,7 @@ sub
 	[#Rule 71
 		 'verbatim', 4,
 sub
-#line 2323 "ppParser.yp"
+#line 2396 "ppParser.yp"
 {
              # trace, if necessary
              warn "[Trace] $sourceFile, line $_[4][1]: Verbatim block completed.\n" if $flags{trace} & TRACE_PARAGRAPHS;
@@ -4570,7 +4643,7 @@ sub
 	[#Rule 72
 		 '@13-2', 0,
 sub
-#line 2351 "ppParser.yp"
+#line 2424 "ppParser.yp"
 {
                         # switch to text mode to allow *all* characters starting a variable value!
                         stateManager(STATE_TEXT);
@@ -4582,7 +4655,7 @@ sub
 	[#Rule 73
 		 'variable_assignment', 4,
 sub
-#line 2359 "ppParser.yp"
+#line 2432 "ppParser.yp"
 {
                         # remove text directives and the final space (made from the final EOL)
                         shift(@{$_[4][0]});
@@ -4620,7 +4693,7 @@ sub
 	[#Rule 74
 		 '@14-2', 0,
 sub
-#line 2396 "ppParser.yp"
+#line 2469 "ppParser.yp"
 {
             # switch to comment mode
             stateManager(STATE_COMMENT);
@@ -4632,7 +4705,7 @@ sub
 	[#Rule 75
 		 'comment', 5,
 sub
-#line 2404 "ppParser.yp"
+#line 2477 "ppParser.yp"
 {
             # back to default mode
             stateManager(STATE_DEFAULT);
@@ -4658,7 +4731,7 @@ sub
 	[#Rule 76
 		 '@15-1', 0,
 sub
-#line 2429 "ppParser.yp"
+#line 2502 "ppParser.yp"
 {
                        # no mode switch necessary
 
@@ -4669,7 +4742,7 @@ sub
 	[#Rule 77
 		 'dstream_entrypoint', 4,
 sub
-#line 2436 "ppParser.yp"
+#line 2509 "ppParser.yp"
 {
                        # no mode switch necessary
 
@@ -4736,7 +4809,7 @@ sub
 	[#Rule 78
 		 '@16-1', 0,
 sub
-#line 2502 "ppParser.yp"
+#line 2575 "ppParser.yp"
 {
                 # temporarily activate number detection
                 push(@specialStack, $specials{number});
@@ -4746,7 +4819,7 @@ sub
 	[#Rule 79
 		 '@17-3', 0,
 sub
-#line 2508 "ppParser.yp"
+#line 2581 "ppParser.yp"
 {
                 # restore previous number detection mode
                 $specials{number}=pop(@specialStack);
@@ -4761,7 +4834,7 @@ sub
 	[#Rule 80
 		 'list_shift', 5,
 sub
-#line 2519 "ppParser.yp"
+#line 2592 "ppParser.yp"
 {
                 # back to default mode
                 stateManager(STATE_DEFAULT);
@@ -4791,7 +4864,7 @@ sub
 	[#Rule 81
 		 'list_shifter', 1,
 sub
-#line 2548 "ppParser.yp"
+#line 2621 "ppParser.yp"
 {
                  # reply a flag
                  [LIST_SHIFT_RIGHT, $_[1][1]];
@@ -4800,7 +4873,7 @@ sub
 	[#Rule 82
 		 'list_shifter', 1,
 sub
-#line 2553 "ppParser.yp"
+#line 2626 "ppParser.yp"
 {
                  # reply a flag
                  [LIST_SHIFT_LEFT, $_[1][1]];
@@ -4809,7 +4882,7 @@ sub
 	[#Rule 83
 		 'optional_literals', 0,
 sub
-#line 2561 "ppParser.yp"
+#line 2634 "ppParser.yp"
 {
                       # start a new, empty list and reply it
                       [[], $lineNrs{$inHandle}];
@@ -4824,7 +4897,7 @@ sub
 	[#Rule 86
 		 'literals', 2,
 sub
-#line 2571 "ppParser.yp"
+#line 2644 "ppParser.yp"
 {
              # update token list and reply it
              push(@{$_[1][0]}, @{$_[2][0]});
@@ -4834,7 +4907,7 @@ sub
 	[#Rule 87
 		 'optional_literals_and_empty_lines', 0,
 sub
-#line 2580 "ppParser.yp"
+#line 2653 "ppParser.yp"
 {
                                       # start a new, empty list and reply it
                                       [[], $lineNrs{$inHandle}];
@@ -4849,7 +4922,7 @@ sub
 	[#Rule 90
 		 'literals_and_empty_lines', 2,
 sub
-#line 2590 "ppParser.yp"
+#line 2663 "ppParser.yp"
 {
                              # update token list and reply it
                              push(@{$_[1][0]}, @{$_[2][0]});
@@ -4862,7 +4935,7 @@ sub
 	[#Rule 92
 		 'literal_or_empty_line', 1,
 sub
-#line 2600 "ppParser.yp"
+#line 2673 "ppParser.yp"
 {
                           # start a new token list and reply it
                           [[$_[1][0]], $_[1][1]];
@@ -4874,7 +4947,7 @@ sub
 	[#Rule 94
 		 'literal', 1,
 sub
-#line 2609 "ppParser.yp"
+#line 2682 "ppParser.yp"
 {
             # start a new token list and reply it
             [[$_[1][0]], $_[1][1]];
@@ -4883,7 +4956,7 @@ sub
 	[#Rule 95
 		 'optional_basics', 0,
 sub
-#line 2617 "ppParser.yp"
+#line 2690 "ppParser.yp"
 {
                    # start a new, empty list and reply it
                    [[], $lineNrs{$inHandle}];
@@ -4898,7 +4971,7 @@ sub
 	[#Rule 98
 		 'basics', 2,
 sub
-#line 2627 "ppParser.yp"
+#line 2700 "ppParser.yp"
 {
            # update token list and reply it
            push(@{$_[1][0]}, @{$_[2][0]});
@@ -4920,7 +4993,7 @@ sub
 	[#Rule 103
 		 'elements', 2,
 sub
-#line 2645 "ppParser.yp"
+#line 2718 "ppParser.yp"
 {
              # update token list and reply it
              push(@{$_[1][0]}, @{$_[2][0]});
@@ -4930,7 +5003,7 @@ sub
 	[#Rule 104
 		 'element', 1,
 sub
-#line 2655 "ppParser.yp"
+#line 2728 "ppParser.yp"
 {
 	    # check string for variables (in boost mode only)
 	    if (
@@ -4954,7 +5027,7 @@ sub
 	[#Rule 105
 		 'element', 1,
 sub
-#line 2675 "ppParser.yp"
+#line 2748 "ppParser.yp"
 {
             # start a new token list and reply it
             [[$_[1][0]], $_[1][1]];
@@ -4963,7 +5036,7 @@ sub
 	[#Rule 106
 		 'element', 1,
 sub
-#line 2680 "ppParser.yp"
+#line 2753 "ppParser.yp"
 {
             # flag that this paragraph uses variables (a cache hit will only be useful if variable settings will be unchanged)
             $flags{checksummed}[4]=1 unless exists $flags{checksummed} and not $flags{checksummed};
@@ -4975,7 +5048,7 @@ sub
 	[#Rule 107
 		 'element', 1,
 sub
-#line 2688 "ppParser.yp"
+#line 2761 "ppParser.yp"
 {
             # flag that this paragraph uses variables (a cache hit will only be useful if variable settings will be unchanged)
             $flags{checksummed}[4]=1 unless exists $flags{checksummed} and not $flags{checksummed};
@@ -4987,7 +5060,7 @@ sub
 	[#Rule 108
 		 'element', 1,
 sub
-#line 2696 "ppParser.yp"
+#line 2769 "ppParser.yp"
 {
             # start a new token list and reply it
             # (the passed stream is already a reference)
@@ -5006,7 +5079,7 @@ sub
 	[#Rule 112
 		 'optional_number', 0,
 sub
-#line 2709 "ppParser.yp"
+#line 2782 "ppParser.yp"
 {[undef, $lineNrs{$inHandle}];}
 	],
 	[#Rule 113
@@ -5015,7 +5088,7 @@ sub
 	[#Rule 114
 		 'words', 1,
 sub
-#line 2716 "ppParser.yp"
+#line 2789 "ppParser.yp"
 {
           # start a new token list and reply it
           [[$_[1][0]], $_[1][1]];
@@ -5024,7 +5097,7 @@ sub
 	[#Rule 115
 		 'words', 2,
 sub
-#line 2721 "ppParser.yp"
+#line 2794 "ppParser.yp"
 {
           # update token list and reply it
           push(@{$_[1][0]}, $_[2][0]);
@@ -5034,7 +5107,7 @@ sub
 	[#Rule 116
 		 'words_or_spaces', 1,
 sub
-#line 2730 "ppParser.yp"
+#line 2803 "ppParser.yp"
 {
                     # start a new token list and reply it
                     [[$_[1][0]], $_[1][1]];
@@ -5043,7 +5116,7 @@ sub
 	[#Rule 117
 		 'words_or_spaces', 2,
 sub
-#line 2735 "ppParser.yp"
+#line 2808 "ppParser.yp"
 {
                     # update token list and reply it
                     push(@{$_[1][0]}, $_[2][0]);
@@ -5059,7 +5132,7 @@ sub
 	[#Rule 120
 		 '@18-1', 0,
 sub
-#line 2750 "ppParser.yp"
+#line 2823 "ppParser.yp"
 {
         # trace, if necessary
         warn "[Trace] $sourceFile, line $_[1][1]: Tag $_[1][0] starts.\n" if $flags{trace} & TRACE_PARAGRAPHS;
@@ -5082,7 +5155,7 @@ sub
 	[#Rule 121
 		 '@19-3', 0,
 sub
-#line 2769 "ppParser.yp"
+#line 2842 "ppParser.yp"
 {
 	# reactivate boost
 	$flags{noboost}=0;
@@ -5111,7 +5184,7 @@ sub
 	[#Rule 122
 		 'tag', 5,
 sub
-#line 2794 "ppParser.yp"
+#line 2867 "ppParser.yp"
 {
         # scopy
         my $ignore;
@@ -5130,32 +5203,9 @@ sub
         # Tag condition set?
         if (exists $pars{_cnd_})
          {
-          # scopy
-          my $result;
-
-          #  Does the caller want to evaluate the code?
-          if ($safeObject)
-            {
-             # update active contents base data, if necessary
-             if ($flags{activeBaseData})
-              {
-               no strict 'refs';
-               ${join('::', ref($safeObject) ? $safeObject->root : 'main', 'PerlPoint')}=dclone($flags{activeBaseData});
-              }
-
-             # make the code a string and evaluate it
-             warn "[Trace] $sourceFile, line $_[5][1]: Evaluating this code:\n\n$pars{_cnd_}\n\n\n" if $flags{trace} & TRACE_ACTIVE;
-
-             # invoke perl to compute the result
-             $result=ref($safeObject) ? $safeObject->reval($pars{_cnd_}) : eval(join(' ', '{package main; no strict;', $pars{_cnd_}, '}'));
-
-             # check result
-             warn "[Error ", ++$semErr, "] $sourceFile, line $_[5][1]: tag condition could not be evaluated: $@.\n" if $@;
-            }
-
           # ok, if the condition was true or could not be evaluated, return just the body
           # (so that the tag or macro is ignored)
-          unless ($safeObject and not $@ and $result)
+          unless (_evalTagCondition($pars{_cnd_}, $sourceFile, $_[5][1]))
            {return([[@{$_[5][0]} ? @{$_[5][0]} : ()], $_[5][1]]);}
           else
            {
@@ -5260,11 +5310,11 @@ sub
              [
               [
                # opener directive
-               [\%hints, DIRECTIVE_TAG, DIRECTIVE_START, $_[1][0], \%pars],
+               [\%hints, DIRECTIVE_TAG, DIRECTIVE_START, $_[1][0], \%pars, scalar(@{$_[5][0]})],
                # the list of enclosed literals, if any
                @{$_[5][0]} ? @{$_[5][0]} : (),
                # final directive
-               [\%hints, DIRECTIVE_TAG, DIRECTIVE_COMPLETE, $_[1][0], \%pars]
+               [\%hints, DIRECTIVE_TAG, DIRECTIVE_COMPLETE, $_[1][0], \%pars, scalar(@{$_[5][0]})]
               ],
               $_[5][1]
              ];
@@ -5306,13 +5356,15 @@ sub
              }
 
            # Bodyless macros need special care - the parser already got the subsequent token to
-           # recognize that the macro was complete. Now, the macro replacement is reinserted into the stream
-           # where it will be read by the next lexer operation which is enforced when the parser needs a token
-           # again - and this will happen after processing the already receicved token which stood behind the
-           # bodyless macro. Letting the parser process the read token this way, this token would be streamed
-           # (in most cases) *before* the macro replacement, while it was intented to come after it. So, if we
-           # detect this case, we move this token *behind* the macro replacement. As for the parser, we replace
-           # this token by something streamed to "nothing", currently an empty string declared as "Word" token.
+           # recognize that the macro was complete. Now, the macro replacement is reinserted into
+           # the stream where it will be read by the next lexer operation which is enforced when
+           # the parser needs a token again - and this will happen after processing the already
+           # received token which stood behind the bodyless macro. Letting the parser process the
+           # read token this way, this token would be streamed (in most cases) *before* the macro
+           # replacement, while it was intented to come after it. So, if we detect this case, we
+           # move this token *behind* the macro replacement. As for the parser, we replace
+           # this token by something streamed to "nothing", currently an empty string declared
+           # as "Word" token.
            my $delayedToken;
            unless (@{$_[5][0]})
              {
@@ -5339,7 +5391,7 @@ sub
 	[#Rule 123
 		 'optional_tagpars', 0,
 sub
-#line 3021 "ppParser.yp"
+#line 3073 "ppParser.yp"
 {[[], $lineNrs{$inHandle}];}
 	],
 	[#Rule 124
@@ -5348,7 +5400,7 @@ sub
 	[#Rule 125
 		 'used_tagpars', 3,
 sub
-#line 3027 "ppParser.yp"
+#line 3079 "ppParser.yp"
 {
                  # supply the parameters
                  [$_[2][0], $_[3][1]];
@@ -5360,7 +5412,7 @@ sub
 	[#Rule 127
 		 'tagpars', 3,
 sub
-#line 3036 "ppParser.yp"
+#line 3088 "ppParser.yp"
 {
             # update parameter list
             push(@{$_[1][0]}, @{$_[3][0]});
@@ -5372,7 +5424,7 @@ sub
 	[#Rule 128
 		 '@20-1', 0,
 sub
-#line 3047 "ppParser.yp"
+#line 3099 "ppParser.yp"
 {
            # temporarily make "=" and quotes the only specials,
            # but take care to reset the remaining settings defined
@@ -5384,7 +5436,7 @@ sub
 	[#Rule 129
 		 '@21-3', 0,
 sub
-#line 3055 "ppParser.yp"
+#line 3107 "ppParser.yp"
 {
            # restore special "=" setting
            $specials{'='}=pop(@specialStack);
@@ -5393,7 +5445,7 @@ sub
 	[#Rule 130
 		 'tagpar', 5,
 sub
-#line 3060 "ppParser.yp"
+#line 3112 "ppParser.yp"
 {
            # restore special settings
            %specials=@{pop(@specialStack)};
@@ -5408,7 +5460,7 @@ sub
 	[#Rule 132
 		 'tagvalue', 3,
 sub
-#line 3071 "ppParser.yp"
+#line 3123 "ppParser.yp"
 {
              # build a string and supply it
              [join('', @{$_[2][0]}), $_[3][1]];
@@ -5417,7 +5469,7 @@ sub
 	[#Rule 133
 		 'optional_tagbody', 0,
 sub
-#line 3079 "ppParser.yp"
+#line 3131 "ppParser.yp"
 {
                      # if we are here, "<" *possibly* was marked to be a special - now it becomes what is was before
                      # (take care the stack is filled correctly!)
@@ -5431,7 +5483,7 @@ sub
 	[#Rule 134
 		 '@22-1', 0,
 sub
-#line 3089 "ppParser.yp"
+#line 3141 "ppParser.yp"
 {
                      # if we are here, "<" was marked to be a special - now it becomes what is was before
                      # (take care the stack is filled correctly!)
@@ -5446,7 +5498,7 @@ sub
 	[#Rule 135
 		 'optional_tagbody', 4,
 sub
-#line 3100 "ppParser.yp"
+#line 3152 "ppParser.yp"
 {
                      # reset ">" setting
                      @specials{('>')}=pop(@specialStack);
@@ -5458,7 +5510,7 @@ sub
 	[#Rule 136
 		 '@23-1', 0,
 sub
-#line 3111 "ppParser.yp"
+#line 3163 "ppParser.yp"
 {
           # trace, if necessary
           warn "[Trace] $sourceFile, line $_[1][1]: Table starts.\n" if $flags{trace} & TRACE_PARAGRAPHS;
@@ -5482,7 +5534,7 @@ sub
 	[#Rule 137
 		 '@24-3', 0,
 sub
-#line 3131 "ppParser.yp"
+#line 3183 "ppParser.yp"
 {
           # reactivate boost
           $flags{noboost}=0;
@@ -5519,7 +5571,7 @@ sub
 	[#Rule 138
 		 'table', 6,
 sub
-#line 3164 "ppParser.yp"
+#line 3216 "ppParser.yp"
 {
           # build parameter hash, if necessary
           my %pars;
@@ -5528,6 +5580,20 @@ sub
              # the list already consists of key/value pairs
              %pars=@{$_[3][0]}
             }
+
+          # Tag condition set?
+          if (exists $pars{_cnd_})
+           {
+            # ok, if the condition was true or could not be evaluated,
+            # stop processing of this tag (there is no body, so return an empty stream)
+            unless (_evalTagCondition($pars{_cnd_}, $sourceFile, $_[6][1]))
+             {return([[()], $_[6][1]]);}
+            else
+             {
+              # strip off this special option before the tag or macro is furtherly processed
+              delete $pars{_cnd_};
+             }
+           }
 
           # add row separator information unless it was defined by the user itself
           $pars{rowseparator}='\n' unless exists $pars{rowseparator};
@@ -5578,7 +5644,7 @@ sub
 	[#Rule 139
 		 'table_separator', 1,
 sub
-#line 3222 "ppParser.yp"
+#line 3288 "ppParser.yp"
 {
                     # update counter of completed table columns
                     $tableColumns++;
@@ -5602,7 +5668,7 @@ sub
 	[#Rule 140
 		 '@25-1', 0,
 sub
-#line 3245 "ppParser.yp"
+#line 3311 "ppParser.yp"
 {
                     # switch to condition mode
                     stateManager(STATE_TABLE);
@@ -5614,7 +5680,7 @@ sub
 	[#Rule 141
 		 '@26-4', 0,
 sub
-#line 3253 "ppParser.yp"
+#line 3319 "ppParser.yp"
 {
                     # store specified column separator
                     unshift(@tableSeparatorStack, [quotemeta(join('', @{$_[3][0]})), "\n"]);
@@ -5623,7 +5689,7 @@ sub
 	[#Rule 142
 		 'table_paragraph', 7,
 sub
-#line 3258 "ppParser.yp"
+#line 3324 "ppParser.yp"
 {
                     # back to default mode
                     stateManager(STATE_DEFAULT);
@@ -5681,7 +5747,7 @@ sub
 	[#Rule 143
 		 '@27-1', 0,
 sub
-#line 3315 "ppParser.yp"
+#line 3381 "ppParser.yp"
 {
              # switch to embedding mode saving the former state (including *all* special settings)
              push(@stateStack, $parserState);
@@ -5706,7 +5772,7 @@ sub
 	[#Rule 144
 		 '@28-3', 0,
 sub
-#line 3336 "ppParser.yp"
+#line 3402 "ppParser.yp"
 {
              # reactivate boost
              $flags{noboost}=0;
@@ -5722,7 +5788,7 @@ sub
 	[#Rule 145
 		 'embedded', 6,
 sub
-#line 3348 "ppParser.yp"
+#line 3414 "ppParser.yp"
 {
              # restore former parser state (including *all* special settings)
              stateManager(pop(@stateStack));
@@ -5736,8 +5802,82 @@ sub
                 %pars=@{$_[3][0]}
                }
 
+             # Tag condition set?
+             if (exists $pars{_cnd_})
+              {
+               # ok, if the condition was true or could not be evaluated,
+               # stop processing of this tag (there is no body, so return an empty stream)
+               unless (_evalTagCondition($pars{_cnd_}, $sourceFile, $_[6][1]))
+                {return([[()], $_[6][1]]);}
+               else
+                {
+                 # strip off this special option before the tag or macro is furtherly processed
+                 delete $pars{_cnd_};
+                }
+              }
+
+             # Input filter to call?
+             if (    exists $pars{ifilter}
+                 and (   not $flags{filter}
+                      or lc($pars{lang}) eq 'pp'
+                      or (    exists $pars{lang}
+                          and $pars{lang}=~/^$flags{filter}$/i
+                         )
+                     )
+                )
+               {
+                # Can we invoke the filter code?
+                unless ($safeObject)
+                  {
+                   # What a pity - but probably the unfiltered source is not what the backend
+                   # expects, so we need to ignore the embedded code completely for now. As
+                   # usually, this is done without warning.
+                   return([[()], $_[6][1]]);
+                  }
+                else
+                  {
+                   # OK, we can try to invoke the filter.
+
+                   # inform user
+                   warn qq([Warn] $sourceFile, line $_[1][1]: Running input filter.\n) if $flags{trace} & TRACE_ACTIVE;
+
+                   # update active contents base data, if necessary
+                   if ($flags{activeBaseData})
+                     {
+                      no strict 'refs';
+                      ${join('::', ref($safeObject) ? $safeObject->root : 'main', 'PerlPoint')}=dclone($flags{activeBaseData});
+                     }
+
+                   # We provide the text in a special variable @main::_ifilterText,
+                   # and the target type in a special variable $main::_ifilterType.
+                   {
+                    no strict 'refs';
+                    @{join('::', ref($safeObject) ? $safeObject->root : 'main', '_ifilterText')}=@{$_[5][0]};
+                    ${join('::', ref($safeObject) ? $safeObject->root : 'main', '_ifilterType')}=$pars{lang};
+                   }
+
+                   # run the filter and catch what it supplies
+                   $_[5][0]=[ref($safeObject) ? $safeObject->reval($pars{ifilter}) : eval(join(' ', '{package main; no strict;', $pars{ifilter}, '}'))];
+
+                   # check result
+                   if ($@)
+                     {
+                      # inform user, if necessary
+                      warn "[Error ", ++$semErr, qq(] $sourceFile, line $_[1][1]: input filter failed: $@.\n);
+
+                      # ignore this part
+                      return([[()], $_[6][1]]);
+                     }
+                  }
+               }
+
              # check if we have to stream this code
-             unless (not $flags{filter} or lc($pars{lang}) eq 'pp' or (exists $pars{lang} and $pars{lang}=~/^$flags{filter}$/i))
+             unless (   not $flags{filter}
+                     or lc($pars{lang}) eq 'pp'
+                     or (    exists $pars{lang}
+                         and $pars{lang}=~/^$flags{filter}$/i
+                        )
+                    )
                {
                 # caller wants to skip the embedded code: we have to supply something, but it should be nothing
                 [[()], $_[6][1]];
@@ -5814,7 +5954,7 @@ sub
 	[#Rule 146
 		 '@29-1', 0,
 sub
-#line 3439 "ppParser.yp"
+#line 3579 "ppParser.yp"
 {
              # trace, if necessary
              warn "[Trace] $sourceFile, line $_[1][1]: Inclusion starts.\n" if $flags{trace} & TRACE_PARAGRAPHS;
@@ -5836,7 +5976,7 @@ sub
 	[#Rule 147
 		 'included', 3,
 sub
-#line 3457 "ppParser.yp"
+#line 3597 "ppParser.yp"
 {
              # scopies
              my ($errors, $originalPath);
@@ -5851,6 +5991,20 @@ sub
              my %tagpars=@{$_[3][0]};
              $errors++, warn "[Error ", ++$semErr, "] $sourceFile, line $_[3][1]: You forgot to specify the type of your included file.\n" unless exists $tagpars{type};
              $errors++, warn "[Error ", ++$semErr, "] $sourceFile, line $_[3][1]: You forgot to specify the name of your included file.\n" unless exists $tagpars{file};
+
+             # Tag condition set?
+             if (exists $tagpars{_cnd_})
+              {
+               # ok, if the condition was true or could not be evaluated,
+               # stop processing of this tag (there is no body, so return an empty stream)
+               unless (_evalTagCondition($tagpars{_cnd_}, $sourceFile, $_[3][1]))
+                {return([[()], $_[3][1]]);}
+               else
+                {
+                 # strip off this special option before the tag or macro is furtherly processed
+                 delete $tagpars{_cnd_};
+                }
+              }
 
              # search specified directories for the file if necessary
              unless (-e $tagpars{file})
@@ -5890,11 +6044,89 @@ sub
                 # check the filename
                 if (-r $tagpars{file})
                   {
+                   # store the files name and directory for later reference
+                   # (we could refer do that later, but using intermediate buffers
+                   # allows to keep the original values when switching the file in
+                   # background which happens with input filters)
+                   my $orgname=$tagpars{file};
+
+                   # Input filter to call?
+                   if (    exists $tagpars{ifilter}
+                       and (   not $flags{filter}
+                            or lc($tagpars{type}) eq 'pp'
+                            or (    exists $tagpars{type}
+                                and $tagpars{type}=~/^$flags{filter}$/i
+                               )
+                           )
+                      )
+                     {
+                      # Can we invoke the filter code?
+                      unless ($safeObject)
+                        {
+                         # What a pity - but probably the unfiltered source is not what the backend
+                         # expects, so we need to ignore the embedded code completely for now. As
+                         # usually, this is done without warning.
+                         return([[()], $_[3][1]]);
+                        }
+                      else
+                        {
+                         # OK, we can try to invoke the filter.
+
+                         # inform user
+                         warn qq([Warn] $sourceFile, line $_[1][1]: Running input filter.\n) if $flags{trace} & TRACE_ACTIVE;
+
+                         # update active contents base data, if necessary
+                         if ($flags{activeBaseData})
+                         {
+                          no strict 'refs';
+                          ${join('::', ref($safeObject) ? $safeObject->root : 'main', 'PerlPoint')}=dclone($flags{activeBaseData});
+                         }
+
+                         # open original file
+                         open(my $orgHandle, $tagpars{file});
+                         binmode($orgHandle);
+
+                         # We provide the text in a special variable @main::_ifilterText,
+                         # and the target type in a special variable $main::_ifilterType.
+                         {
+                          no strict 'refs';
+                          @{join('::', ref($safeObject) ? $safeObject->root : 'main', '_ifilterText')}=<$orgHandle>;
+                          ${join('::', ref($safeObject) ? $safeObject->root : 'main', '_ifilterType')}=$tagpars{type};
+                         }
+
+                         # close original file
+                         close($orgHandle);
+
+                         # run the filter in the files directory and catch what it supplies
+                         my $startDir=cwd();
+                         chdir(dirname($orgname));
+                         my @ifiltered=ref($safeObject) ? $safeObject->reval($tagpars{ifilter}) : eval(join(' ', '{package main; no strict;', $tagpars{ifilter}, '}'));
+                         chdir($startDir);
+
+                         # check result
+                         if ($@)
+                           {
+                            # inform user, if necessary
+                            warn "[Error ", ++$semErr, qq(] $sourceFile, line $_[1][1]: input filter failed: $@.\n);
+
+                            # ignore this part
+                            return([[()], $_[3][1]]);
+                           }
+
+                         # ok, now "replace" the original file by a temporary one
+                         my ($tmpHandle, $tmpFilename)=tempfile(UNLINK => ($flags{trace} & TRACE_TMPFILES ? 0 : 1));
+                         $tagpars{file}=$tmpFilename;
+
+                         print $tmpHandle @ifiltered;
+                         close($tmpHandle);
+                        }
+                     }
+
                    # check specified file type
                    if ($tagpars{type}=~/^pp$/i)
                      {
                       # update nesting stack
-                      push(@nestedSourcefiles, $tagpars{file});
+                      push(@nestedSourcefiles, $orgname);
 
 		      # update source file nesting level hint
 		      predeclareVariables({_SOURCE_LEVEL=>scalar(@nestedSourcefiles)});
@@ -5941,7 +6173,7 @@ sub
                       $lineNrs{$inHandle}=0;
 
                       # change directory with file
-                      chdir(dirname($tagpars{file}));
+                      chdir(dirname($orgname));
 
                       # open a new input stack
                       unshift(@inputStack, []);
@@ -6084,7 +6316,7 @@ sub
 	[#Rule 148
 		 '@30-1', 0,
 sub
-#line 3705 "ppParser.yp"
+#line 3937 "ppParser.yp"
 {
                      # switch to definition mode
                      stateManager(STATE_DEFINITION);
@@ -6096,7 +6328,7 @@ sub
 	[#Rule 149
 		 '@31-3', 0,
 sub
-#line 3713 "ppParser.yp"
+#line 3945 "ppParser.yp"
 {
                      # deactivate boost
                      $flags{noboost}=1;
@@ -6105,7 +6337,7 @@ sub
 	[#Rule 150
 		 '@32-5', 0,
 sub
-#line 3718 "ppParser.yp"
+#line 3950 "ppParser.yp"
 {
                      # reactivate boost
                      $flags{noboost}=0;
@@ -6114,7 +6346,7 @@ sub
 	[#Rule 151
 		 '@33-7', 0,
 sub
-#line 3723 "ppParser.yp"
+#line 3955 "ppParser.yp"
 {
                      # disable all specials to get the body as a plain text
                      @specials{keys %specials}=(0) x scalar(keys %specials);
@@ -6123,7 +6355,7 @@ sub
 	[#Rule 152
 		 'alias_definition', 9,
 sub
-#line 3728 "ppParser.yp"
+#line 3960 "ppParser.yp"
 {
                      # "text" already switched back to default mode (and disabled specials [{}:])
 
@@ -6201,7 +6433,7 @@ sub
     bless($self,$class);
 }
 
-#line 3803 "ppParser.yp"
+#line 4035 "ppParser.yp"
 
 
 
@@ -6708,17 +6940,17 @@ sub lexer
      # reply next token: scan for Ils if necessary
      $found=$1, s/^$1//,
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Ils in line $lineNrs{$inHandle}.\n")),
-     return('Ils', [$found, $lineNrs{$inHandle}]) if $parserState==STATE_PFILTERED and /^(\s+)/;
+     return('Ils', [$found, $lineNrs{$inHandle}]) if $parserState==STATE_PFILTERED and /^$lexerPatterns{space}/;
 
      # reply next token: scan for spaces
      $found=$1, s/^$1//,
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Space in line $lineNrs{$inHandle}.\n")),
-     return('Space', [$found, $lineNrs{$inHandle}]) if /^(\s+)/;
+     return('Space', [$found, $lineNrs{$inHandle}]) if /^$lexerPatterns{space}/;
 
      # reply next token: scan for paragraph filter delimiters ("||" and "|")
      $found=$1, s/^\Q$1//,
      (($flags{trace} & TRACE_LEXER) and warn(qq([Trace] Lexer: Paragraph filter delimiter "$found" in line $lineNrs{$inHandle}.\n))),
-     return($found, [$found, $lineNrs{$inHandle}]) if /^(?<!\\)((\|){1,2})/ and $specials{pfilter};
+     return($found, [$found, $lineNrs{$inHandle}]) if /^$lexerPatterns{pfilterDelimiter}/ and $specials{pfilter};
 
      # reply next token: scan for here doc openers
      $found=$1, s/^<<$1//,
@@ -6728,58 +6960,58 @@ sub lexer
      # reply next token: scan for SPECIAL tagnames: \TABLE
      $found=$1, s/^\\$1//,
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Table starts in line $lineNrs{$inHandle}.\n")),
-     return('Table', [$found, $lineNrs{$inHandle}]) if $specials{tag} and /^(?<!\\)\\(TABLE)/;
+     return('Table', [$found, $lineNrs{$inHandle}]) if $specials{tag} and /^$lexerPatterns{table}/;
      
      # reply next token: scan for SPECIAL tagnames: \END_TABLE
      $found=$1, s/^\\$1//,
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Table completed in line $lineNrs{$inHandle}.\n")),
-     return('Tabled', [$found, $lineNrs{$inHandle}])  if $specials{tag} and /^(?<!\\)\\(END_TABLE)/;
+     return('Tabled', [$found, $lineNrs{$inHandle}])  if $specials{tag} and /^$lexerPatterns{endTable}/;
      
      # reply next token: scan for SPECIAL tagnames: \EMBED
      $found=$1, s/^\\$1//,
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Embedding starts in line $lineNrs{$inHandle}.\n")),
-     return('Embed', [$found, $lineNrs{$inHandle}]) if $specials{tag} and /^(?<!\\)\\(EMBED)/;
+     return('Embed', [$found, $lineNrs{$inHandle}]) if $specials{tag} and /^$lexerPatterns{embed}/;
      
      # reply next token: scan for SPECIAL tagnames: \END_EMBED
      $found=$1, s/^\\$1//,
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Embedding completed in line $lineNrs{$inHandle}.\n")),
-     return('Embedded', [$found, $lineNrs{$inHandle}]) if $specials{embedded} and /^(?<!\\)\\(END_EMBED)/;
+     return('Embedded', [$found, $lineNrs{$inHandle}]) if $specials{embedded} and /^$lexerPatterns{endEmbed}/;
      
      # reply next token: scan for SPECIAL tagnames: \INCLUDE
      $found=$1, s/^\\$1//,
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Including starts in line $lineNrs{$inHandle}.\n")),
-     return('Include', [$found, $lineNrs{$inHandle}]) if $specials{tag} and /^(?<!\\)\\(INCLUDE)/;
+     return('Include', [$found, $lineNrs{$inHandle}]) if $specials{tag} and /^$lexerPatterns{include}/;
      
      # reply next token: scan for tagnames
      $found=$1, s/^\\$1//,
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Tag opener $found in line $lineNrs{$inHandle}.\n")),
-     return('Tag_name', [$found, $lineNrs{$inHandle}]) if $specials{tag} and /^(?<!\\)\\([A-Z_0-9]+)/ and (exists $tagsRef->{$1} or exists $macros{$1});
+     return('Tag_name', [$found, $lineNrs{$inHandle}]) if $specials{tag} and /^$lexerPatterns{tag}/ and (exists $tagsRef->{$1} or exists $macros{$1});
      
      # reply next token: scan for special characters
      $found=$1, s/^\Q$1//,
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Special $found in line $lineNrs{$inHandle}.\n")),
-     return($found, [$found, $lineNrs{$inHandle}]) if /^(?<!\\)(\S)/ and exists $specials{$1} and $specials{$1};
+     return($found, [$found, $lineNrs{$inHandle}]) if /^$patternNlbBackslash(\S)/ and exists $specials{$1} and $specials{$1};
 
      # reply next token: scan for definition list items
      $found=$1, s/^$1//,
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Colon in line $lineNrs{$inHandle}.\n")),
-     return('Colon', [$found, $lineNrs{$inHandle}]) if $specials{colon} and /^(?<!\\)(:)/;
+     return('Colon', [$found, $lineNrs{$inHandle}]) if $specials{colon} and /^$lexerPatterns{colon}/;
 
      # reply next token: search for named variables
      $found=$1, s/^\$$1//,
-     (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Named variable \"$found\" in line $lineNrs{$inHandle}.\n")),
-     return('Named_variable', [$found, $lineNrs{$inHandle}]) if /^(?<!\\)\$($patternWUmlauts)/;
+     (($flags{trace} & TRACE_LEXER) and warn(qq([Trace] Lexer: Named variable "$found" in line $lineNrs{$inHandle}.\n))),
+     return('Named_variable', [$found, $lineNrs{$inHandle}]) if /^$lexerPatterns{namedVar}/;
 
      # reply next token: search for symbolic variables
      $found=$1, s/^\${$1}//,
-     (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Symbolic variable \"$found\" in line $lineNrs{$inHandle}.\n")),
-     return('Symbolic_variable', [$found, $lineNrs{$inHandle}]) if /^(?<!\\)\${($patternWUmlauts)}/;
+     (($flags{trace} & TRACE_LEXER) and warn(qq([Trace] Lexer: Symbolic variable "$found" in line $lineNrs{$inHandle}.\n))),
+     return('Symbolic_variable', [$found, $lineNrs{$inHandle}]) if /^$lexerPatterns{symVar}/;
 
      # flag that this paragraph *might* use macros someday, if there is still something being no tag and no
      # macro, but looking like a tag or a macro (somebody could *later* declare it a real macro, so the cache
      # needs to check macro definitions)
      $flags{checksummed}[3]=1
-       if     $specials{tag} and /^(?<!\\)\\([A-Z_0-9]+)/
+       if     $specials{tag} and /^$lexerPatterns{tag}/
           and not (exists $flags{checksummed} and not $flags{checksummed});
 
      # remove guarding \\, if necessary
@@ -6808,18 +7040,51 @@ sub lexer
         # warn("---------> $_\n");
         $found=$1, s/^\Q$1//,
         # warn("=====> $found\n"),
-        (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Word \"$found\" in line $lineNrs{$inHandle}.\n")),
+        (($flags{trace} & TRACE_LEXER) and warn(qq([Trace] Lexer: Word "$found" in line $lineNrs{$inHandle}.\n))),
         return('Word', [$found, $lineNrs{$inHandle}]) if /^(.+?)($special|($))/;
        }
 
      # reply next token: scan for word or single character (declared as "Word" as well)
      $found=$1, s/^\Q$1//,
-     (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Word \"$found\" in line $lineNrs{$inHandle}.\n")),
+     (($flags{trace} & TRACE_LEXER) and warn(qq([Trace] Lexer: Word "$found" in line $lineNrs{$inHandle}.\n))),
      return('Word', [$found, $lineNrs{$inHandle}]) if /^($patternWUmlauts)/ or /^(\S)/;
 
      # everything should be handled - this code should never be executed!
-     die "[BUG] $sourceFile, line $lineNrs{$inHandle}: No symbol found in \"$_\"!\n";
+     die qq([BUG] $sourceFile, line $lineNrs{$inHandle}: No symbol found in "$_"!\n);
     }
+ }
+
+# evaluate a tag condition (can possibly be generalized: this is just a piece of code)
+sub _evalTagCondition
+ {
+  # get parameters
+  my ($code, $file, $line)=@_;
+
+  # declare variables
+  my ($rc);
+
+  #  Does the caller want to evaluate the code?
+  if ($safeObject)
+    {
+     # update active contents base data, if necessary
+     if ($flags{activeBaseData})
+       {
+        no strict 'refs';
+        ${join('::', ref($safeObject) ? $safeObject->root : 'main', 'PerlPoint')}=dclone($flags{activeBaseData});
+       }
+
+     # make the code a string and evaluate it
+     warn "[Trace] $sourceFile, line $_[5][1]: Evaluating this code:\n\n$code\n\n\n" if $flags{trace} & TRACE_ACTIVE;
+
+     # invoke perl to compute the result
+     $rc=ref($safeObject) ? $safeObject->reval($code) : eval(join(' ', '{package main; no strict;', $code, '}'));
+
+     # check result
+     warn "[Error ", ++$semErr, "] $file, line $line: tag condition could not be evaluated: $@.\n" if $@;
+    }
+
+  # supply result
+  $rc;
  }
 
 # reference lexed: reply appropriate token
@@ -7704,7 +7969,7 @@ sub run
   if (exists $pars{filter})
     {
      eval "'lang'=~/$pars{filter}/";
-     confess "[BUG] Invalid filter expression \"$pars{filter}\": $@.\n" if $@;
+     confess qq([BUG] Invalid filter expression "$pars{filter}": $@.\n) if $@;
     }
 
   # variables
@@ -7929,7 +8194,7 @@ EOC
         # clean up old format caches
         unless (
                     exists $checksums->{sha1_base64('version')}
-                and $checksums->{sha1_base64('version')}>=0.37
+                and $checksums->{sha1_base64('version')}>=0.38
 
                 and exists $checksums->{sha1_base64('constants')}
                 and $checksums->{sha1_base64('constants')}==$PerlPoint::Constants::VERSION
@@ -8014,6 +8279,9 @@ EOC
        {
         # get data
         my ($level, $title)=@$_;
+
+        # skip empty headlines
+        next unless $title;
 
         # update headline path and numbers
         $headlinePath[$level]=$title;
@@ -8373,6 +8641,9 @@ sub pfilterCall
   # build retranslator, if necessary
   unless ($retranslator)
     {
+     # scopy
+     my ($verbatimFlag)=(0);
+
      # the retranslator is a backend object
      $retranslator=new PerlPoint::Backend(
                                           name    => 'retranslator',
@@ -8386,8 +8657,12 @@ sub pfilterCall
                                                  # get parameters
                                                  my ($opcode, $mode, @contents)=@_;
 
-                                                 # add contents to the source text collection
-                                                 $retranslationBuffer.=join('', @contents);
+                                                 # add contents to the source text collection,
+                                                 # double backslashes (if they are here, they were guarded originally),
+                                                 # and restore ">" characters as if they were guarded
+                                                 (my $text=join('', @contents));
+                                                 $text=~s/([\\>])/\\$1/g unless $verbatimFlag;
+                                                 $retranslationBuffer.=$text;
                                                 }
                             );
 
@@ -8407,8 +8682,8 @@ sub pfilterCall
                                                    my ($opcode, $mode)=@_;
 
                                                    # cover contents
-                                                   $retranslationBuffer.="<<EOE\n" if $mode==DIRECTIVE_START;
-                                                   $retranslationBuffer.="EOE\n"   if $mode==DIRECTIVE_COMPLETE;
+                                                   $verbatimFlag=1, $retranslationBuffer.="<<EOE\n" if $mode==DIRECTIVE_START;
+                                                   $verbatimFlag=0, $retranslationBuffer.="EOE\n"   if $mode==DIRECTIVE_COMPLETE;
                                                   }
                             );
 
@@ -8452,13 +8727,13 @@ sub pfilterCall
      $retranslator->register(DIRECTIVE_TAG, sub
                                              {
                                               # get parameters
-                                              my ($opcode, $mode, $tag, $settings)=@_;
+                                              my ($opcode, $mode, $tag, $settings, $bodyHint)=@_;
 
                                               # table tags need special care, is it one?
                                               unless ($tag=~/^TABLE/)
                                                 {
                                                  # act mode dependend
-                                                 $retranslationBuffer.=$mode==DIRECTIVE_START ? join('', "\\$tag", (defined $settings and %$settings) ? join('', '{', join(' ', map {qq($_="$settings->{$_}")} grep(!/^__/, keys %$settings)), '}') : (), '<') : '>';
+                                                 $retranslationBuffer.=$mode==DIRECTIVE_START ? join('', "\\$tag", (defined $settings and %$settings) ? join('', '{', join(' ', map {qq($_="$settings->{$_}")} grep(!/^__/, keys %$settings)), '}') : (), ($bodyHint ? '<' : ())) : ($bodyHint ? '>' : ());
                                                 }
                                               else
                                                 {

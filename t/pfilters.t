@@ -63,7 +63,6 @@ is(shift(@results), $_) foreach (DIRECTIVE_DOCUMENT, DIRECTIVE_START, 'pfilters.
 # ------------------------------------------------------------------------
 do 't/pfilter-checks.pl';
 
-
 # filtered block at document source end
 is(shift(@results), $_) foreach (DIRECTIVE_BLOCK, DIRECTIVE_START);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '  ');
