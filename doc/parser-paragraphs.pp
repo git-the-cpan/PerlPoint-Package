@@ -207,7 +207,7 @@ paragraphs until the next condition are \I<skipped>.
 This feature can be used to maintain various language versions of a presentation
 in one source file:
 
-  ? $language eq 'German'
+  ? $PerlPoint->{userSettings}{language} eq 'German'
 
 Or you could enable parts of your document by date:
 
@@ -248,7 +248,7 @@ visible to the parser. (This includes condition paragraphs.) This means that
   \EMBED{lang=perl}$main::var*=2;\END_EMBED
 EOE
 
-causes I\<\$var> to be different on parser and code side - the parser will still use a
+causes \C<\$var> to be different on parser and code side - the parser will still use a
 value of 10, while embedded code works on with a value of 20.
 
 Translator software \I<can> make additional use of variables. Please see your
@@ -273,10 +273,10 @@ This means that your macro text can contain any valid constructions like tags or
 other macros.
 
 The replacement text may contain strings embedded into doubled underscores like
-"__this__". This is a special syntax to mark that the macro takes parameters
-of these names (e.g. "this"). If a tag is used and these parameters are set,
+\C<__this__>. This is a special syntax to mark that the macro takes parameters
+of these names (e.g. \C<this>). If a tag is used and these parameters are set,
 their values will replace the mentioned placeholders. The special placeholder
-"__body__" is used to mark the place where the macro body is to place.
+\C<__body__> is used to mark the place where the macro body is to place.
 
 Here are a few examples:
 

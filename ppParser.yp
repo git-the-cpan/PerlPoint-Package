@@ -1,4 +1,4 @@
-
+ 
 # ATTENTION:
 #
 # This is NO module and NO script, but a GRAMMAR. To build the module,
@@ -14,6 +14,26 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.31    |30.01.2001| JSTENZEL | ordered lists now provide the entry level number
+#         |          |          | (additionally to the first list point which already
+#         |          |          | did this if the list was continued);
+#         |01.02.2001| JSTENZEL | made POD more readable to pod2man;
+#         |          | JSTENZEL | bugfix: if a headline is restored from cache, internal
+#         |          |          | headline level flags need to be restored as well to
+#         |          |          | make \INCLUDE{headlinebase=CURRENT_LEVEL} work when
+#         |          |          | it is the first thing in a document except of headlines
+#         |          |          | which are all restored from cache;
+#         |          | JSTENZEL | new "smart" option of \INCLUDE tag suppresses inclusion
+#         |          |          | if the file was already loaded, which is useful for alias
+#         |          |          | definitions used both in a nested and the base source;
+#         |02.02.2001| JSTENZEL | bugfix: circular source nesting was supressed too hard:
+#         |          |          | a source could never be loaded twice, but this may be
+#         |          |          | really useful to reuse files multiply - now only the
+#         |          |          | currently nested sources are taken into account;
+#         |03.02.2001| JSTENZEL | bugfix: continued lists did not work as expected yet,
+#         |          |          | now they do (bug was detected by Lorenz), improved by
+#         |          |          | the way: continued list points not really continuing
+#         |          |          | are streamed now as usual list points (no level hint);
 # 0.30    |05.01.2001| JSTENZEL | slight lexer improvement (removed obsolete code);
 #         |          | JSTENZEL | modified the grammar a way that shift/reduce conflicts
 #         |          |          | were reduced (slightly) and, more important, the grammar
@@ -166,7 +186,7 @@ B<PerlPoint::Parser> - a PerlPoint Parser
 
 =head1 VERSION
 
-This manual describes version B<0.30>.
+This manual describes version B<0.31>.
 
 =head1 SYNOPSIS
 
@@ -567,7 +587,7 @@ made part of the input stream and parsed. In this case a special tag option
 "headlinebase" can be specified to define a headline base level used as
 an offset to all headlines in the included document. This makes it easier
 to share partial documents with others, or to build complex documents by
-including seperately maintained parts, or to include one and the same
+including separately maintained parts, or to include one and the same
 part at different headline levels.
 
  Example: If "\INCLUDE{type=PP file=file headlinebase=20}" is
@@ -586,6 +606,12 @@ set just the I<current> headline level as an offset. This results in
  \INCLUDE{type=PP file=file headlinebase=CURRENT_LEVEL}
 
 A given offset is reset when the included document is parsed completely.
+
+A second special option I<smart> commands the parser to include the file
+only unless this was already done before. This is intended for inclusion
+of pure alias/macro definition or variable assignment files.
+
+ \INCLUDE{type=PP file="common-macros.pp" smart=1}
 
 A PerlPoint file can be included wherever a tag is allowed, but sometimes
 it has to be arranged slightly: if you place the inclusion directive at
@@ -680,7 +706,7 @@ output stream.
 The same is true for special headers and trailers. It is a I<backend> task to
 add them if necessary. The parser does handle the I<input> only.
 
-  
+
 =head1 STREAM FORMAT
 
 It is suggested to use B<PerlPoint::Backend> to evaluate the intermediate format.
@@ -810,7 +836,7 @@ B<Example:>
  require 5.00503;
 
  # declare module version
- $PerlPoint::Parser::VERSION=0.30;
+ $PerlPoint::Parser::VERSION=0.31;
  $PerlPoint::Parser::VERSION=$PerlPoint::Parser::VERSION; # to suppress a warning of exclusive usage only;
 
  # pragmata
@@ -836,8 +862,9 @@ B<Example:>
      %variables,                   # user managed variables;
      %flags,                       # various flags;
      %macros,                      # macros / aliases;
-     %openedSourcefiles,           # a list of all already opened source files (to avoid circular nesting);
+     %openedSourcefiles,           # a hash of all already opened source files (to enable smart inclusion);
 
+     @nestedSourcefiles,           # a list of current source file nesting (to avoid circular inclusions);
      @specialStack,                # special state stack for temporary activations (to restore original states);
      @stateStack,                  # state stack (mostly intended for non paragraph states like STATE_EMBEDDED);
      @tableSeparatorStack,         # the first element is the column separator string within a table, empty otherwise;
@@ -934,7 +961,8 @@ document : paragraph
                updateChecksums($_[1][0], 'Paragraph_cache_hit') unless    $_[1][0][0][0]==DIRECTIVE_BLOCK
                                                                        or $_[1][0][0][0]==DIRECTIVE_DLIST
                                                                        or $_[1][0][0][0]==DIRECTIVE_OLIST
-                                                                       or $_[1][0][0][0]==DIRECTIVE_ULIST;
+                                                                       or $_[1][0][0][0]==DIRECTIVE_ULIST
+                                                                       or $_[1][0][0][0]==DIRECTIVE_HEADLINE;
 
                # update statistics, if necessary
                $statistics{$_[1][0][0][0]}++ unless not defined $_[1][0][0][0] or exists $embeddedParagraphs{$_[1][0][0][0]};
@@ -964,7 +992,11 @@ document : paragraph
                updateChecksums($_[2][0], 'Paragraph_cache_hit') unless    $_[2][0][0][0]==DIRECTIVE_BLOCK
                                                                        or $_[2][0][0][0]==DIRECTIVE_DLIST
                                                                        or $_[2][0][0][0]==DIRECTIVE_OLIST
-                                                                       or $_[2][0][0][0]==DIRECTIVE_ULIST;
+                                                                       or $_[2][0][0][0]==DIRECTIVE_ULIST
+                                                                       or $_[2][0][0][0]==DIRECTIVE_HEADLINE;
+
+               # update ordered list flag as necessary
+               $flags{olist}=0 unless $_[2][0][0][0]==DIRECTIVE_OLIST;
 
                # update statistics, if necessary
                $statistics{$_[2][0][0][0]}++ unless exists $embeddedParagraphs{$_[2][0][0][0]};
@@ -1025,20 +1057,30 @@ headline : headline_level
 	     # update related data
              @olistLevels=();
 
+             # prepare result (data part only)
+             my $data=[
+                       # opener directive (including headline level)
+                       [DIRECTIVE_HEADLINE, DIRECTIVE_START, $_[1][0]],
+                       # the list of enclosed literals
+                       @{$_[3][0]},
+                       # final directive (including headline level again)
+                       [DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, $_[1][0]]
+                      ];
+
+             # update checksums (done here because hits need special handling)
+             updateChecksums($data, 'Headline_cache_hit');
+
              # reply data
-             [
-              [
-               # opener directive (including headline level)
-               [DIRECTIVE_HEADLINE, DIRECTIVE_START, $_[1][0]],
-               # the list of enclosed literals
-               @{$_[3][0]},
-               # final directive (including headline level again)
-               [DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, $_[1][0]]
-              ],
-              $_[4][1]
-             ];
+             [$data, $_[4][1]];
             }
          | Headline_cache_hit
+            {
+             # update headline level hint
+             $flags{headlineLevel}=$_[1][0][0][2];
+
+             # supply what you got unchanged
+             $_[1];
+            }
          ;
 
 # headline level
@@ -1137,21 +1179,27 @@ list : list_part
 # list elements (default actions work)
 list_part : olist
              {
+              # the first point may start by a certain number, check this
+              my $start=(defined $_[1][0][0][2] and $_[1][0][0][2]>1) ? $_[1][0][0][2] : 1;
+
               # embed the points into list directives
               [
                [
                 # opener directive
-                [DIRECTIVE_OLIST, DIRECTIVE_START],
+                [DIRECTIVE_OLIST, DIRECTIVE_START, $start],
                 # the list of enclosed literals
                 @{$_[1][0]},
                 # final directive
-                [DIRECTIVE_OLIST, DIRECTIVE_COMPLETE]
+                [DIRECTIVE_OLIST, DIRECTIVE_COMPLETE, $start]
                ],
                $_[1][1]
               ];
              }
           | ulist
              {
+              # reset ordered list flag
+              $flags{olist}=0;
+
               # embed the points into list directives
               [
                [
@@ -1167,6 +1215,9 @@ list_part : olist
              }
           | dlist
              {
+              # reset ordered list flag
+              $flags{olist}=0;
+
               # embed the points into list directives
               [
                [
@@ -1235,15 +1286,18 @@ opoint : opoint_opener
            # reply data (they are already well prepared except that they are marked as text)
            $_[3][0][0][0]=$_[3][0][$#{$_[3][0]}][0]=&DIRECTIVE_OPOINT;
 
-           # update list level hint
-           $olistLevels[0]++;
+           # update list level hints as necessary
+           $olistLevels[0]=($flags{olist} or $_[1][0]) ? $olistLevels[0]+1 : 1;
 
 	   # add a level hint, if necessary
-	   if ($_[1][0] and $olistLevels[0]>1)
+	   if ($_[1][0] and not $flags{olist} and $olistLevels[0]>1)
 	     {
 	      push(@{$_[3][0][0]}, $olistLevels[0]);
 	      push(@{$_[3][0][$#{$_[3][0]}]}, $olistLevels[0]);
 	     }
+
+           # update ordered list flag
+           $flags{olist}=1;
 
 	   # update checksums
 	   updateChecksums($_[3][0], 'Opoint_cache_hit');
@@ -1476,7 +1530,7 @@ text : literal
          # remove the final EOL literal, if any
          pop(@{$_[3][0]}) if defined $_[3][0][$#{$_[3][0]}] and $_[3][0][$#{$_[3][0]}] eq 'EOL';
 
-         # reply data
+         # reply data, if any
          [
           [
            # opener directive
@@ -1624,6 +1678,9 @@ list_shift : list_shifter
 		  {unshift(@olistLevels, 0) for (1..(defined $_[3][0] ? $_[3][0] : 1));}
 		else
 		  {shift(@olistLevels) for (1..(defined $_[3][0] ? $_[3][0] : 1));}
+
+                # reset ordered list flag
+                $flags{olist}=0;
 
                 # reply data
                 [
@@ -2254,17 +2311,24 @@ included : Include
              my %tagpars=@{$_[3][0]};
              $errors++, warn "[Error ", ++$semErr, "] $sourceFile, line $_[3][1]: You forgot to specify the type of your included file.\n" unless exists $tagpars{type};
              $errors++, warn "[Error ", ++$semErr, "] $sourceFile, line $_[3][1]: You forgot to specify the name of your included file.\n" unless exists $tagpars{file};
-             $errors++, warn "[Error ", ++$semErr, "] $sourceFile, line $_[3][1]: Source file $tagpars{file} was already opened before.\n" if     exists $tagpars{file}
-                                                                                                                                 and exists $openedSourcefiles{$tagpars{file}}
-                                                                                                                                 and exists $tagpars{type}
-                                                                                                                                 and $tagpars{type}=~/^pp$/;
+
+             # smart inclusion?
+             my $smart=1 if     $tagpars{type}=~/^pp$/
+                            and exists $tagpars{smart} and $tagpars{smart}
+                            and exists $openedSourcefiles{$tagpars{file}};
+
+             # avoid circular source inclusion
+             $errors++, warn "[Error ", ++$semErr, "] $sourceFile, line $_[3][1]: Source file $tagpars{file} was already opened before.\n" if     $tagpars{type}=~/^pp$/
+                                                                                                                                              and not $smart
+                                                                                                                                              and grep($_ eq $tagpars{file}, @nestedSourcefiles);
+
 
              # PerlPoint headline offsets have to be positive numbers or certain strings
              $errors++, warn "[Error ", ++$semErr, "] $sourceFile, line $_[3][1]: Invalid headline level offset $tagpars{headlinebase}, positive number or keyword CURRENT_LEVEL expected.\n" if $tagpars{type}=~/^pp$/i and exists $tagpars{headlinebase} and $tagpars{headlinebase}!~/^\d+$/ and $tagpars{headlinebase}!~/^current_level$/i;
              $tagpars{headlinebase}=$flags{headlineLevel} if exists $tagpars{headlinebase} and $tagpars{headlinebase}=~/^current_level$/i;
 
              # all right?
-             unless (defined $errors)
+             unless (defined $smart or defined $errors)
                {
                 # check the filename
                 if (-r $tagpars{file})
@@ -2272,6 +2336,9 @@ included : Include
                    # check specified file type
                    if ($tagpars{type}=~/^pp$/i)
                      {
+                      # update nesting stack
+                      push(@nestedSourcefiles, $tagpars{file});
+
                       # we include a PerlPoint document, switch input handle (we intermediately have to close the original handle because of perl5.6.0 bugs)
                       unshift(@inHandles, [tell($inHandle), $_[0]->YYData->{INPUT}, basename($sourceFile), $lineNrs{$inHandle}, @flags{qw(headlineLevelOffset headlineLevel)}, cwd()]);
                       close($inHandle);
@@ -2565,6 +2632,9 @@ sub lexer
 
              # switch back to envelopes input stack
              shift(@inputStack);
+
+             # update nesting stack
+             pop(@nestedSourcefiles);
             }
          }
 
@@ -3560,7 +3630,7 @@ sub run
     );
 
   # init more
-  @flags{qw(skipInput headlineLevelOffset headlineLevel)}=(0) x 3;
+  @flags{qw(skipInput headlineLevelOffset headlineLevel olist)}=(0) x 4;
   $statistics{cache}[1]=0 if $flags{cache} & CACHE_ON;
 
   # welcome user
@@ -3589,6 +3659,9 @@ sub run
 
      # init input stack
      @inputStack=([]);
+
+     # init nesting stack
+     @nestedSourcefiles=($file);
 
      # update file hint
      $sourceFile=$file;

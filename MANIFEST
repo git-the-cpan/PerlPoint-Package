@@ -21,6 +21,7 @@ doc/parser-active-contents.pp
 
 doc/parser-faq.pp
 doc/faq/Misc/parser-faq-1.pp
+doc/faq/Misc/parser-faq-2.pp
 
 doc/parser-paragraphs.pp
 doc/parser-tags.pp
@@ -87,4 +88,6 @@ t/verbatim.t
 t/verbatim.pp
 
 utilities/PerlPoint.clp
+utilities/PerlPoint.vim
+utilities/perlpoint-hilit19.lisp
 utilities/utilities.txt

@@ -5,6 +5,7 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.07    |30.01.2001| JSTENZEL | ordered lists now provide the entry level number;
 # 0.06    |09.12.2000| JSTENZEL | new namespace: "PP" => "PerlPoint";
 # 0.05    |05.10.2000| JSTENZEL | parser takes a Safe object now;
 # 0.04    |03.10.2000| JSTENZEL | adapted to new definition list grammar: definition item
@@ -29,7 +30,7 @@ use PerlPoint::Parser 0.09;
 use PerlPoint::Constants;
 
 # prepare tests
-BEGIN {plan tests=>736;}
+BEGIN {plan tests=>738;}
 
 # declare variables
 my (@streamData, @results);
@@ -390,7 +391,7 @@ ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
 }
 ok(shift(@results), $_) foreach (DIRECTIVE_UPOINT, DIRECTIVE_COMPLETE);
 ok(shift(@results), $_) foreach (DIRECTIVE_ULIST, DIRECTIVE_COMPLETE);
-ok(shift(@results), $_) foreach (DIRECTIVE_OLIST, DIRECTIVE_START);
+ok(shift(@results), $_) foreach (DIRECTIVE_OLIST, DIRECTIVE_START, 1);
 ok(shift(@results), $_) foreach (DIRECTIVE_OPOINT, DIRECTIVE_START);
 ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TOAST');
 {
@@ -407,7 +408,7 @@ ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TOAST');
 }
 ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
 ok(shift(@results), $_) foreach (DIRECTIVE_OPOINT, DIRECTIVE_COMPLETE);
-ok(shift(@results), $_) foreach (DIRECTIVE_OLIST, DIRECTIVE_COMPLETE);
+ok(shift(@results), $_) foreach (DIRECTIVE_OLIST, DIRECTIVE_COMPLETE, 1);
 ok(shift(@results), $_) foreach (DIRECTIVE_DLIST, DIRECTIVE_START);
 ok(shift(@results), $_) foreach (DIRECTIVE_DPOINT, DIRECTIVE_START);
 ok(shift(@results), $_) foreach (DIRECTIVE_DPOINT_ITEM, DIRECTIVE_START);

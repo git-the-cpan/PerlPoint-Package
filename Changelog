@@ -1,38 +1,78 @@
 
+
+=0.31
+
+==Bugfixes
+
+* fixed POD to be more readable by pod2man (detected by Lorenz);
+
+* bugfix: in special constallations it could happen that
+  headlines after file inclusion with \C<headlinebase=CURRENT_LEVEL>
+  were detected at wrong levels;
+
+* the internal list counter of ordered lists used to find out where
+  a continued list restarts is now reset when a new lists begins
+  (as Lorenz detected, it was not reset correctly before);
+
+* Circular inclusion of PerlPoint sources was blocked too strictly:
+  every source was accepted only once. Now there's a better
+  algorithm checking real nesting: you can use a source file
+  as often as necessary, but not nested.
+
+
+==Features
+
+* added a \B<vim> syntax highlighting file to the \C<utilities>
+  directory, provided by Lorenz Domke (lorenz.domke@gmx.de);
+
+* Ordered lists now provide the startup level, additionally
+  to the first point which already did this if the list was
+  continued by \C<##>. This makes it easier for translator
+  authors to begin the list by a certain number if necessary.
+
+* added a tiny editing hint to the docs (FAQ);
+
+* added Emacs lisp code in the utilities directory as an example
+  how the hilit19 module could be extended for PerlPoint;
+
+* improved \C<Changelog> structure;
+
+* adapted parser-paragraphs.pp documentation slightly;
+
+* New option \B<\C<smart>> makes the \C<\\INCLUDE> tag
+  working like Perl's \C<require> or \C<use> for nested
+  PerlPoint sources: the file is only read unless it was
+  already read before.
+
+   \INCLUDE{file="macros.pp" smart=1}
+
+* This feature is \I<not> intended for translated paragraphs but
+  especially useful to make macros available by separate source
+  files included whereever necessary, and to nest source parts
+  which \I<both> load such definitions.
+
+
+==pp2sdf
+
+* pp2sdf: all generated text paragraphs now begin with a backslash
+  to avoid unintended paragraph style interpretation by sdf
+  in case a colon follows the first word like in
+
+     Remember: think twice.
+
+  The only exceptions of this rule are made if the first word
+  is "Note" or "Sign" because the special SDF formattings seem
+  to make sense then.
+
+* pp2sdf is now installed automatically by "make install";
+
+
 =0.30
 
-* internal code cosmetics;
-
-* variable settings can be propagated into the stream now;
-
-* improved syntactical error messages;
+==Bugfixes
 
 * fixed a bug detected by \I<Lorenz Domke> (lorenz.domke@gmx.de):
   embedded code can now be included into tags;
-
-* According to the PerlPoint language definition tag
-  recognition is now strictly limited to capitals and underscores
-  (previous versions accepted lowercase letters in tag names as well).
-  The restriction makes it easier to use backslashed strings when
-  \I<all> tags are accepted. Formerly, one had to write
-
-    This is \\no_tag, be sure!
-
-  Now this can be written
-
-    This is \no_tag, be sure!
-
-  and only capitalized backslashed strings are still to be guarded:
-
-    This is \\NO_TAG, be sure!
-
-  As before, this has only to be taken into account if
-  users prefer to accept everything looking like a tag as a tag
-  (see \C<\\ACCEPT_ALL> for details).
-
-* Consequently, lowercased letters in alias/macro definitions
-  are no longer valid. They are accepted but automatically converted
-  into capitals, while the parser displays a warning.
 
 * \I<Lorenz Domke> (lorenz.domke@gmx.de) detected unhandled macro
   modifications when caching was active. I figured out that this
@@ -59,13 +99,55 @@
 * Well, this is not perfect. Users should know this at least, so I added
   a suggestion to clean up the cache after introducing new alias definitions.
 
-* pp2sdf: "}" characters outside verbatim blocks and embedded HTML
+
+==Features
+
+* variable settings can be propagated into the stream now;
+
+* improved syntactical error messages;
+
+* According to the PerlPoint language definition tag
+  recognition is now strictly limited to capitals and underscores
+  (previous versions accepted lowercase letters in tag names as well).
+  The restriction makes it easier to use backslashed strings when
+  \I<all> tags are accepted. Formerly, one had to write
+
+    This is \\no_tag, be sure!
+
+  Now this can be written
+
+    This is \no_tag, be sure!
+
+  and only capitalized backslashed strings are still to be guarded:
+
+    This is \\NO_TAG, be sure!
+
+  As before, this has only to be taken into account if
+  users prefer to accept everything looking like a tag as a tag
+  (see \C<\\ACCEPT_ALL> for details).
+
+* Consequently, lowercased letters in alias/macro definitions
+  are no longer valid. They are accepted but automatically converted
+  into capitals, while the parser displays a warning.
+
+
+
+==Internals
+
+* internal code cosmetics;
+
+
+==pp2sdf
+
+* "}" characters outside verbatim blocks and embedded HTML
   are now replaced by SDF escape "{{CHAR::rbrace}}" to guard
   translations of things like \C<\\B<{key=\>value}\>>
 
 
 
 =0.29
+
+==Features
 
 * modified the parser module a way that its version can be
   displayed by CPAN;
@@ -81,10 +163,6 @@
   process more detailled by passing simple translator options).
 
   See \B<pp2sdf> for an example of usage.
-
-* pp2sdf target code embedding is now restricted to SDF and
-  HTML, but these both \I<are> officially supported now (as
-  well as Perl, of course ;-);
 
 * Simplified backslash handling in macros. Before 0.29, each
   macro level (and each tag level in the macro replacement,
@@ -131,6 +209,13 @@ EOE
   parser which accelerates startup time of translators in general.
 
 
+==pp2sdf
+
+* pp2sdf target code embedding is now restricted to SDF and
+  HTML, but these both \I<are> officially supported now (as
+  well as Perl, of course ;-);
+
+
 =0.28
 
 * removed an old POD headline prefix in README which caused
@@ -148,15 +233,29 @@ EOE
 
 =0.26
 
-* pp2sdf: avoid unintended SDF phrases (\C<P\<something\>>)
-  now by generating "<" as "{{CHAR:lt}}" (outside verbatim
-  blocks);
-
-* new utilities directory, providing a NoteTab clipbook file
-  initially;
+==Bugfixes
 
 * bugfix in active contents handling: it might happen that
   lines were ignored;
+
+* bugfix in dynamic contents handling: nested dynamic contents
+  (resolved macros, embedded parts, included parts) might not
+  be handled in the correct order;
+
+* The cache now considers headline level offsets of nested sources.
+  Before 0.26 it might happen that the headline level offset was
+  modified but an \I<old> offset was restored from cache.
+
+  \B<The cache format was modified. You \I<can> still use existing
+  cache files but old data therein will never be referenced. To
+  clean up old caches just remove them or use the parsers cleanup
+  facility.>
+
+
+==Features
+
+* new utilities directory, providing a NoteTab clipbook file
+  initially;
 
 * new dynamic FAQ document;
 
@@ -185,20 +284,14 @@ EOE
 
       \\INCLUDE{type=pp file="subdoc.pp"}
 
-* bugfix in dynamic contents handling: nested dynamic contents
-  (resolved macros, embedded parts, included parts) might not
-  be handled in the correct order;
-
-* The cache now considers headline level offsets of nested sources.
-  Before 0.26 it might happen that the headline level offset was
-  modified but an \I<old> offset was restored from cache.
-
-  \B<The cache format was modified. You \I<can> still use existing
-  cache files but old data therein will never be referenced. To
-  clean up old caches just remove them or use the parsers cleanup
-  facility.>
-
 * the package now explicitly requires perl 5.6;
+
+
+==pp2sdf
+
+* pp2sdf: avoid unintended SDF phrases (\C<P\<something\>>)
+  now by generating "<" as "{{CHAR:lt}}" (outside verbatim
+  blocks);
 
 
 =0.25

@@ -51,8 +51,6 @@ details.
 ==File inclusion
 
 It is possible to include another file by \B<\\INCLUDE{file=\<filename\> type=\<type\>}>.
-The nesting level is umlimited, but every file is \I<read only once> (to avoid confusion by
-circular nesting).
 
 The mandatory base options are
 
@@ -74,7 +72,10 @@ translator specific documentation for details.
 ===Including nested PerlPoint sources
 
 If the type of an included file is specified as \C<"PP">, the file contents is
-made part of the presentation source.
+made part of the presentation source. The nesting level is umlimited, but every
+file \I<in a nesting hierarchy> is \I<read only once> (to avoid confusion by
+circular nesting). (Including the same file multiply in different nesting
+hierarchies is possible without problems.)
 
 In this case a special tag option \C<"headlinebase"> can be specified to define a headline
 base level used as an offset to all headlines in the included document.
@@ -102,6 +103,12 @@ A given offset is reset when the included document is parsed completely.
 The \C<"headlinebase"> feature makes it easier to share partial documents with others,
 or to build complex documents by including seperately maintained parts, or to include
 one and the same part at different headline levels.
+
+A second special option \I<smart> commands the parser to include the file
+only unless this was already done before. This is intended for inclusion
+of pure alias/macro definition or variable assignment files.
+
+ \\INCLUDE{type=PP file="common-macros.pp" smart=1}
 
 A PerlPoint file can be included wherever a tag is allowed, but sometimes
 it has to be arranged slightly: if you place the inclusion directive at

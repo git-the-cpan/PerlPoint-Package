@@ -14,7 +14,7 @@ require 5.00503;
 # write makefile
 $ok=WriteMakefile(
                   NAME         => 'PerlPoint',
-                  VERSION      => '0.30',
+                  VERSION      => '0.31',
                   PREREQ_PM    => {
 		                   Digest::SHA1 => 1,
                                    IO::File     => 1,
@@ -24,6 +24,7 @@ $ok=WriteMakefile(
                                    COMPRESS     => 'gzip -9',
                                    SUFFIX       => 'tgz',
                                   },
+                  EXE_FILES    => ['demo/pp2sdf'],
                  );
 
 # provide additional informations
@@ -45,8 +46,7 @@ first PerlPoint input to run the demo scripts.
 implement the full language but show how
 translators can be built.)
 
-If you want to install pp2sdf just adapt
-the shebang line and copy it into your
-path.
+pp2sdf will be installed together with the
+package modules.
 
 EOM
