@@ -1,4 +1,8 @@
 
+// include macro definitions shared by all basic tag docs
+\INCLUDE{type=pp file="basic-tag-macros.pp" smart=1}
+
+
 
 =C
 
@@ -33,5 +37,5 @@ The PerlPoint phrase "This text is \\C<formatted>." is translated into
 
 \B<See also>
 
-More basic set tags: \B<\\B>, \B<\\I>, \B<\\IMAGE> and \B<\\READY>.
+More basic set tags: \OTHER_BASIC_TAGS{current=C}.
 

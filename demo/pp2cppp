@@ -5,6 +5,8 @@
 # ---------------------------------------------------------------------------------------
 # version | date   | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.02    |16.08.01| JSTENZEL | fixed call of <parser>->run() by adapting it to new tag
+#         |        |          | declarations finally (but the bug caused no error);
 # 0.01    |16.06.01| JSTENZEL | derived from my pp2sdf.
 # ---------------------------------------------------------------------------------------
 
@@ -16,7 +18,7 @@ B<pp2cppp> - translates PerlPoint to Clinton Pierce's Perl Projector
 
 =head1 VERSION
 
-This manual describes version B<0.01>.
+This manual describes version B<0.02>.
 
 =head1 DESCRIPTION
 
@@ -308,6 +310,8 @@ parsed sources (as ".<source file name>.ppcache" in the source directory).
 
 =head1 SEE ALSO
 
+The Perl Projector homepage.
+
 PerlPoint::Tags::CPPP
 
 PerlPoint::Parser
@@ -359,7 +363,7 @@ distribution for more details.
 package PerlPoint::Converter::pp2cppp;
 
 # declare version
-$VERSION=$VERSION=0.01;
+$VERSION=$VERSION=0.02;
 
 # pragmata
 use strict;
@@ -373,7 +377,7 @@ use PerlPoint::Tags;
 use PerlPoint::Backend;
 use PerlPoint::Constants;
 use PerlPoint::Tags::CPPP;
-use PerlPoint::Parser 0.35;
+use PerlPoint::Parser 0.36;
 use Getopt::ArgvFile qw(argvFile);
 
 
@@ -464,7 +468,6 @@ if (exists $options{safeOpcode})
 # and call it
 $parser->run(
              stream          => \@streamData,
-             tags            => \%tagHash,
              files           => \@ARGV,
 
              filter          => 'perl|cppp',
@@ -784,7 +787,7 @@ sub handleComment
   # get parameters
   my ($opcode, $mode)=@_;
 
-  # act list and mode dependend
+  # act mode dependend
   print "=comment " if $mode==DIRECTIVE_START;
   print "\n" if $mode==DIRECTIVE_COMPLETE;
  }

@@ -309,6 +309,9 @@ is true for tag combinations a user may prefer to use. That's what \I<aliases>
 his own shortcuts and to use them like a tag. The parser will resolve such aliases,
 replace them by the defined replacement text and work on with this replacement.
 
+
+===Basic definition
+
 An alias declaration starts with a \B<"+"> character followed \I<immediately> by the
 alias \I<name> (without backslash prefix), followed \I<immediately> by a colon.
 (No additional spaces here.) \I<All text after this colon up to the paragraph
@@ -348,6 +351,37 @@ Here are a few examples:
   Please note: \TEXT
 
 EOE
+
+
+===Option defaults
+
+If an option is declared but unused, it defaults to an empty string unless
+the definition declared a default value itself by using an assignment list
+after the macro name.
+
+  +MACRO\B<{\I<value>="default value"}>:value is \B<__value__>
+
+Please note that the default assignment uses the \I<real> option name, no
+placeholder.
+
+As long as the option is set in the macro call, the passed value will be used:
+
+  Now I'm using the macro the usual way, \MACRO{value=passed}.
+
+But if the option is omitted, PerlPoint falls back to the stored default value:
+
+  Using this macro the convenient way: \MACRO.
+
+Default assignment lists are syntactically similar to the ones used in tag and
+macro \I<calls>, so it is possible to make various settings.
+
+  +MACRO{\B<a=1 b=2 c=3>}:sum(__a__, __b__, __c__)
+  
+Setting a default value for an option not declared in the macros replacement
+text takes no effect and is silently ignored.
+
+
+===Recognition
 
 \I<If no parameter is defined in the macro definition, options will not be recognized.>
 The same is true for the body part. \I<Unless \C<"__body__"> is used in the macro
@@ -390,6 +424,9 @@ to be translated into
 The principle behind all this is to make macro usage \I<easier> and intuative:
 why think of options or a body or of special characters possibly treated as
 option/body part openers unless the macro makes use of an option or body?
+
+
+===Deleting a macro
 
 An \I<empty> macro text \I<undefines> the macro (if it was already known).
 

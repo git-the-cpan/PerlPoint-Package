@@ -38,7 +38,7 @@ $parser->run(
              filter     => 'pp',
              safe       => new Safe,
              var2stream => 1,
-             trace      => TRACE_NOTHING,
+             trace      => TRACE_NOTHING, # PARSER+TRACE_LEXER+TRACE_SEMANTIC+TRACE_PARAGRAPHS,   # NOTHING,
              display    => DISPLAY_NOINFO+DISPLAY_NOWARN,
             );
 
@@ -140,6 +140,9 @@ ok(shift(@results), $_) foreach (DIRECTIVE_VARSET, DIRECTIVE_START);
  ok($pars->{var}, 'toBeRestored2');
  ok($pars->{value}, 'newValue2');
 }
+
+# use Data::Dumper; warn Dumper(\@results);
+
 ok(shift(@results), $_) foreach (DIRECTIVE_VARSET, DIRECTIVE_START);
 {
  my $pars=shift(@results);
@@ -148,6 +151,8 @@ ok(shift(@results), $_) foreach (DIRECTIVE_VARSET, DIRECTIVE_START);
  ok($pars->{var}, 'canBeOverwritten');
  ok($pars->{value}, 'newValue3');
 }
+
+# use Data::Dumper; warn Dumper(\@results);
 
 # in the nested source
 ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);

@@ -5,6 +5,7 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.05    |16.08.2001| JSTENZEL | no need to build a Safe object;
 # 0.04    |20.03.2001| JSTENZEL | adapted to tag templates;
 # 0.03    |09.12.2000| JSTENZEL | new namespace: "PP" => "PerlPoint";
 # 0.02    |05.10.2000| JSTENZEL | parser takes a Safe object now;
@@ -19,7 +20,6 @@ use strict;
 
 # load modules
 use Carp;
-use Safe;
 use Test;
 use PerlPoint::Backend;
 use PerlPoint::Parser 0.08;
@@ -38,7 +38,7 @@ my ($parser)=new PerlPoint::Parser;
 $parser->run(
              stream  => \@streamData,
              files   => ['t/comments.pp'],
-             safe    => new Safe,
+             safe    => undef,
              trace   => TRACE_NOTHING,
              display => DISPLAY_NOINFO+DISPLAY_NOWARN,
             );

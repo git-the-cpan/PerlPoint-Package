@@ -10,7 +10,7 @@ implementation if possible.
 
 =General
 
-* add an intro/tutorial to PerlPoint
+* add a tutorial to PerlPoint
 
 
 =List shifting
@@ -20,10 +20,8 @@ implementation if possible.
   a new one instead of holding the first list open
   and opening a subordered list);
 
-
-=Parser
-
-* subchapter element feature (just an idea, needs an additional pass);
+* but list directives now contain hints about preceding
+  and following level shifts, may be this is sufficient;
 
 
 =pp2pod
@@ -50,3 +48,4 @@ implementation if possible.
 * add index (supporting pp2html index tags as possible);
 
 * add documentation in PerlPoint format;
+

@@ -5,6 +5,7 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.04    |16.08.2001| JSTENZEL | no need to load Safe;
 # 0.03    |20.03.2001| JSTENZEL | adapted to tag templates;
 # 0.02    |09.12.2000| JSTENZEL | new namespace: "PP" => "PerlPoint";
 # 0.01    |07.10.2000| JSTENZEL | new.
@@ -18,7 +19,6 @@ use strict;
 
 # load modules
 use Carp;
-use Safe;
 use Test;
 use PerlPoint::Backend;
 use PerlPoint::Parser 0.08;

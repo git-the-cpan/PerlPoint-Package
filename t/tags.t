@@ -5,6 +5,11 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.10    |16.08.2001| JSTENZEL | no need to build a Safe object;
+#         |13.10.2001| JSTENZEL | switched to Test::More;
+#         |          | JSTENZEL | added tests to check finish hook interface
+#         |          |          | (and parsers anchor management by the way);
+#         |27.11.2001| JSTENZEL | adapted to additional shift hints in list directives;
 # 0.09    |22.07.2001| JSTENZEL | adapted to perl 5.005;
 # 0.08    |20.03.2001| JSTENZEL | adapted to tag templates;
 #         |23.03.2001| JSTENZEL | adapted to by line lexing of verbatim blocks;
@@ -27,8 +32,7 @@
 
 # load modules
 use Carp;
-use Safe;
-use Test;
+use Test::More qw(no_plan);
 use PerlPoint::Backend;
 use PerlPoint::Parser 0.34;
 use PerlPoint::Constants;
@@ -38,9 +42,6 @@ use lib qw(t);
 use PerlPoint::Tags;
 use PerlPoint::Tags::_tags;
 
-# prepare tests
-BEGIN {plan tests=>531;}
-
 # declare variables
 my (@streamData, @results);
 
@@ -49,11 +50,11 @@ my ($parser)=new PerlPoint::Parser;
 
 # and call it
 $parser->run(
-             stream  => \@streamData,
-             files   => ['t/tags.pp'],
-             safe    => new Safe,
-             trace   => TRACE_NOTHING,
-             display => DISPLAY_NOINFO,
+             stream        => \@streamData,
+             files         => ['t/tags.pp'],
+             headlineLinks => 1,
+             trace         => TRACE_NOTHING,
+             display       => DISPLAY_NOINFO,
             );
 
 # build a backend
@@ -70,418 +71,467 @@ $backend->register($_, \&handler) foreach (DIRECTIVE_BLOCK .. DIRECTIVE_SIMPLE);
 $backend->run(\@streamData);
 
 # checks
-ok(shift(@results), $_) foreach (DIRECTIVE_DOCUMENT, DIRECTIVE_START, 'tags.pp');
-ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Simple');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ': ');
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
+is(shift(@results), $_) foreach (DIRECTIVE_DOCUMENT, DIRECTIVE_START, 'tags.pp');
+is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Simple');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ': ');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), '');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), '');
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), '');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), '');
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Guarded: ');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '\TEST.');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Sequence: ');
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Guarded: ');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '\TEST.');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Sequence: ');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), '');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), '');
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), '');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), '');
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TOAST');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TOAST');
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), '');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), '');
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TOAST');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TOAST');
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), '');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), '');
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
-ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
-ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'With body');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ': ');
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TOAST');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
+is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'With body');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ': ');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TOAST');
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), '');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), '');
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'toast');
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TOAST');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'toast');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TOAST');
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), '');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), '');
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Sequence: ');
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Sequence: ');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), '');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), '');
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'test');
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'test');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), '');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), '');
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TOAST');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TOAST');
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), '');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), '');
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'toast');
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TOAST');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'toast');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TOAST');
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), '');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), '');
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Nested: ');
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Nested: ');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), '');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), '');
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'tested ');
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TOAST');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'tested ');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TOAST');
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), '');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), '');
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'toast');
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TOAST');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'toast');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TOAST');
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), '');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), '');
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), '');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), '');
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
-ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
-ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'With parameters');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ': ');
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
+is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'With parameters');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ': ');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), 'par1 par2');
- ok($pars->{par1}, 'p1');
- ok($pars->{par2}, 'p2');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 'par1 par2');
+ is($pars->{par1}, 'p1');
+ is($pars->{par2}, 'p2');
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), 'par1 par2');
- ok($pars->{par1}, 'p1');
- ok($pars->{par2}, 'p2');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 'par1 par2');
+ is($pars->{par1}, 'p1');
+ is($pars->{par2}, 'p2');
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Sequence: ');
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Sequence: ');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), 't');
- ok($pars->{t}, 'test');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 't');
+ is($pars->{t}, 'test');
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), 't');
- ok($pars->{t}, 'test');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 't');
+ is($pars->{t}, 'test');
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TOAST');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TOAST');
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), 't');
- ok($pars->{t}, 'toast');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 't');
+ is($pars->{t}, 'toast');
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TOAST');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TOAST');
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), 't');
- ok($pars->{t}, 'toast');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 't');
+ is($pars->{t}, 'toast');
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
-ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
-ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Complete');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ': ');
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
+is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Complete');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ': ');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), 't');
- ok($pars->{t}, 'test');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 't');
+ is($pars->{t}, 'test');
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'test');
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'test');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), 't');
- ok($pars->{t}, 'test');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 't');
+ is($pars->{t}, 'test');
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Sequence: ');
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Sequence: ');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), 't');
- ok($pars->{t}, 'test');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 't');
+ is($pars->{t}, 'test');
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'test');
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'test');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), 't');
- ok($pars->{t}, 'test');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 't');
+ is($pars->{t}, 'test');
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TOAST');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TOAST');
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), 't');
- ok($pars->{t}, 'toast');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 't');
+ is($pars->{t}, 'toast');
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'toast');
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TOAST');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'toast');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TOAST');
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), 't');
- ok($pars->{t}, 'toast');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 't');
+ is($pars->{t}, 'toast');
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Nested: ');
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Nested: ');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), 't');
- ok($pars->{t}, 'test');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 't');
+ is($pars->{t}, 'test');
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'tested ');
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TOAST');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'tested ');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TOAST');
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), 't');
- ok($pars->{t}, 'toast');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 't');
+ is($pars->{t}, 'toast');
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'toast');
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TOAST');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'toast');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TOAST');
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), 't');
- ok($pars->{t}, 'toast');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 't');
+ is($pars->{t}, 'toast');
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), 't');
- ok($pars->{t}, 'test');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 't');
+ is($pars->{t}, 'test');
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
-ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
-ok(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, DIRECTIVE_COMPLETE);
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Tag in a ');
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
-{
- my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), '');
-}
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'headline');
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
-{
- my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), '');
-}
-# ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
-ok(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, DIRECTIVE_COMPLETE);
-ok(shift(@results), $_) foreach (DIRECTIVE_ULIST, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_UPOINT, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
-{
- my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), '');
-}
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Tags');
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
-{
- my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), '');
-}
-ok(shift(@results), $_) foreach (DIRECTIVE_UPOINT, DIRECTIVE_COMPLETE);
-ok(shift(@results), $_) foreach (DIRECTIVE_ULIST, DIRECTIVE_COMPLETE);
-ok(shift(@results), $_) foreach (DIRECTIVE_OLIST, DIRECTIVE_START, 1);
-ok(shift(@results), $_) foreach (DIRECTIVE_OPOINT, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TOAST');
-{
- my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), '');
-}
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'in');
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TOAST');
-{
- my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), '');
-}
-ok(shift(@results), $_) foreach (DIRECTIVE_OPOINT, DIRECTIVE_COMPLETE);
-ok(shift(@results), $_) foreach (DIRECTIVE_OLIST, DIRECTIVE_COMPLETE, 1);
-ok(shift(@results), $_) foreach (DIRECTIVE_DLIST, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_DPOINT, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_DPOINT_ITEM, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'FONT');
-{
- my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), 'color');
- ok($pars->{color}, 'blue')
-}
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'item');
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'FONT');
-{
- my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), 'color');
- ok($pars->{color}, 'blue')
-}
-ok(shift(@results), $_) foreach (DIRECTIVE_DPOINT_ITEM, DIRECTIVE_COMPLETE);
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'list ');
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
-{
- my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), '');
-}
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'po');
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TOAST');
-{
- my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), '');
-}
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'i');
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TOAST');
-{
- my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), '');
-}
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'nts');
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
-{
- my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), '');
-}
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
-ok(shift(@results), $_) foreach (DIRECTIVE_DPOINT, DIRECTIVE_COMPLETE);
-ok(shift(@results), $_) foreach (DIRECTIVE_DLIST, DIRECTIVE_COMPLETE);
-ok(shift(@results), $_) foreach (DIRECTIVE_BLOCK, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '   ');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'And in');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "\n");
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '   ');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'a ');
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
-{
- my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), '');
-}
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'block');
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
-{
- my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), '');
-}
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "\n");
-ok(shift(@results), $_) foreach (DIRECTIVE_BLOCK, DIRECTIVE_COMPLETE);
-ok(shift(@results), $_) foreach (DIRECTIVE_VERBATIM, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "\n");
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "  Tags are currently \\TEST<not>\n");
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "  processed in \\TOAST<Verbatim blocks>.\n");
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "\n");
-ok(shift(@results), $_) foreach (DIRECTIVE_VERBATIM, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
+is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 
-ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'String parameter');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ': ');
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
-{
- my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), 'addr t');
- ok($pars->{addr}, 'http://www.perl.com');
- ok($pars->{t}, 'test');
-}
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'test');
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
-{
- my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), 'addr t');
- ok($pars->{addr}, 'http://www.perl.com');
-}
-ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 
-ok(shift(@results), $_) foreach (DIRECTIVE_DOCUMENT, DIRECTIVE_COMPLETE, 'tags.pp');
+# headline reference (forward)
+is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Headline reference (forward)');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ': ');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'REF');
+{
+ my $pars=shift(@results);
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), '__value__ name');
+ is($pars->{__value__}, 'Tag in a headline');
+ is($pars->{name}, 'Tag in a headline');
+}
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'REF');
+{
+ my $pars=shift(@results);
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 'name');
+ is($pars->{name}, 'Tag in a headline');
+}
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
+is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
+
+
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 1, 'Tag in a headline');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Tag in a ');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
+{
+ my $pars=shift(@results);
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), '');
+}
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'headline');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
+{
+ my $pars=shift(@results);
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), '');
+}
+# is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 1);
+is(shift(@results), $_) foreach (DIRECTIVE_ULIST, DIRECTIVE_START, (0) x 5);
+is(shift(@results), $_) foreach (DIRECTIVE_UPOINT, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
+{
+ my $pars=shift(@results);
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), '');
+}
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Tags');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
+{
+ my $pars=shift(@results);
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), '');
+}
+is(shift(@results), $_) foreach (DIRECTIVE_UPOINT, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_ULIST, DIRECTIVE_COMPLETE, (0) x 5);
+is(shift(@results), $_) foreach (DIRECTIVE_OLIST, DIRECTIVE_START, 1, (0) x 4);
+is(shift(@results), $_) foreach (DIRECTIVE_OPOINT, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TOAST');
+{
+ my $pars=shift(@results);
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), '');
+}
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'in');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TOAST');
+{
+ my $pars=shift(@results);
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), '');
+}
+is(shift(@results), $_) foreach (DIRECTIVE_OPOINT, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_OLIST, DIRECTIVE_COMPLETE, 1, (0) x 4);
+is(shift(@results), $_) foreach (DIRECTIVE_DLIST, DIRECTIVE_START, (0) x 5);
+is(shift(@results), $_) foreach (DIRECTIVE_DPOINT, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_DPOINT_ITEM, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'FONT');
+{
+ my $pars=shift(@results);
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 'color');
+ is($pars->{color}, 'blue')
+}
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'item');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'FONT');
+{
+ my $pars=shift(@results);
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 'color');
+ is($pars->{color}, 'blue')
+}
+is(shift(@results), $_) foreach (DIRECTIVE_DPOINT_ITEM, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'list ');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
+{
+ my $pars=shift(@results);
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), '');
+}
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'po');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TOAST');
+{
+ my $pars=shift(@results);
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), '');
+}
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'i');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TOAST');
+{
+ my $pars=shift(@results);
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), '');
+}
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'nts');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
+{
+ my $pars=shift(@results);
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), '');
+}
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
+is(shift(@results), $_) foreach (DIRECTIVE_DPOINT, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_DLIST, DIRECTIVE_COMPLETE, (0) x 5);
+
+is(shift(@results), $_) foreach (DIRECTIVE_BLOCK, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '   ');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'And in');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "\n");
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '   ');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'a ');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
+{
+ my $pars=shift(@results);
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), '');
+}
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'block');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
+{
+ my $pars=shift(@results);
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), '');
+}
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "\n");
+is(shift(@results), $_) foreach (DIRECTIVE_BLOCK, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_VERBATIM, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "\n");
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "  Tags are currently \\TEST<not>\n");
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "  processed in \\TOAST<Verbatim blocks>.\n");
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "\n");
+is(shift(@results), $_) foreach (DIRECTIVE_VERBATIM, DIRECTIVE_COMPLETE);
+
+is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'String parameter');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ': ');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
+{
+ my $pars=shift(@results);
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 'addr t');
+ is($pars->{addr}, 'http://www.perl.com');
+ is($pars->{t}, 'test');
+}
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'test');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
+{
+ my $pars=shift(@results);
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 'addr t');
+ is($pars->{addr}, 'http://www.perl.com');
+}
+is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
+
+# headline reference (backwards)
+is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Headline reference (backwards)');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ': ');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'REF');
+{
+ my $pars=shift(@results);
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), '__value__ name');
+ is($pars->{__value__}, 'Tag in a headline');
+ is($pars->{name}, 'Tag in a headline');
+}
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'REF');
+{
+ my $pars=shift(@results);
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 'name');
+ is($pars->{name}, 'Tag in a headline');
+}
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
+is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
+
+
+is(shift(@results), $_) foreach (DIRECTIVE_DOCUMENT, DIRECTIVE_COMPLETE, 'tags.pp');
 
 
 # SUBROUTINES ###############################################################################

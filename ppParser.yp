@@ -1,4 +1,4 @@
- 
+
 # ATTENTION:
 #
 # This is NO module and NO script, but a GRAMMAR. To build the module,
@@ -14,6 +14,75 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.36    |10.08.2001| JSTENZEL | the stream became a more complex data structure to
+#         |          |          | allow converter authors to act according to a documents
+#         |          |          | structure (getting headlines without having to process
+#         |          |          | all tokens, moving between chapters) - basically, it
+#         |          |          | *remained* a stream (with additional structure info);
+#         |29.09.2001| JSTENZEL | adapted stream initialization to intermediately
+#         |          |          | modified design;
+#         |          | JSTENZEL | bugfixes in normalizeTableRows(): standalone single "0"
+#         |          |          | in table cells was removed;
+#         |07.10.2001| JSTENZEL | improved error messages provide an error pointer;
+#         |11.10.2001| JSTENZEL | removed unused "use fields" directive;
+#         |          | JSTENZEL | storing headline anchors now, depending on new
+#         |          |          | flag headlineLinks;
+#         |          | JSTENZEL | modified tag hook interface, tag body array is now
+#         |          |          | passed by *reference*;
+#         |          | JSTENZEL | passing anchor object to tag hooks;
+#         |12.10.2001| JSTENZEL | added tag finish hook interface;
+#         |13.10.2001| JSTENZEL | list shifts are no longer flagged by DIRECTIVE_START
+#         |          |          | *and* DIRECTIVE_COMPLETED, no just by DIRECTIVE_START;
+#         |          | JSTENZEL | headline start directives in the stream now provide
+#         |          |          | the full (plain) headline;
+#         |          | JSTENZEL | added tag conditions;
+#         |14.10.2001| JSTENZEL | bugfix: passed tag options to parsing hooks instead
+#         |          |          | of tag body;
+#         |          | JSTENZEL | using new stream directive index constants;
+#         |          | JSTENZEL | stream directives now begin with a hash reference to
+#         |          |          | pass backend hints;
+#         |17.10.2001| JSTENZEL | new directive format results in modified cache format,
+#         |          |          | adapted automatic update;
+#         |27.10.2001| JSTENZEL | list directives now contain hints about predecessing
+#         |          |          | or following list shifts;
+#         |29.10.2001| JSTENZEL | added paragraph filters (in a first version for verb. blocks);
+#         |16.11.2001| JSTENZEL | improved _Error();
+#         |          | JSTENZEL | improved lexer traces (did hide lines in verb. blocks and
+#         |          |          | comments;
+#         |          | JSTENZEL | Heredoc close sequence detection is no longer restricted
+#         |          |          | to original source lines but also active for lines gotten
+#         |          |          | from stack - this became possible because verbatim block
+#         |          |          | lines are scanned in *completely* since version 0.34.
+#         |          |          | As a result, it is possible now to generate verbatim
+#         |          |          | blocks via active contents, but it is still impossible
+#         |          |          | to do this for blocks and text paragraphs beginning with
+#         |          |          | a tag or macro.
+#         |17.11.2001| JSTENZEL | implemented a more general paragraph filter approach
+#         |          |          | (still incomplete: needs to be extended for lists, needs
+#         |          |          | retranslation of paragraph stream into text);
+#         |18.11.2001| JSTENZEL | slightly improved stackInput() (initially empty lines
+#         |          |          | buffers would have been stacked, and a final buffer value
+#         |          |          | of "0" would have been ignored);
+#         |          | JSTENZEL | detection of block starts and text paragraphs beginning
+#         |          |          | with a line now take stacked lines into consideration
+#         |          |          | - this was suppressed because stacked input can begin
+#         |          |          | anywhere in a real line and not just at the beginning,
+#         |          |          | but now it is checked if there was a trailing \n in the
+#         |          |          | previous stack entry (we do not have to check previous
+#         |          |          | non stacked lines because there is no way to produce
+#         |          |          | a beginning paragraph on the stack without a leading
+#         |          |          | (and therefore stacked) empty line);
+#         |          | JSTENZEL | text passed to paragraph filters is now retranslated from
+#         |          |          | the paragraphs streams (implementation still incomplete);
+#         |21.11.2001| JSTENZEL | macro definitions can now optionally take option defaults;
+#         |22.11.2001| JSTENZEL | bugfix in macro definition tag option handling: no boost!;
+#         |01.12.2001| JSTENZEL | tables can be filtered now;
+#         |          | JSTENZEL | Compound paragraphs can be filtered now!
+#         |          | JSTENZEL | lists can be filtered now, added retranslation parts;
+#         |          | JSTENZEL | slightly restructered lexer parts: new _lineStartResearch();
+#         |02.12.2002| JSTENZEL | slightly restructered lexer parts: new _refLexed()
+#         |          |          | (to detect streamed parts placed in the input line, must
+#         |          |          | have beed happened before as well??);
 # 0.35    |16.06.2001| JSTENZEL | text paragraphs containing an image only are now
 #         |          |          | transformed into just the image;
 #         |22.07.2001| JSTENZEL | in order to make it run under 5.005 again, a pseudo
@@ -319,7 +388,7 @@ B<PerlPoint::Parser> - a PerlPoint Parser
 
 =head1 VERSION
 
-This manual describes version B<0.35>.
+This manual describes version B<0.36>.
 
 =head1 SYNOPSIS
 
@@ -1131,6 +1200,8 @@ B<Example:>
                             'STATE_DPOINT',          # definition list point;
                             'STATE_DPOINT_ITEM',     # definition list point item (defined stuff);
                             'STATE_EMBEDDING',       # embedded things (HTML, Perl, ...);
+                            'STATE_PFILTER',         # paragraph filter installation;
+                            'STATE_PFILTERED',       # "default" state after a pfilter installation;
                             'STATE_CONDITION',       # condition;
                             'STATE_HEADLINE_LEVEL',  # headline level setting;
                             'STATE_HEADLINE',        # headline;
@@ -1156,21 +1227,22 @@ B<Example:>
  require 5.00503;
 
  # declare module version
- $PerlPoint::Parser::VERSION=0.35;
+ $PerlPoint::Parser::VERSION=0.36;
  $PerlPoint::Parser::VERSION=$PerlPoint::Parser::VERSION; # to suppress a warning of exclusive usage only;
 
  # pragmata
  use strict;
- use fields;
 
  # load modules
  use Cwd;
  use Carp;
  use IO::File;
  use File::Basename;
- use PerlPoint::Constants 0.14 qw(:DEFAULT :parsing :tags);
+ use PerlPoint::Anchors;
+ use PerlPoint::Backend 0.10;
  use Digest::SHA1 qw(sha1_base64);
  use Storable qw(:DEFAULT dclone nfreeze);
+ use PerlPoint::Constants 0.15 qw(:DEFAULT :parsing :stream :tags);
 
  # startup declarations
  my (
@@ -1191,11 +1263,14 @@ B<Example:>
      @inputStack,                  # a stack of additional input lines and dynamically inserted parts;
      @inHandles,                   # a stack of input handles (to manage nested sources);
      @olistLevels,                 # a hint storing the last recent ordered list level number of a paragraph (hyrarchically);
+     @inLine,                      # current *real* input line (the unexpanded line read from a source file);
+     @previousStackLines,          # buffer of the last lines gotten from input stack;
 
+     $anchors,                     # anchor collector object;
      $safeObject,                  # an object of class Safe to evaluate Perl code embedded into PerlPoint;
      $sourceFile,                  # the source file currently read;
      $tagsRef,                     # reference to a hash of valid tag openers (strings without the "<");
-     $resultStreamRef,             # reference to an array to put generated stream data in;
+     $resultStreamRef,             # reference to a data structure to put generated stream data in;
      $inHandle,                    # the data input stream (to parse);
      $parserState,                 # the current parser state;
      $readCompletely,              # the input file is read completely;
@@ -1204,6 +1279,10 @@ B<Example:>
      $checksums,		   # paragraph checksums (and associated stream parts);
      $macroChecksum,               # the current macro checksum;
      $varChecksum,                 # the current user variables checksum;
+     $pendingTags,                 # list of tags to be finished after parsing (collected using a structure);
+     $directiveCounter,            # directive counter (just to mark stream directive pairs uniquely);
+     $retranslator,                # a backend object used to restore paragraph sources to be filtered;
+     $retranslationBuffer,         # buffer used in retranslation (needs to b global to avoid closure effects with lexicals in translator routines);
     );
 
  # ----- Startup code begins here. -----
@@ -1229,23 +1308,23 @@ B<Example:>
 
  # declare token descriptions (to be used in error messages)
  my %tokenDescriptions=(
-                        EOL                => 'a carriage return',
-                        Embed              => 'embedded code',
-                        Embedded           => 'an \END_EMBED tag',
-                        Empty_line         => 'an empty line',
-                        Heredoc_close      => 'a string closing the "here document"',
-                        Heredoc_open       => 'a "here document" opener',
-                        Ils                => 'a indentation',
-                        Include            => 'an included part',
-                        Named_variable     => 'a named variable',
-                        Space              => 'a whitespace',
-                        StreamedPart       => undef,
-                        Symbolic_variable  => 'a symbolic variable',
-                        Table              => 'a table',
-                        Table_separator    => 'a table column separator',
-                        Tabled             => 'an \END_TABLE tag',
-                        Tag_name           => 'a tag name',
-                        Word               => 'a word',
+                        EOL                      => 'a carriage return',
+                        Embed                    => 'embedded code',
+                        Embedded                 => 'an \END_EMBED tag',
+                        Empty_line               => 'an empty line',
+                        Heredoc_close            => 'a string closing the "here document"',
+                        Heredoc_open             => 'a "here document" opener',
+                        Ils                      => 'a indentation',
+                        Include                  => 'an included part',
+                        Named_variable           => 'a named variable',
+                        Space                    => 'a whitespace',
+                        StreamedPart             => undef,
+                        Symbolic_variable        => 'a symbolic variable',
+                        Table                    => 'a table',
+                        Table_separator          => 'a table column separator',
+                        Tabled                   => 'an \END_TABLE tag',
+                        Tag_name                 => 'a tag name',
+                        Word                     => 'a word',
                        );
 
 %}
@@ -1280,23 +1359,32 @@ document : paragraph
              unless ($_[1][0] eq '')
               {
                # add data to the output stream
-               push(@$resultStreamRef, @{$_[1][0]});
+               push(@{$resultStreamRef->[STREAM_TOKENS]}, @{$_[1][0]});
+
+               # update tag finish memory
+               updateTagFinishMem(scalar(@{$resultStreamRef->[STREAM_TOKENS]}));
 
   	       # update checksums (unless done before for parts)
-               updateChecksums($_[1][0], 'Paragraph_cache_hit') unless    $_[1][0][0][0]==DIRECTIVE_BLOCK
-                                                                       or $_[1][0][0][0]==DIRECTIVE_DLIST
-                                                                       or $_[1][0][0][0]==DIRECTIVE_OLIST
-                                                                       or $_[1][0][0][0]==DIRECTIVE_ULIST
-                                                                       or $_[1][0][0][0]==DIRECTIVE_HEADLINE;
+               updateChecksums($_[1][0], 'Paragraph_cache_hit') unless    $_[1][0][0][STREAM_DIR_TYPE]==DIRECTIVE_BLOCK
+                                                                       or $_[1][0][0][STREAM_DIR_TYPE]==DIRECTIVE_DLIST
+                                                                       or $_[1][0][0][STREAM_DIR_TYPE]==DIRECTIVE_OLIST
+                                                                       or $_[1][0][0][STREAM_DIR_TYPE]==DIRECTIVE_ULIST
+                                                                       or $_[1][0][0][STREAM_DIR_TYPE]==DIRECTIVE_HEADLINE;
 
                # update statistics, if necessary
-               $statistics{$_[1][0][0][0]}++ unless not defined $_[1][0][0][0] or exists $embeddedParagraphs{$_[1][0][0][0]};
+               $statistics{$_[1][0][0][STREAM_DIR_TYPE]}++ unless not defined $_[1][0][0][STREAM_DIR_TYPE] or exists $embeddedParagraphs{$_[1][0][0][STREAM_DIR_TYPE]};
 
-               # let the user know that something is going on
-               print STDERR "\r", ' ' x length('[Info] '), '... ', $statistics{&DIRECTIVE_HEADLINE}, " chapters read."
-                 if     $flags{vis}
-                    and $_[1][0][0][0]==DIRECTIVE_HEADLINE
-                    and not $statistics{&DIRECTIVE_HEADLINE} % $flags{vis};
+               # perform special headline operations
+               if ($_[1][0][0][STREAM_DIR_TYPE]==DIRECTIVE_HEADLINE)
+                 {
+                  # update headline stream by adding the token index of the headline
+                  push(@{$resultStreamRef->[STREAM_HEADLINES]}, @{$resultStreamRef->[STREAM_TOKENS]}-@{$_[1][0]});
+
+                  # let the user know that something is going on
+                  print STDERR "\r", ' ' x length('[Info] '), '... ', $statistics{&DIRECTIVE_HEADLINE}, " chapters read."
+                    if     $flags{vis}
+                       and not $statistics{&DIRECTIVE_HEADLINE} % $flags{vis};
+                 }
 
                # this is for the parser to flag success
                1;
@@ -1308,26 +1396,35 @@ document : paragraph
              unless ($_[2][0] eq '')
               {
                # add data to the output stream, if necessary
-               push(@$resultStreamRef, @{$_[2][0]});
+               push(@{$resultStreamRef->[STREAM_TOKENS]}, @{$_[2][0]});
+
+               # update tag finish memory
+               updateTagFinishMem(scalar(@{$resultStreamRef->[STREAM_TOKENS]}));
 
                # update checksums, if necessary
-               updateChecksums($_[2][0], 'Paragraph_cache_hit') unless    $_[2][0][0][0]==DIRECTIVE_BLOCK
-                                                                       or $_[2][0][0][0]==DIRECTIVE_DLIST
-                                                                       or $_[2][0][0][0]==DIRECTIVE_OLIST
-                                                                       or $_[2][0][0][0]==DIRECTIVE_ULIST
-                                                                       or $_[2][0][0][0]==DIRECTIVE_HEADLINE;
+               updateChecksums($_[2][0], 'Paragraph_cache_hit') unless    $_[2][0][0][STREAM_DIR_TYPE]==DIRECTIVE_BLOCK
+                                                                       or $_[2][0][0][STREAM_DIR_TYPE]==DIRECTIVE_DLIST
+                                                                       or $_[2][0][0][STREAM_DIR_TYPE]==DIRECTIVE_OLIST
+                                                                       or $_[2][0][0][STREAM_DIR_TYPE]==DIRECTIVE_ULIST
+                                                                       or $_[2][0][0][STREAM_DIR_TYPE]==DIRECTIVE_HEADLINE;
 
                # update ordered list flag as necessary
-               $flags{olist}=0 unless $_[2][0][0][0]==DIRECTIVE_OLIST;
+               $flags{olist}=0 unless $_[2][0][0][STREAM_DIR_TYPE]==DIRECTIVE_OLIST;
 
                # update statistics, if necessary
-               $statistics{$_[2][0][0][0]}++ unless exists $embeddedParagraphs{$_[2][0][0][0]};
+               $statistics{$_[2][0][0][STREAM_DIR_TYPE]}++ unless exists $embeddedParagraphs{$_[2][0][0][STREAM_DIR_TYPE]};
 
-               # let the user know that something is going on
-               print STDERR "\r", ' ' x length('[Info] '), '... ', $statistics{&DIRECTIVE_HEADLINE}, " chapters read."
-                 if     $flags{vis}
-                    and $_[2][0][0][0]==DIRECTIVE_HEADLINE
-                    and not $statistics{&DIRECTIVE_HEADLINE} % $flags{vis};
+               # perform special headline operations
+               if ($_[2][0][0][STREAM_DIR_TYPE]==DIRECTIVE_HEADLINE)
+                 {
+                  # update headline stream by adding the token index of the headline
+                  push(@{$resultStreamRef->[STREAM_HEADLINES]}, @{$resultStreamRef->[STREAM_TOKENS]}-@{$_[2][0]});
+
+                  # let the user know that something is going on, if necessary
+                  print STDERR "\r", ' ' x length('[Info] '), '... ', $statistics{&DIRECTIVE_HEADLINE}, " chapters read."
+                    if     $flags{vis}
+                       and not $statistics{&DIRECTIVE_HEADLINE} % $flags{vis};
+                 }
 
                # this is for the parser to flag success
                1;
@@ -1335,50 +1432,175 @@ document : paragraph
             }
          ;
 
+
+# paragraph filters
+optional_paragraph_filter : # this makes it optional
+                          | '||'
+                             {
+                              # switch to pfiltered mode
+                              stateManager(STATE_PFILTER);
+                             }
+                            paragraph_filters '||'
+                             {
+                              # back to default mode
+                              stateManager(STATE_PFILTERED);
+
+                              # supply filter list
+                              $_[3];
+                             }
+                          ;
+
+
+# paragraph filter
+paragraph_filters : Word
+                     {
+                      # start a new filter list
+                      [[$_[1][0]], $_[1][1]];
+                     }
+                  | paragraph_filters '|' Word
+                     {
+                      # append to filter list and reply updated list
+                      push(@{$_[1][0]}, $_[3][0]);
+                      [$_[1][0], $_[3][1]];
+                     }
+                  ;
+
+
+
 # paragraph (default actions work)
-paragraph : headline
-          | list
-          | text
-             {
-              # check if this paragraph consists only of exactly one table
-              if (
-                   # starting with a table tag?
-                       ref($_[1][0][1]) eq 'ARRAY'
-                   and $_[1][0][1][0]==DIRECTIVE_TAG
-                   and $_[1][0][1][2]=~/^(IMAGE|TABLE)$/
-
-                   # ending with a table tag?
-                   and ref($_[1][0][-2]) eq 'ARRAY'
-                   and $_[1][0][-2][0]==DIRECTIVE_TAG
-                   and $_[1][0][-2][2] eq $1
-
-                   # both covering the same table?
-                   and $_[1][0][-2][3] eq $_[1][0][1][3]
-                 )
-               {
-                # remove the enclosing paragraph stuff - just return the table
-                shift(@{$_[1][0]});         # text paragraph opener
-                pop(@{$_[1][0]});           # text paragraph trailer
-               }
-
-              # pass (original or modified) data
-              $_[1];
-             }
-          | compound_block
-          | verbatim
-          | variable_assignment
-          | comment
-          | condition
-          | table_paragraph
-             {
-
-              # by default, simply pass data
-              $_[1];
-             }
-          | alias_definition
-          | Empty_line
-          | Paragraph_cache_hit
+paragraph : built_paragraph
+          | restored_paragraph
           ;
+
+
+# build paragraph (default actions work)
+built_paragraph : optional_paragraph_filter original_paragraph
+                   {
+                    # filters installed and active?
+                    if ($_[1])
+                      {
+                       # Does the caller want to evaluate code?
+                       if ($safeObject)
+                         {
+                          # update active contents base data, if necessary
+                          if ($flags{activeBaseData})
+                            {
+                             no strict 'refs';
+                             ${join('::', ref($safeObject) ? $safeObject->root : 'main', 'PerlPoint')}=dclone($flags{activeBaseData});
+                            }
+
+                          # peform filter call(s)
+                          my $result=pfilterCall($_[1][0], $_[2][0], $_[2][1]);
+
+                          # reply unmodified paragraph in case of an error
+                          return $_[2] unless defined $result;
+
+                          # any result?
+                          if ($result)
+                            {
+                             # certain paragraphs need a parser lookahaed operation to be
+                             # recognized completely, so we already parsed a token which
+                             # should *follow* the filter results, rearrange input and
+                             # parser stack appropriately
+                             if (
+                                    $_[2][0][0][STREAM_DIR_TYPE]==DIRECTIVE_DLIST
+                                 or $_[2][0][0][STREAM_DIR_TYPE]==DIRECTIVE_OLIST
+                                 or $_[2][0][0][STREAM_DIR_TYPE]==DIRECTIVE_ULIST
+                                )
+                               {
+                                my $delayedToken;
+
+                                # insert the current token behind the filter result
+                                $delayedToken=new PerlPoint::Parser::DelayedToken($_[0]->YYCurtok, $_[0]->YYCurval);
+
+                                # set new dummy values to let the parser work on
+                                # (something without effect and valid at a paragraphs beginning)
+                                $_[0]->YYCurtok('Word');
+                                $_[0]->YYCurval(['', $_[0]->YYCurval->[1]]);
+
+                                # finally, pass the filter result back to the input stream (by stack)
+                                stackInput($_[0], @$result, $delayedToken);
+                               }
+                             else
+                               {
+                                # default case - just make the result part of the input stream, if any
+                                stackInput($_[0], @$result);
+                               }
+                            }
+
+                          # reset the "end of input reached" flag if necessary
+                          $readCompletely=0 if $readCompletely;
+
+                          # supply nothing here, the result must be reparsed first
+                          ['', $_[2][2]];
+                         }
+                       else
+                         {
+                          # filters cannot be run, inform user
+                          warn "[Warn] $sourceFile, line $_[1][1]: Active Content is disabled, paragraph cannot be filtered.\n" unless $flags{display} & DISPLAY_NOWARN;
+
+                          # supply the unmodified paragraph
+                          $_[2];
+                         }
+                      }
+                    else
+                      {
+                       # no filter: provide paragraph data
+                       $_[2];
+                      }
+                   }
+                | non_filterable_paragraph
+                ;
+
+# original paragraph (not composed, unmodified)
+original_paragraph: headline
+                  | text
+                     {
+                      # check if this paragraph consists of exactly one table only
+                      if (
+                           # starting with a table tag?
+                               ref($_[1][0][1]) eq 'ARRAY'
+                           and $_[1][0][1][STREAM_DIR_TYPE]==DIRECTIVE_TAG
+                           and $_[1][0][1][STREAM_DIR_DATA]=~/^(IMAGE|TABLE)$/
+
+                           # ending with a table tag?
+                           and ref($_[1][0][-2]) eq 'ARRAY'
+                           and $_[1][0][-2][STREAM_DIR_TYPE]==DIRECTIVE_TAG
+                           and $_[1][0][-2][STREAM_DIR_DATA] eq $1
+
+                           # both covering the same table?
+                           and $_[1][0][-2][STREAM_DIR_DATA+1] eq $_[1][0][1][STREAM_DIR_DATA+1]
+                         )
+                       {
+                        # remove the enclosing paragraph stuff - just return the table
+                        shift(@{$_[1][0]});         # text paragraph opener
+                        pop(@{$_[1][0]});           # text paragraph trailer
+                       }
+
+                      # pass (original or modified) data
+                      $_[1];
+                     }
+                  | verbatim
+                  | comment
+                  | table_paragraph
+                  | compound_block
+                  | list
+                    # variable assigments should not be filtered, but moving them
+                    # to "non_filterable_paragraphs" causes additional shift/reduce
+                    # conflicts ... hm, this should be solved
+                  | variable_assignment
+                  ;
+
+# non filterable paragraph (filtering control paragraphs which produce
+# nothing directly makes no sense)
+non_filterable_paragraph : Empty_line
+                         | condition
+                         | alias_definition
+                         ;
+
+# paragraph restored from cache (default actions work)
+restored_paragraph : Paragraph_cache_hit
+                   ;
 
 # headline
 headline : headline_level
@@ -1407,13 +1629,14 @@ headline : headline_level
              @olistLevels=();
 
              # prepare result (data part only)
+             my %hints=(nr=>++$directiveCounter);
              my $data=[
                        # opener directive (including headline level)
-                       [DIRECTIVE_HEADLINE, DIRECTIVE_START, $_[1][0]],
+                       [\%hints, DIRECTIVE_HEADLINE, DIRECTIVE_START, $_[1][0]],
                        # the list of enclosed literals
                        @{$_[3][0]},
                        # final directive (including headline level again)
-                       [DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, $_[1][0]]
+                       [\%hints, DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, $_[1][0]]
                       ];
 
              # update checksums (done here because hits need special handling)
@@ -1425,7 +1648,7 @@ headline : headline_level
          | Headline_cache_hit
             {
              # update headline level hint
-             $flags{headlineLevel}=$_[1][0][0][2];
+             $flags{headlineLevel}=$_[1][0][0][STREAM_DIR_DATA];
 
              # supply what you got unchanged
              $_[1];
@@ -1522,9 +1745,17 @@ list : list_part
          # update statistics, if necessary (shifters are not passed as standalone paragraphs, so ...)
          $statistics{$_[2][0][0][0]}++;
 
+         # add shift informations to related list parts: the predecessor
+         # gets informations about a following shift, the successor about
+         # a predecessing shift
+          @{$_[1][0][-1]}[STREAM_DIR_DATA+3, STREAM_DIR_DATA+4]
+         =@{$_[3][0][ 0]}[STREAM_DIR_DATA+1, STREAM_DIR_DATA+2]
+         =@{$_[2][0][ 0]}[STREAM_DIR_TYPE, STREAM_DIR_DATA];
+
+
          # update token list and reply it
          push(@{$_[1][0]}, @{$_[2][0]}, @{$_[3][0]});
-         [$_[1][0], $_[2][1]];
+         [$_[1][0], $_[3][1]];
         }
      ;
 
@@ -1532,17 +1763,18 @@ list : list_part
 list_part : olist
              {
               # the first point may start by a certain number, check this
-              my $start=(defined $_[1][0][0][2] and $_[1][0][0][2]>1) ? $_[1][0][0][2] : 1;
+              my $start=(defined $_[1][0][0][STREAM_DIR_DATA] and $_[1][0][0][STREAM_DIR_DATA]>1) ? $_[1][0][0][STREAM_DIR_DATA] : 1;
 
               # embed the points into list directives
+              my %hints=(nr=>++$directiveCounter);
               [
                [
                 # opener directive
-                [DIRECTIVE_OLIST, DIRECTIVE_START, $start],
+                [\%hints, DIRECTIVE_OLIST, DIRECTIVE_START, $start, (0) x 4],
                 # the list of enclosed literals
                 @{$_[1][0]},
                 # final directive
-                [DIRECTIVE_OLIST, DIRECTIVE_COMPLETE, $start]
+                [\%hints, DIRECTIVE_OLIST, DIRECTIVE_COMPLETE, $start, (0) x 4]
                ],
                $_[1][1]
               ];
@@ -1553,14 +1785,15 @@ list_part : olist
               $flags{olist}=0;
 
               # embed the points into list directives
+              my %hints=(nr=>++$directiveCounter);
               [
                [
                 # opener directive
-                [DIRECTIVE_ULIST, DIRECTIVE_START],
+                [\%hints, DIRECTIVE_ULIST, DIRECTIVE_START, 0, (0) x 4],
                 # the list of enclosed literals
                 @{$_[1][0]},
                 # final directive
-                [DIRECTIVE_ULIST, DIRECTIVE_COMPLETE]
+                [\%hints, DIRECTIVE_ULIST, DIRECTIVE_COMPLETE, 0, (0) x 4]
                ],
                $_[1][1]
               ];
@@ -1571,14 +1804,15 @@ list_part : olist
               $flags{olist}=0;
 
               # embed the points into list directives
+              my %hints=(nr=>++$directiveCounter);
               [
                [
                 # opener directive
-                [DIRECTIVE_DLIST, DIRECTIVE_START],
+                [\%hints, DIRECTIVE_DLIST, DIRECTIVE_START, 0, (0) x 4],
                 # the list of enclosed literals
                 @{$_[1][0]},
                 # final directive
-                [DIRECTIVE_DLIST, DIRECTIVE_COMPLETE]
+                [\%hints, DIRECTIVE_DLIST, DIRECTIVE_COMPLETE, 0, (0) x 4]
                ],
                $_[1][1]
               ];
@@ -1636,7 +1870,7 @@ opoint : opoint_opener
            splice(@{$_[3][0]}, 1, 1) while not ref($_[3][0][1]) and $_[3][0][1]=~/^\s*$/;
 
            # reply data (they are already well prepared except that they are marked as text)
-           $_[3][0][0][0]=$_[3][0][$#{$_[3][0]}][0]=&DIRECTIVE_OPOINT;
+           $_[3][0][0][STREAM_DIR_TYPE]=$_[3][0][$#{$_[3][0]}][STREAM_DIR_TYPE]=&DIRECTIVE_OPOINT;
 
            # update list level hints as necessary
            $olistLevels[0]=(($flags{olist} or $_[1][0]) and @olistLevels) ? $olistLevels[0]+1 : 1;
@@ -1663,7 +1897,7 @@ opoint : opoint_opener
            $olistLevels[0]=($flags{olist} and @olistLevels) ? $olistLevels[0]+1 : 1;
 
            # update continued list points
-           $_[1][0][0][2]=$olistLevels[0] if @{$_[1][0][0]}>2;
+           $_[1][0][0][STREAM_DIR_DATA]=$olistLevels[0] if @{$_[1][0][0]}>3;
 
            # update ordered list flag
            $flags{olist}=1;
@@ -1705,7 +1939,7 @@ upoint : '*'
            splice(@{$_[3][0]}, -2, 1) while not ref($_[3][0][$#{$_[3][0]}-1]) and $_[3][0][$#{$_[3][0]}-1]=~/^\s*$/;
 
            # reply data (they are already well prepared except that they are marked as text)
-           $_[3][0][0][0]=$_[3][0][$#{$_[3][0]}][0]=&DIRECTIVE_UPOINT;
+           $_[3][0][0][STREAM_DIR_TYPE]=$_[3][0][$#{$_[3][0]}][STREAM_DIR_TYPE]=&DIRECTIVE_UPOINT;
 
 	   # update checksums
 	   updateChecksums($_[3][0], 'Upoint_cache_hit');
@@ -1733,14 +1967,15 @@ dpoint : dlist_opener
            splice(@{$_[3][0]}, 1, 1) while not ref($_[3][0][1]) and $_[3][0][1]=~/^\s*$/;
 
            # reply data (they are already well prepared except that they are marked as text, and that the definition item stream needs to be added)
-           $_[3][0][0]=[DIRECTIVE_DPOINT, DIRECTIVE_START];
-           $_[3][0][$#{$_[3][0]}]=[DIRECTIVE_DPOINT, DIRECTIVE_COMPLETE];
+           my ($hints1, $hints2)=({nr=>++$directiveCounter}, {nr=>++$directiveCounter});
+           $_[3][0][0]=[$hints1, DIRECTIVE_DPOINT, DIRECTIVE_START];
+           $_[3][0][$#{$_[3][0]}]=[$hints1, DIRECTIVE_DPOINT, DIRECTIVE_COMPLETE];
 
            # insert the definition item stream
            splice(@{$_[3][0]}, 1, 0,
-                  [DIRECTIVE_DPOINT_ITEM, DIRECTIVE_START],
+                  [$hints2, DIRECTIVE_DPOINT_ITEM, DIRECTIVE_START],
                   @{$_[1][0]},
-                  [DIRECTIVE_DPOINT_ITEM, DIRECTIVE_COMPLETE],
+                  [$hints2, DIRECTIVE_DPOINT_ITEM, DIRECTIVE_COMPLETE],
                  );
 
 	   # update checksums
@@ -1778,7 +2013,7 @@ compound_block : block
                | compound_block block
                   {
                    # this is tricky - to combine both blocks, we have to remove the already
-                   # embedded stop/start directives and to supply the 
+                   # embedded stop/start directives and to supply the ...
                    [
                     [
                      # original collection WITHOUT the final directive ...
@@ -1847,7 +2082,7 @@ block : Ils
 
           # reply data (they are almost perfect except that they are marked as text,
           # and that the initial spaces have to be inserted)
-          $_[3][0][0][0]=$_[3][0][$#{$_[3][0]}][0]=DIRECTIVE_BLOCK;
+          $_[3][0][0][STREAM_DIR_TYPE]=$_[3][0][$#{$_[3][0]}][STREAM_DIR_TYPE]=DIRECTIVE_BLOCK;
           splice(@{$_[3][0]}, 1, 0, $_[1][0]);
 
 	  # update checksums
@@ -1883,11 +2118,11 @@ text : literal
         {
          # trace, if necessary
          warn "[Trace] $sourceFile, line $_[4][1]: Text completed.\n" unless    not $flags{trace} & TRACE_PARAGRAPHS
-                                                                or $parserState==STATE_BLOCK
-                                                                or $parserState==STATE_UPOINT
-                                                                or $parserState==STATE_OPOINT
-                                                                or $parserState==STATE_DPOINT
-                                                                or $parserState==STATE_DPOINT_ITEM;
+                                                                             or $parserState==STATE_BLOCK
+                                                                             or $parserState==STATE_UPOINT
+                                                                             or $parserState==STATE_OPOINT
+                                                                             or $parserState==STATE_DPOINT
+                                                                             or $parserState==STATE_DPOINT_ITEM;
 
          # back to default mode
          stateManager(STATE_DEFAULT);
@@ -1899,14 +2134,15 @@ text : literal
          pop(@{$_[3][0]}) if defined $_[3][0][-1] and $_[3][0][-1] eq ' ';
 
          # reply data, if any
+         my %hints=(nr=>++$directiveCounter);
          [
           [
            # opener directive
-           [DIRECTIVE_TEXT, DIRECTIVE_START],
+           [\%hints, DIRECTIVE_TEXT, DIRECTIVE_START],
            # the list of enclosed literals
            @{$_[1][0]}, @{$_[3][0]},
            # final directive
-           [DIRECTIVE_TEXT, DIRECTIVE_COMPLETE],
+           [\%hints, DIRECTIVE_TEXT, DIRECTIVE_COMPLETE],
           ],
           $_[4][1],
          ];
@@ -1941,14 +2177,15 @@ verbatim : Heredoc_open
              shift(@{$_[3][0]});
 
              # reply data
+             my %hints=(nr=>++$directiveCounter);
              [
               [
                # opener directive
-               [DIRECTIVE_VERBATIM, DIRECTIVE_START],
+               [\%hints, DIRECTIVE_VERBATIM, DIRECTIVE_START],
                # the list of enclosed literals
                @{$_[3][0]},
                # final directive
-               [DIRECTIVE_VERBATIM, DIRECTIVE_COMPLETE]
+               [\%hints, DIRECTIVE_VERBATIM, DIRECTIVE_COMPLETE]
               ],
               $_[4][1]
              ];
@@ -1977,7 +2214,13 @@ variable_assignment : Named_variable '='
                         $varChecksum=sha1_base64(nfreeze(\%variables));
 
                         # propagate the setting to the stream, if necessary
-                        push(@$resultStreamRef, [DIRECTIVE_VARSET, DIRECTIVE_START, {var=>$_[1][0], value=>$variables{$_[1][0]}}]) if $flags{var2stream};
+                        if ($flags{var2stream})
+                         {
+                          push(@{$resultStreamRef->[STREAM_TOKENS]}, [{}, DIRECTIVE_VARSET, DIRECTIVE_START, {var=>$_[1][0], value=>$variables{$_[1][0]}}]);
+
+                          # update tag finish memory by the way
+                          updateTagFinishMem(scalar(@{$resultStreamRef->[STREAM_TOKENS]}));
+                         }
 
                         # make the new variable setting available to embedded Perl code, if necessary
                         if ($safeObject)
@@ -2012,14 +2255,15 @@ comment : '/' '/'
             warn "[Trace] $sourceFile, line $_[5][1]: Comment completed.\n" if $flags{trace} & TRACE_PARAGRAPHS;
 
             # reply data
+            my %hints=(nr=>++$directiveCounter);
             [
              [
               # opener directive
-              [DIRECTIVE_COMMENT, DIRECTIVE_START],
+              [\%hints, DIRECTIVE_COMMENT, DIRECTIVE_START],
               # the list of enclosed literals
               @{$_[4][0]},
               # final directive
-              [DIRECTIVE_COMMENT, DIRECTIVE_COMPLETE]
+              [\%hints, DIRECTIVE_COMMENT, DIRECTIVE_COMPLETE]
              ],
              $_[5][1]
             ];
@@ -2064,10 +2308,8 @@ list_shift : list_shifter
                 # reply data
                 [
                  [
-                  # opener directive
-                  [$_[1][0]==LIST_SHIFT_RIGHT ? DIRECTIVE_LIST_RSHIFT : DIRECTIVE_LIST_LSHIFT, DIRECTIVE_START, defined $_[3][0] ? $_[3][0] : 1],
-                  # final directive
-                  [$_[1][0]==LIST_SHIFT_RIGHT ? DIRECTIVE_LIST_RSHIFT : DIRECTIVE_LIST_LSHIFT, DIRECTIVE_COMPLETE, defined $_[3][0] ? $_[3][0] : 1]
+                  # opener directive (no explicit closing)
+                  [{}, $_[1][0]==LIST_SHIFT_RIGHT ? DIRECTIVE_LIST_RSHIFT : DIRECTIVE_LIST_LSHIFT, DIRECTIVE_START, defined $_[3][0] ? $_[3][0] : 1],
                  ],
                  $_[5][1]
                 ];
@@ -2271,7 +2513,7 @@ tag : Tag_name
 
         # temporarily activate specials "{" and "}" *as necessary*
         push(@specialStack, @specials{('{', '}')}), @specials{('{', '}')}=(1) x 2
-         if    (exists $macros{$_[1][0]} and @{$macros{$_[1][0]}->[0]})         # macro: evaluate declared options;
+         if    (exists $macros{$_[1][0]} and %{$macros{$_[1][0]}->[0]})         # macro: evaluate declared options;
             || $tagsRef->{$_[1][0]}{__flags__}{__options__};                    # tag with options;
 
 	# deactivate boost
@@ -2284,7 +2526,7 @@ tag : Tag_name
 
         # restore special states of "{" and "}", if necessary
         @specials{('{', '}')}=splice(@specialStack, -2, 2)
-         if    (exists $macros{$_[1][0]} and @{$macros{$_[1][0]}->[0]})         # macro: evaluate declared options;
+         if    (exists $macros{$_[1][0]} and %{$macros{$_[1][0]}->[0]})         # macro: evaluate declared options;
             || $tagsRef->{$_[1][0]}{__flags__}{__options__};                    # tag with options;
 
         # check options in general if declared mandatory
@@ -2304,61 +2546,11 @@ tag : Tag_name
        }
       optional_tagbody
        {
+        # scopy
+        my $ignore;
+
         # trace, if necessary
         warn "[Trace] $sourceFile, line $_[5][1]: Tag $_[1][0] completed.\n" if $flags{trace} & TRACE_PARAGRAPHS;
-
-        # check tag body in general if declared mandatory
-        if (
-                not @{$_[5][0]}
-            and exists $tagsRef->{$_[1][0]}
-            and exists $tagsRef->{$_[1][0]}{body}
-            and $tagsRef->{$_[1][0]}{body}==&TAGS_MANDATORY
-           )
-         {
-          # display error message
-          warn "[Fatal] $sourceFile, line $_[5][1]: Missing mandatory body of tag $_[1][0]\n";
-
-          # this is an syntactical error, stop parsing
-          $_[0]->YYAbort;
-         }
-
-        # invoke hook function, if necessary
-        if (exists $tagsRef->{$_[1][0]} and exists $tagsRef->{$_[1][0]}{hook})
-         {
-          # make an option hash
-          my $options={@{$_[3][0]}};
-
-          # call hook function (use eval() to guard yourself)
-          my $rc;
-          eval {$rc=&{$tagsRef->{$_[1][0]}{hook}}($_[1][1], $options, @{$_[3][0]})};
-
-          # check result
-          unless ($@)
-           {
-            {
-             # semantic error?
-             ++$semErr, last if $rc==PARSING_ERROR;
-
-             # syntactical error?
-             $_[0]->YYAbort, last if $rc==PARSING_FAILED;
-
-             # update options (might be modified, and checking for a difference
-             # might take more time then just copying the replied values)
-             @{$_[3][0]}=%$options;
-
-             # all right?
-             last if $rc==PARSING_OK;
-
-             # or even superb?
-             $_[0]->YYAccept, last if $rc==PARSING_COMPLETED;
-
-             # something is wrong here
-             warn "[Warn] Tags $_[1][0] body hook replied unexpected result $rc, ignored.\n";
-            }
-           }
-          else
-           {warn "[Warn] Error in tags $_[1][0] body hook: $@\n"}
-         }
 
         # build parameter hash, if necessary
         my %pars;
@@ -2368,24 +2560,158 @@ tag : Tag_name
            %pars=@{$_[3][0]}
           }
 
+        # Tag condition set?
+        if (exists $pars{_cnd_})
+         {
+          # scopy
+          my $result;
+
+          #  Does the caller want to evaluate the code?
+          if ($safeObject)
+            {
+             # update active contents base data, if necessary
+             if ($flags{activeBaseData})
+              {
+               no strict 'refs';
+               ${join('::', ref($safeObject) ? $safeObject->root : 'main', 'PerlPoint')}=dclone($flags{activeBaseData});
+              }
+
+             # make the code a string and evaluate it
+             warn "[Trace] $sourceFile, line $_[5][1]: Evaluating this code:\n\n$pars{_cnd_}\n\n\n" if $flags{trace} & TRACE_ACTIVE;
+
+             # invoke perl to compute the result
+             $result=ref($safeObject) ? $safeObject->reval($pars{_cnd_}) : eval(join(' ', '{package main; no strict;', $pars{_cnd_}, '}'));
+
+             # check result
+             warn "[Error ", ++$semErr, "] $sourceFile, line $_[5][1]: tag condition could not be evaluated: $@.\n" if $@;
+            }
+
+          # ok, if the condition was true or could not be evaluated, return just the body
+          # (so that the tag or macro is ignored)
+          unless ($safeObject and not $@ and $result)
+           {return([[@{$_[5][0]} ? @{$_[5][0]} : ()], $_[5][1]]);}
+          else
+           {
+            # strip off this special option before the tag or macro is furtherly processed
+            delete $pars{_cnd_};
+           }
+         }
+
+        # tags require special handling
+        unless (exists $macros{$_[1][0]})
+         {
+          # check tag body in general if declared mandatory
+          if (
+                 not @{$_[5][0]}
+             and exists $tagsRef->{$_[1][0]}
+             and exists $tagsRef->{$_[1][0]}{body}
+             and $tagsRef->{$_[1][0]}{body}==&TAGS_MANDATORY
+             )
+           {
+            # display error message
+            warn "[Fatal] $sourceFile, line $_[5][1]: Missing mandatory body of tag $_[1][0]\n";
+
+            # this is an syntactical error, stop parsing
+            $_[0]->YYAbort;
+           }
+
+          # invoke hook function, if necessary
+          if (exists $tagsRef->{$_[1][0]} and exists $tagsRef->{$_[1][0]}{hook})
+           {
+            # make an option hash
+            my $options={@{$_[3][0]}};
+
+            # call hook function (use eval() to guard yourself)
+            my $rc;
+            eval {$rc=&{$tagsRef->{$_[1][0]}{hook}}($_[1][1], $options, dclone($_[5][0]), $anchors)};
+
+            # check result
+            unless ($@)
+             {
+              {
+               # semantic error?
+               ++$semErr, last if $rc==PARSING_ERROR;
+ 
+               # syntactical error?
+               $_[0]->YYAbort, last if $rc==PARSING_FAILED;
+ 
+               # tag to ignore, or even everything covered?
+               $ignore=$rc, last if $rc==PARSING_IGNORE or $rc==PARSING_ERASE;
+
+               # update options (might be modified, and checking for a difference
+               # might take more time then just copying the replied values)
+               @{$_[3][0]}=%$options;
+
+               # all right?
+               if ($rc==PARSING_OK)
+                {
+                 # update number of tags to finish in the currently built stream section, if necessary
+                 $pendingTags->[1]++ if exists $tagsRef->{$_[1][0]}{finish};
+ 
+                 # well done
+                 last;
+                }
+ 
+               # or even superb?
+               $_[0]->YYAccept, last if $rc==PARSING_COMPLETED;
+ 
+               # something is wrong here
+               warn "[Warn] Tags $_[1][0] tag hook replied unexpected result $rc, ignored.\n";
+              }
+             }
+            else
+             {warn "[Warn] Error in tags $_[1][0] tag hook: $@\n"}
+
+            # rebuild parameter hash, if necessary
+            if (@{$_[3][0]})
+             {
+              # the list already consists of key/value pairs
+              %pars=@{$_[3][0]}
+             }
+           }
+         }
+
         # this might be a macro as well as a tag - so what?
         unless (exists $macros{$_[1][0]})
           {
            # update statistics
            $statistics{&DIRECTIVE_TAG}++;
 
-           # reply tag data
-           [
-            [
-             # opener directive
-             [DIRECTIVE_TAG, DIRECTIVE_START, $_[1][0], \%pars],
-             # the list of enclosed literals, if any
-             @{$_[5][0]} ? @{$_[5][0]} : (),
-             # final directive
-             [DIRECTIVE_TAG, DIRECTIVE_COMPLETE, $_[1][0], \%pars]
-            ],
-            $_[5][1]
-           ];
+           # reply tag data as necessary
+           unless (defined $ignore)
+            {
+             # supply a complete tag
+             my %hints=(nr=>++$directiveCounter);
+             [
+              [
+               # opener directive
+               [\%hints, DIRECTIVE_TAG, DIRECTIVE_START, $_[1][0], \%pars],
+               # the list of enclosed literals, if any
+               @{$_[5][0]} ? @{$_[5][0]} : (),
+               # final directive
+               [\%hints, DIRECTIVE_TAG, DIRECTIVE_COMPLETE, $_[1][0], \%pars]
+              ],
+              $_[5][1]
+             ];
+            }
+           elsif ($ignore==PARSING_IGNORE)
+            {
+             # supply the body, ignore the tag "envelope" ("hide" the tag)
+             [
+              [
+               # the list of enclosed literals, if any
+               @{$_[5][0]} ? @{$_[5][0]} : (),
+              ],
+              $_[5][1]
+             ];
+            }
+           elsif ($ignore==PARSING_ERASE)
+            {
+             # reply nothing real
+             [[()], $_[5][1]];
+            }
+           else
+            {die "[BUG] Unhandled flag $ignore.";}
           }
         else
           {
@@ -2396,9 +2722,11 @@ tag : Tag_name
            my $macro=$macros{$_[1][0]}->[1];
 
            # fill in parameters
-           foreach my $par (@{$macros{$_[1][0]}->[0]})
+           foreach my $par (keys %{$macros{$_[1][0]}->[0]})
              {
-              my $value=exists $pars{$par} ? $pars{$par} : '';
+              my $value=  exists $pars{$par}                   ? $pars{$par}
+                        : defined $macros{$_[1][0]}->[0]{$par} ? $macros{$_[1][0]}->[0]{$par}
+                        : '';
               $macro=~s/__${par}__/$value/g;
              }
 
@@ -2588,8 +2916,9 @@ table : Table
              %pars=@{$_[3][0]}
             }
 
-          # remove row separator information which is of no use to a converter
-          delete $pars{rowseparator};
+          # add row separator information unless it was defined by the user itself
+          $pars{rowseparator}='\n' unless exists $pars{rowseparator};
+          $pars{rowseparator}='\\\\n' if $pars{rowseparator} eq '\\n';
 
           # store nesting level information
           $pars{__nestingLevel__}=@tableSeparatorStack;
@@ -2602,10 +2931,10 @@ table : Table
           # completed table cell.
           splice(@{$_[5][0]}, -4, 4) if     @{$_[5][0]}
                                         and ref($_[5][0][-1]) eq 'ARRAY'
-                                        and @{$_[5][0][-1]}==3
-                                        and $_[5][0][-1][0] eq DIRECTIVE_TAG
-                                        and $_[5][0][-1][1] eq DIRECTIVE_START
-                                        and $_[5][0][-1][2] eq 'TABLE_COL';
+                                        and @{$_[5][0][-1]}==4
+                                        and $_[5][0][-1][STREAM_DIR_TYPE]  eq DIRECTIVE_TAG
+                                        and $_[5][0][-1][STREAM_DIR_STATE] eq DIRECTIVE_START
+                                        and $_[5][0][-1][STREAM_DIR_DATA]  eq 'TABLE_COL';
 
           # normalize table rows (no need of auto format)
           normalizeTableRows($_[5][0], 0);
@@ -2615,18 +2944,19 @@ table : Table
           $tableColumns=0;
 
           # reply data in a "tag envelope" (for backends)
+          my ($hints1, $hints2, $hints3)=({nr=>++$directiveCounter}, {nr=>++$directiveCounter}, {nr=>++$directiveCounter});
           [
            [
             # opener directives
-            [DIRECTIVE_TAG, DIRECTIVE_START, 'TABLE', \%pars],
-            [DIRECTIVE_TAG, DIRECTIVE_START, 'TABLE_ROW'],
-            [DIRECTIVE_TAG, DIRECTIVE_START, 'TABLE_COL'],
+            [$hints1, DIRECTIVE_TAG, DIRECTIVE_START, 'TABLE', \%pars],
+            [$hints2, DIRECTIVE_TAG, DIRECTIVE_START, 'TABLE_ROW'],
+            [$hints3, DIRECTIVE_TAG, DIRECTIVE_START, 'TABLE_COL'],
             # the list of enclosed literals reduced by the final two, if any
             @{$_[5][0]} ? @{$_[5][0]} : (),
             # final directive
-            [DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TABLE_COL'],
-            [DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TABLE_ROW'],
-            [DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TABLE', \%pars]
+            [$hints3, DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TABLE_COL'],
+            [$hints2, DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TABLE_ROW'],
+            [$hints1, DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TABLE', \%pars]
            ],
            $_[6][1]
           ];
@@ -2640,15 +2970,16 @@ table_separator : Table_separator
                     $tableColumns++;
 
                     # supply a simple seperator tag
+                    my %hints=(nr=>++$directiveCounter);
                     [
                      [
-                      [DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TABLE_COL'],
+                      [\%hints, DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TABLE_COL'],
                       $_[1][0] eq 'c' ? ()
                                       : (
-                                         [DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TABLE_ROW'],
-                                         [DIRECTIVE_TAG, DIRECTIVE_START, 'TABLE_ROW'],
+                                         [{}, DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TABLE_ROW'],
+                                         [{}, DIRECTIVE_TAG, DIRECTIVE_START, 'TABLE_ROW'],
                                         ),
-                      [DIRECTIVE_TAG, DIRECTIVE_START, 'TABLE_COL'],
+                      [\%hints, DIRECTIVE_TAG, DIRECTIVE_START, 'TABLE_COL'],
                      ],
                      $_[1][1]
                     ];
@@ -2681,8 +3012,13 @@ table_paragraph : '@'
                     shift(@tableSeparatorStack);
                     $tableColumns=0;
 
-                    # build parameter hash (contains level information only, which is always 1)
-                    my %pars=(__nestingLevel__ => 1);
+                    # build parameter hash (contains level information, which is always 1,
+                    # and various retranslation hints)
+                    my %pars=(
+                              __nestingLevel__ => 1,
+                              __paragraph__    => 1,
+                              separator        => join('', @{$_[3][0]}),
+                             );
 
                     # If we are here and found anything in the table, a final row was
                     # closed and a new one opened at the end of the last table line.
@@ -2697,16 +3033,17 @@ table_paragraph : '@'
                        normalizeTableRows($_[6][0], 1);
 
                        # reply data in a "tag envelope" (for backends)
+                       my %hints=(nr=>++$directiveCounter);
                        [
                         [
                          # opener directives (note that first row and column are already opened by the initial carriage return stream)
-                         [DIRECTIVE_TAG, DIRECTIVE_START, 'TABLE', \%pars],
-                         [DIRECTIVE_TAG, DIRECTIVE_START, 'TABLE_ROW'],
-                         [DIRECTIVE_TAG, DIRECTIVE_START, 'TABLE_HL'],
+                         [\%hints, DIRECTIVE_TAG, DIRECTIVE_START, 'TABLE', \%pars],
+                         [{}, DIRECTIVE_TAG, DIRECTIVE_START, 'TABLE_ROW'],
+                         [{}, DIRECTIVE_TAG, DIRECTIVE_START, 'TABLE_HL'],
                          # the list of enclosed literals reduced by the final two, if any
                          @{$_[6][0]} ? @{$_[6][0]} : (),
                          # final directive
-                         [DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TABLE', \%pars]
+                         [\%hints, DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TABLE', \%pars]
                         ],
                         $_[7][1]
                        ];
@@ -2809,7 +3146,7 @@ embedded : Embed
 
                       # check result
                       if ($@)
-                        {warn "[Error ", ++$semErr, "] $sourceFile, line $_[5][1]: embedded Perl code could not be evaluated: $@.\n";}
+                        {warn "[Error ", ++$semErr, "] $sourceFile, line $_[6][1]: embedded Perl code could not be evaluated: $@.\n";}
                       else
                         {
                          # success - make the result part of the input stream, if any
@@ -2827,14 +3164,15 @@ embedded : Embed
              else
                {
                 # reply data in a "tag envelope" (for backends)
+                my %hints=(nr=>++$directiveCounter);
                 [
                  [
                   # opener directive
-                  [DIRECTIVE_TAG, DIRECTIVE_START, 'EMBED', \%pars],
+                  [\%hints, DIRECTIVE_TAG, DIRECTIVE_START, 'EMBED', \%pars],
                   # the list of enclosed literals, if any
                   @{$_[5][0]} ? @{$_[5][0]} : (),
                   # final directive
-                  [DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'EMBED', \%pars]
+                  [\%hints, DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'EMBED', \%pars]
                  ],
                  $_[6][1]
                 ];
@@ -3042,28 +3380,30 @@ included : Include
                               }
                            }
 
+                         my %hints=(nr=>++$directiveCounter);
                          [
                           [
                            # opener directive
-                           [DIRECTIVE_VERBATIM, DIRECTIVE_START],
+                           [\%hints, DIRECTIVE_VERBATIM, DIRECTIVE_START],
                            # the list of enclosed literals
                            @included,
                            # final directive
-                           [DIRECTIVE_VERBATIM, DIRECTIVE_COMPLETE]
+                           [\%hints, DIRECTIVE_VERBATIM, DIRECTIVE_COMPLETE]
                           ],
                           $_[3][1]
                          ];
                         }
                       else
                         {
+                         my %hints=(nr=>++$directiveCounter);
                          [
                           [
                            # opener directive
-                           [DIRECTIVE_TAG, DIRECTIVE_START, 'EMBED', {lang=>$tagpars{type}}],
+                           [\%hints, DIRECTIVE_TAG, DIRECTIVE_START, 'EMBED', {lang=>$tagpars{type}}],
                            # the list of enclosed "literals", if any
                            @included,
                            # final directive
-                           [DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'EMBED', {lang=>$tagpars{type}}]
+                           [\%hints, DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'EMBED', {lang=>$tagpars{type}}]
                           ],
                           $_[3][1]
                          ];
@@ -3097,7 +3437,17 @@ alias_definition : '+'
                      # trace, if necessary
                      warn "[Trace] $sourceFile, line $_[1][1]: Macro definition starts.\n" if $flags{trace} & TRACE_PARAGRAPHS;
                     }
-                   Word Colon
+                   Word
+                    {
+                     # deactivate boost
+                     $flags{noboost}=1;
+                    }
+                   optional_tagpars
+                    {
+                     # reactivate boost
+                     $flags{noboost}=0;
+                    }
+                   Colon
                     {
                      # disable all specials to get the body as a plain text
                      @specials{keys %specials}=(0) x scalar(keys %specials);
@@ -3107,7 +3457,7 @@ alias_definition : '+'
                      # "text" already switched back to default mode (and disabled specials [{}:])
 
                      # trace, if necessary
-                     warn "[Trace] $sourceFile, line $_[4][1]: Macro definition completed.\n" if $flags{trace} & TRACE_PARAGRAPHS;
+                     warn "[Trace] $sourceFile, line $_[7][1]: Macro definition completed.\n" if $flags{trace} & TRACE_PARAGRAPHS;
 
                      # check spelling (only accept capitals and underscores in alias names, just like in tags)
                      if ($_[3][0]=~/[a-z]/)
@@ -3117,8 +3467,8 @@ alias_definition : '+'
                        }
 
                      # build macro text
-                     shift(@{$_[6][0]}); pop(@{$_[6][0]});
-                     my $macro=join('', @{$_[6][0]});
+                     shift(@{$_[9][0]}); pop(@{$_[9][0]});
+                     my $macro=join('', @{$_[9][0]});
 
                      # anything specified?
                      if ($macro=~/^\s*$/)
@@ -3130,7 +3480,7 @@ alias_definition : '+'
                            delete $macros{$_[3][0]};
 
                            # trace, if necessary
-                           warn "[Trace] $sourceFile, line $_[4][1]: Macro \"$_[3][0]\" is cancelled.\n" if $flags{trace} & TRACE_SEMANTIC;
+                           warn "[Trace] $sourceFile, line $_[7][1]: Macro \"$_[3][0]\" is cancelled.\n" if $flags{trace} & TRACE_SEMANTIC;
 
                            # update macro checksum
                            $macroChecksum=sha1_base64(nfreeze(\%macros));
@@ -3138,7 +3488,7 @@ alias_definition : '+'
                         else
                           {
                            # trace, if necessary
-                           warn "[Trace] $sourceFile, line $_[4][1]: Empty macro \"$_[3][0]\" is ignored.\n" if $flags{trace} & TRACE_SEMANTIC;
+                           warn "[Trace] $sourceFile, line $_[7][1]: Empty macro \"$_[3][0]\" is ignored.\n" if $flags{trace} & TRACE_SEMANTIC;
                           }
                        }
                      else
@@ -3147,6 +3497,14 @@ alias_definition : '+'
                         my %pars; 
                         @pars{($macro=~/__([^_\\]+)__/g)}=();
 
+                        # store default values of options, if necessary
+                        if (@{$_[5][0]})
+                          {
+                           # the list already consists of key/value pairs
+                           my %defaults=@{$_[5][0]};
+                           exists $pars{$_} and $pars{$_}=$defaults{$_} for keys %defaults;
+                          }
+
                         # tag body wildcard is no parameter
                         my $bodyFlag=exists $pars{body} ? 1 : 0;
                         delete $pars{body};
@@ -3154,8 +3512,9 @@ alias_definition : '+'
                         # make guarded underscores just underscores
                         $macro=~s/\\_//g;
 
-                        # store name, parameters, macro text and body flag
-                        $macros{$_[3][0]}=[[keys %pars], $macro, $bodyFlag];
+                        # store name, parameters (and their defaults, if any),
+                        # macro text and body flag
+                        $macros{$_[3][0]}=[\%pars, $macro, $bodyFlag];
 
                         # update macro checksum
                         $macroChecksum=sha1_base64(nfreeze(\%macros));
@@ -3163,7 +3522,7 @@ alias_definition : '+'
 
                      # we have to supply something, but it should be nothing
                      # (this is a paragraph, so reply a plain string)
-                     ['', $_[8][1]];
+                     ['', $_[11][1]];
                     }
                  ;
 
@@ -3197,7 +3556,7 @@ sub stackInput
       if (ref($line))
         {
          # push collected string and current reference
-         push(@waiting, $lineBuffer, $line);
+         push(@waiting, length($lineBuffer) ? $lineBuffer : (), $line);
 
          # reset line buffer
          $lineBuffer='';
@@ -3212,7 +3571,7 @@ sub stackInput
       # ... until a newline was found
       push(@waiting, $lineBuffer), $lineBuffer='' if $line eq "\n";
      }
-   push(@waiting, $lineBuffer) if $lineBuffer;
+   push(@waiting, $lineBuffer) if length($lineBuffer);
   }
 
   # get next line to read
@@ -3220,6 +3579,9 @@ sub stackInput
 
   # update (innermost) input stack
   unshift(@{$inputStack[0]}, @waiting);
+
+  # update line memory (flag that this was an expanded line by adding a third parameter)
+  unshift(@inLine, [length($newInputLine)+length('exp.: '), "exp.: $newInputLine", 1]);
 
   # make the new top line the current input
   $parser->{USER}->{INPUT}=$newInputLine;
@@ -3261,9 +3623,16 @@ sub lexer
   # get next symbol
   unless ($parser->{USER}->{INPUT})
     {
+     # update line memory (removed handled lines, both original and expanded ones)
+     # (use a do block to perform the operation once in any case, see perlsyn)
+     do {shift(@inLine)} until not @inLine or @{$inLine[0]}==2;
+
       {
        # will the next line be get from the input stack instead of from a real file?
        my $lineFromStack=scalar(@{$inputStack[0]});
+
+       # reset stack line buffer, if necessary
+       undef @previousStackLines unless $lineFromStack;
 
        # get next input line
        unless (
@@ -3324,7 +3693,10 @@ sub lexer
                 if ($flags{var2stream})
                   {
                    # stream variable reset
-                   push(@$resultStreamRef, [DIRECTIVE_VARRESET, DIRECTIVE_START]);
+                   push(@{$resultStreamRef->[STREAM_TOKENS]}, [{}, DIRECTIVE_VARRESET, DIRECTIVE_START]);
+
+                   # update tag finish memory
+                   updateTagFinishMem(scalar(@{$resultStreamRef->[STREAM_TOKENS]}));
 
                    # restore former variables completely, overwriting current settings
                    # (and propagating them into the stream again)
@@ -3350,23 +3722,18 @@ sub lexer
             }
          }
 
-       # if this line was got from stack and is a reference, we got an already prepared stream part
-       # or a delayed token
-       if ($lineFromStack and ref($parser->{USER}->{INPUT}))
+       # update stack line buffers, if necessary
+       if ($lineFromStack)
          {
-          if (ref($parser->{USER}->{INPUT}) eq 'PerlPoint::Parser::DelayedToken')
-            {
-             my $delayedToken=$parser->{USER}->{INPUT};
-             $parser->{USER}->{INPUT}='';
-             return($delayedToken->token, $delayedToken->value);
-            }
-          else
-            {
-             my $streamedPart=$parser->{USER}->{INPUT};
-             $parser->{USER}->{INPUT}='';
-             return('StreamedPart', [$streamedPart, $lineNrs{$inHandle}]);
-            }
+          # "rotate" buffers (necessary because there are various return points following,
+          # so there will be not exactly one final point where we could save the current
+          # line value in a scalar buffer)
+          $previousStackLines[0]=$previousStackLines[1];
+          $previousStackLines[1]=$parser->{USER}->{INPUT};
          }
+
+       # reference found on stack?
+       return _refLexed($parser) if $lineFromStack and ref($parser->{USER}->{INPUT});
 
        # update line counter, if necessary
        $lineNrs{$inHandle}++ unless $lineFromStack;
@@ -3377,10 +3744,19 @@ sub lexer
        # if we are here, skip mode is leaved
        $flags{skipInput}=0;
      
+       # we read a new line (or something from stack)
+       unshift(@inLine, [length($parser->{USER}->{INPUT})+length('org.: '), "org.: $parser->{USER}->{INPUT}"]);
+
        unless ($lineFromStack)
          {
           # add a line update hint
-          push(@$resultStreamRef, [DIRECTIVE_NEW_LINE, DIRECTIVE_START, {file=>$sourceFile, line=>$lineNrs{$inHandle}}]) if $flags{linehints};
+          if ($flags{linehints})
+            {
+             push(@{$resultStreamRef->[STREAM_TOKENS]}, [{}, DIRECTIVE_NEW_LINE, DIRECTIVE_START, {file=>$sourceFile, line=>$lineNrs{$inHandle}}]);
+
+             # update tag finish memory by the way
+             updateTagFinishMem(scalar(@{$resultStreamRef->[STREAM_TOKENS]}));
+            }
 
           # remove TRAILING whitespaces, but keep newlines (if any)
           {
@@ -3403,7 +3779,7 @@ sub lexer
           $parser->{USER}->{INPUT}='';
 
           # sometimes empty lines have no special meaning
-          $lexerFlags{el}==LEXER_IGNORE and redo;
+          shift(@inLine), redo if $lexerFlags{el}==LEXER_IGNORE;
 
           # but sometimes they are very special
           return('Empty_line', ["\n", $lineNrs{$inHandle}]);
@@ -3503,9 +3879,13 @@ sub lexer
                    unless (defined $checksums->{$sourceFile}{$checksum}[2])
                      {
                       # direct case - add the already known part directly to the stream
-                      push(@$resultStreamRef, @{$checksums->{$sourceFile}{$checksum}[0]});
+                      push(@{$resultStreamRef->[STREAM_TOKENS]}, @{$checksums->{$sourceFile}{$checksum}[0]});
+
+                      # update tag finish memory
+                      updateTagFinishMem(scalar(@{$resultStreamRef->[STREAM_TOKENS]}));
 
                       # Well done this paragraph - go on!
+                      shift(@inLine);
                       redo;
                      }
                    else
@@ -3516,7 +3896,7 @@ sub lexer
                   }
 
                 # flag that we are going to build an associated stream
-                $flags{checksummed}=[$checksum, scalar(@$resultStreamRef), $plines];
+                $flags{checksummed}=[$checksum, scalar(@{$resultStreamRef->[STREAM_TOKENS]}), $plines];
                 # warn "---> Started checksumming for\n-----\n$paragraph\n---(", $plines+1, " line(s))\n";
                }
 
@@ -3529,53 +3909,50 @@ sub lexer
           $flags{checksum}=0;
          }
 
-       unless ($lineFromStack)
+       # detect things at the beginning of a *real* line at the beginning of a paragraph
+       # (which nevertheless might have been stacked)
+       if (   not $lineFromStack
+           or (    defined $previousStackLines[0]
+               and not ref($previousStackLines[0])
+               and $previousStackLines[0]=~/\n$/
+              )
+          )
          {
-          # scan for heredoc close hints
-          if ($specials{heredoc} and $specials{heredoc} ne '1' and $parser->{USER}->{INPUT}=~/^($specials{heredoc})$/)
-            {
-             # trace, if necessary
-             warn "[Trace] Lexer: Heredoc close hint $1 in line $lineNrs{$inHandle}.\n" if $flags{trace} & TRACE_LEXER;
-
-             # update input line
-             $parser->{USER}->{INPUT}='';
-
-             # reset heredoc setting
-             $specials{heredoc}=1;
-
-             # reply token
-             return('Heredoc_close', [$1, $lineNrs{$inHandle}]);
-            }
-
-          # scan for indented lines, if necessary
-          if ($parser->{USER}->{INPUT}=~/^(\s+)/)
-            {
-             if ($lexerFlags{ils}==LEXER_TOKEN)
-               {
-                # trace, if necessary
-                warn "[Trace] Lexer: Ils in line $lineNrs{$inHandle}.\n" if $flags{trace} & TRACE_LEXER;
-
-                # update input buffer and reply the token (contents is necessary as well)
-                my $ils=$1;
-                $parser->{USER}->{INPUT}=~s/^$1//; 
-                return('Ils', [$ils, $lineNrs{$inHandle}]);
-               }
-             elsif ($lexerFlags{ils}==LEXER_IGNORE)
-               {
-                warn "[Trace] Lexer: Ils in line $lineNrs{$inHandle} is ignored.\n" if $flags{trace} & TRACE_LEXER;
-                $parser->{USER}->{INPUT}=~s/^(\s+)//;
-               }
-            }
-
-          # scan for a new paragraph opened by a tag, if necessary
-          if ($parserState==STATE_DEFAULT and $parser->{USER}->{INPUT}=~/^\\/)
-            {
-             # remain in default state, but switch to its tag mode
-             stateManager(STATE_DEFAULT_TAGMODE);
-            }
+          my @rc=_lineStartResearch($parser);
+          return(@rc) if shift(@rc);
          }
       }
-     }
+    }
+
+  # trace, if necessary
+  warn '[Trace] Lexing ', ref($parser->{USER}->{INPUT}) ? 'a prepared part' : qq("$parser->{USER}->{INPUT}"), ".\n" if $flags{trace} & TRACE_LEXER;
+
+  # Reference found? (Usually placed by stackInput().)
+  return _refLexed($parser) if ref($parser->{USER}->{INPUT});
+
+  # if the paragraph was just filtered, there might be certain operations to perform
+  # (as usual at the beginning of a new paragraph)
+  if ($parserState==STATE_PFILTERED)
+    {
+     my @rc=_lineStartResearch($parser);
+     return(@rc) if shift(@rc);
+    }
+
+  # scan for heredoc close hints
+  if ($specials{heredoc} and $specials{heredoc} ne '1' and $parser->{USER}->{INPUT}=~/^($specials{heredoc})$/)
+    {
+     # trace, if necessary
+     warn "[Trace] Lexer: Heredoc close hint $1 in line $lineNrs{$inHandle}.\n" if $flags{trace} & TRACE_LEXER;
+
+     # update input line
+     $parser->{USER}->{INPUT}='';
+
+     # reset heredoc setting
+     $specials{heredoc}=1;
+
+     # reply token
+     return('Heredoc_close', [$1, $lineNrs{$inHandle}]);
+    }
 
   # can we take the rest of the line at *once*?
   if (($parserState==STATE_COMMENT or $parserState==STATE_VERBATIM) and $parser->{USER}->{INPUT} ne "\n")
@@ -3587,6 +3964,9 @@ sub lexer
      # update input line (restore trailing newline if it will be used to detect paragraph completion)
      $parser->{USER}->{INPUT}=$parserState==STATE_VERBATIM ? '' : "\n";
 
+     # trace, if necessary
+     warn qq([Trace] Lexer: word "$line" in line $lineNrs{$inHandle}.\n) if $flags{trace} & TRACE_LEXER;
+
      # supply result
      return('Word', [$line, $lineNrs{$inHandle}]);
     }
@@ -3596,9 +3976,6 @@ sub lexer
     {
      # declare scopies
      my ($found, $sfound);
-
-     # trace, if necessary
-     warn "[Trace] Lexing \"$_\".\n" if $flags{trace} & TRACE_LEXER;
 
      # check for table separators, if necessary (these are the most common strings)
      if (@tableSeparatorStack)
@@ -3642,10 +4019,20 @@ sub lexer
           {die "[BUG] Unhandled EOL directive $lexerFlags{eol}.";}
        }
 
+     # reply next token: scan for Ils if necessary
+     $found=$1, s/^$1//,
+     (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Ils in line $lineNrs{$inHandle}.\n")),
+     return('Ils', [$found, $lineNrs{$inHandle}]) if $parserState==STATE_PFILTERED and /^(\s+)/;
+
      # reply next token: scan for spaces
      $found=$1, s/^$1//,
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Space in line $lineNrs{$inHandle}.\n")),
      return('Space', [$found, $lineNrs{$inHandle}]) if /^(\s+)/;
+
+     # reply next token: scan for paragraph filter delimiters ("||" and "|")
+     $found=$1, s/^\Q$1//,
+     (($flags{trace} & TRACE_LEXER) and warn(qq([Trace] Lexer: Paragraph filter delimiter "$found" in line $lineNrs{$inHandle}.\n))),
+     return($found, [$found, $lineNrs{$inHandle}]) if /^(?<!\\)((\|){1,2})/ and $specials{pfilter};
 
      # reply next token: scan for here doc openers
      $found=$1, s/^<<$1//,
@@ -3712,6 +4099,7 @@ sub lexer
      # remove guarding \\, if necessary
      s/^\\// unless    $specials{heredoc}
                     or $parserState==STATE_EMBEDDING
+                    or $parserState==STATE_PFILTER
                     or $parserState==STATE_CONDITION
                     or $parserState==STATE_DEFINITION;
 
@@ -3726,6 +4114,7 @@ sub lexer
         my %translator;
         @translator{'colon', 'number', '-'}=(':', '0-9', '\-');
         my $special=join('', '([', (map {exists $translator{$_} ? $translator{$_} : $_} grep(($specials{$_} and (length==1 or exists $translator{$_})), keys %specials)), '\n\\\\', '])');
+        $special=join('', $special, '|(\|{1,2})') if $specials{pfilter};
         $special=join('', $special, '|(', $tableSeparatorStack[0][0], ')|(', $tableSeparatorStack[0][1], ')') if @tableSeparatorStack;
 
         # reply next token: scan for word or single character (declared as "Word" as well)
@@ -3747,16 +4136,100 @@ sub lexer
     }
  }
 
+# reference lexed: reply appropriate token
+sub _refLexed
+  {
+   # get parameters
+   my ($parser)=@_;
+
+   # we got an already prepared stream part or a delayed token
+   if (ref($parser->{USER}->{INPUT}) eq 'PerlPoint::Parser::DelayedToken')
+     {
+      my $delayedToken=$parser->{USER}->{INPUT};
+      $parser->{USER}->{INPUT}='';
+      return($delayedToken->token, $delayedToken->value);
+     }
+   else
+     {
+      my $streamedPart=$parser->{USER}->{INPUT};
+      $parser->{USER}->{INPUT}='';
+      return('StreamedPart', [$streamedPart, $lineNrs{$inHandle}]);
+     }
+  }
+
+
+sub _lineStartResearch
+ {
+  # get parameters
+  my ($parser)=@_;
+
+  # scan for indented lines, if necessary
+  if ($parser->{USER}->{INPUT}=~/^(\s+)/)
+    {
+     if ($lexerFlags{ils}==LEXER_TOKEN)
+       {
+        # trace, if necessary
+        warn "[Trace] Lexer: Ils in line $lineNrs{$inHandle}.\n" if $flags{trace} & TRACE_LEXER;
+
+        # update input buffer and reply the token (contents is necessary as well)
+        my $ils=$1;
+        $parser->{USER}->{INPUT}=~s/^$1//; 
+        return(1, 'Ils', [$ils, $lineNrs{$inHandle}]);
+       }
+     elsif ($lexerFlags{ils}==LEXER_IGNORE)
+       {
+        warn "[Trace] Lexer: Ils in line $lineNrs{$inHandle} is ignored.\n" if $flags{trace} & TRACE_LEXER;
+        $parser->{USER}->{INPUT}=~s/^(\s+)//;
+       }
+    }
+
+  # scan for a new paragraph opened by a tag, if necessary
+  if (($parserState==STATE_DEFAULT or $parserState==STATE_PFILTERED) and $parser->{USER}->{INPUT}=~/^\\/)
+    {
+     # remain in default state, but switch to its tag mode
+     stateManager(STATE_DEFAULT_TAGMODE);
+    }
+
+  # flags that there is no token to return
+  0;
+ }
+
 # ----------------------------------------------------------------------------------------------
 # Internal function: error message display.
 # ----------------------------------------------------------------------------------------------
 sub _Error
  {
-  # declare base indention
-  my $baseIndention=' ' x length('[Error] ');
+  # get parameters
+  my ($parser)=@_;
 
-  # use $_[0]->YYCurtok to display the recognized *token* if necessary - for users convenience, it is suppressed in the message
-  warn "\n\n[Error] $sourceFile, line ${$_[0]->YYCurval}[1]", (exists $statistics{cache} and $statistics{cache}[1]) ? ' (or below because of cache hits)' : (), qq(: found "), ${$_[0]->YYCurval}[0], qq(", expected:\n$baseIndention), ' ' x length('or '), join("\n${baseIndention}or ", map {exists $tokenDescriptions{$_} ? defined $tokenDescriptions{$_} ? $tokenDescriptions{$_} : () : $_} sort grep($_!~/cache_hit$/, $_[0]->YYExpect)), ".\n\n";
+  # declare base indention
+  my $baseIndentation=' ' x length('[Error] ');
+
+  # use $_[0]->YYCurtok to display the recognized *token* if necessary
+  # - for users convenience, it is suppressed in the message
+  warn "\n\n[Error] $sourceFile, ",
+       ${$parser->YYCurval}[1] > 0 ? "line ${$parser->YYCurval}[1]" : 'all sources read',
+       (exists $statistics{cache} and $statistics{cache}[1]) ? ' (or below because of cache hits)'
+                                                             : (),
+       ': found ',
+       defined ${$parser->YYCurval}[0] ? qq("${$parser->YYCurval}[0]") : 'nothing',
+       ", expected:\n$baseIndentation",
+       ' ' x length('or '),
+       join("\n${baseIndentation}or ",
+            map {
+                 exists $tokenDescriptions{$_} ? defined $tokenDescriptions{$_} ? $tokenDescriptions{$_}
+                                                                                : ()
+                                               : $_
+                } sort grep($_!~/cache_hit$/, $parser->YYExpect)
+           ),
+        ".\n\n";
+
+  # visualize error position
+  warn(
+       (map {my $l=$_->[1]; chomp($l); "$baseIndentation$l\n"} reverse @inLine==1 ? @inLine : @inLine[0, -1]), "",
+       $baseIndentation, ' ' x ($inLine[0][0]-length($parser->{USER}->{INPUT})-1), "^\n",
+       $baseIndentation, '_' x ($inLine[0][0]-length($parser->{USER}->{INPUT})-1), '|', "\n\n\n"
+      ) if @inLine;
  }
 
 # ----------------------------------------------------------------------------------------------
@@ -3778,6 +4251,8 @@ sub stateManager
                                                                or $newState==STATE_BLOCK
                                                                or $newState==STATE_VERBATIM
                                                                or $newState==STATE_EMBEDDING
+                                                               or $newState==STATE_PFILTER
+                                                               or $newState==STATE_PFILTERED
                                                                or $newState==STATE_CONDITION
                                                                or $newState==STATE_HEADLINE_LEVEL
                                                                or $newState==STATE_HEADLINE
@@ -3796,7 +4271,7 @@ sub stateManager
      @lexerFlags{qw(ils eol el)}=(LEXER_TOKEN, LEXER_EMPTYLINE, LEXER_IGNORE);
 
      # activate special characters as necessary
-     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', 'heredoc', 'colon', 'tag', 'embedded', 'number')}=(1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0);
+     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1);
 
      # trace, if necessary
      warn "[Trace] Entered default state.\n" if $flags{trace} & TRACE_SEMANTIC;
@@ -3804,6 +4279,39 @@ sub stateManager
      # well done
      return;
     };
+
+  # enter new state: paragraph filter installation
+  $newState==STATE_PFILTER and do
+    {
+     # prepare lexer
+     @lexerFlags{qw(ils eol el)}=(LEXER_TOKEN, LEXER_EMPTYLINE, LEXER_IGNORE);
+
+     # activate special characters as necessary
+     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1);
+
+     # trace, if necessary
+     warn "[Trace] Entered pfilter installation state.\n" if $flags{trace} & TRACE_SEMANTIC;
+
+     # well done
+     return;
+    };
+
+  # enter new state: paragraph filter (similar to default except for the name)
+  $newState==STATE_PFILTERED and do
+    {
+     # prepare lexer
+     @lexerFlags{qw(ils eol el)}=(LEXER_TOKEN, LEXER_EMPTYLINE, LEXER_IGNORE);
+
+     # activate special characters as necessary
+     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1);
+
+     # trace, if necessary
+     warn "[Trace] Entered postfilter default state.\n" if $flags{trace} & TRACE_SEMANTIC;
+
+     # well done
+     return;
+    };
+
 
   # enter new state: default in tag mode (same as default, but a paragraph starting with a tag delays switching to other
   # modes, so we have to explicitly disable the paragraph opener specials)
@@ -3813,7 +4321,7 @@ sub stateManager
      @lexerFlags{qw(ils eol el)}=(LEXER_TOKEN, LEXER_EMPTYLINE, LEXER_IGNORE);
 
      # activate special characters as necessary
-     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', 'heredoc', 'colon', 'tag', 'embedded', 'number')}=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0);
+     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0);
 
      # trace, if necessary
      warn "[Trace] Entered default state in tag mode.\n" if $flags{trace} & TRACE_SEMANTIC;
@@ -3829,7 +4337,7 @@ sub stateManager
      @lexerFlags{qw(ils eol el)}=(LEXER_IGNORE, LEXER_SPACE, LEXER_TOKEN);
 
      # activate special characters as necessary
-     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', 'heredoc', 'colon', 'tag', 'embedded', 'number')}=(0, 0, 0, $newState==STATE_HEADLINE ? 0 : 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0);
+     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(0, 0, 0, $newState==STATE_HEADLINE ? 0 : 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0);
 
      # trace, if necessary
      warn "[Trace] Entered headline ", $newState==STATE_HEADLINE ? 'body' : 'level', " state.\n" if $flags{trace} & TRACE_SEMANTIC;
@@ -3845,7 +4353,7 @@ sub stateManager
      @lexerFlags{qw(ils eol el)}=(LEXER_IGNORE, LEXER_EMPTYLINE, LEXER_IGNORE);
 
      # activate special characters as necessary
-     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', 'heredoc', 'colon', 'tag', 'embedded', 'number')}=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
      # trace, if necessary
      warn "[Trace] Entered comment state.\n" if $flags{trace} & TRACE_SEMANTIC;
@@ -3861,7 +4369,7 @@ sub stateManager
      @lexerFlags{qw(ils eol el)}=(LEXER_IGNORE, LEXER_SPACE, LEXER_TOKEN);
 
      # activate special characters as necessary
-     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', 'heredoc', 'colon', 'tag', 'embedded', 'number')}=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0);
+     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0);
 
      # trace, if necessary
      warn "[Trace] Entered text state.\n" if $flags{trace} & TRACE_SEMANTIC;
@@ -3877,7 +4385,7 @@ sub stateManager
      @lexerFlags{qw(ils eol el)}=(LEXER_SPACE, LEXER_TOKEN, LEXER_TOKEN);
 
      # activate special characters as necessary
-     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', 'heredoc', 'colon', 'tag', 'embedded', 'number')}=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0);
+     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0);
 
      # trace, if necessary
      warn "[Trace] Entered table paragraph state.\n" if $flags{trace} & TRACE_SEMANTIC;
@@ -3893,7 +4401,7 @@ sub stateManager
      @lexerFlags{qw(ils eol el)}=(LEXER_IGNORE, LEXER_SPACE, LEXER_TOKEN);
 
      # activate special characters as necessary
-     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', 'heredoc', 'colon', 'tag', 'embedded', 'number')}=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0);
+     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0);
 
      # trace, if necessary
      warn "[Trace] Entered macro definition state.\n" if $flags{trace} & TRACE_SEMANTIC;
@@ -3909,7 +4417,7 @@ sub stateManager
      @lexerFlags{qw(ils eol el)}=(LEXER_IGNORE, LEXER_SPACE, LEXER_TOKEN);
 
      # activate special characters as necessary
-     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', 'heredoc', 'colon', 'tag', 'embedded', 'number')}=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0);
+     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0);
 
      # trace, if necessary
      warn "[Trace] Entered definition item state.\n" if $flags{trace} & TRACE_SEMANTIC;
@@ -3925,7 +4433,7 @@ sub stateManager
      @lexerFlags{qw(ils eol el)}=(LEXER_IGNORE, LEXER_SPACE, LEXER_TOKEN);
 
      # activate special characters as necessary
-     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', 'heredoc', 'colon', 'tag', 'embedded', 'number')}=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0);
+     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0);
 
      # trace, if necessary
      warn "[Trace] Entered point state.\n" if $flags{trace} & TRACE_SEMANTIC;
@@ -3941,7 +4449,7 @@ sub stateManager
      @lexerFlags{qw(ils eol el)}=(LEXER_SPACE, LEXER_TOKEN, LEXER_TOKEN);
 
      # activate special characters as necessary
-     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', 'heredoc', 'colon', 'tag', 'embedded', 'number')}=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0);
+     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0);
 
      # trace, if necessary
      warn "[Trace] Entered block state.\n" if $flags{trace} & TRACE_SEMANTIC;
@@ -3957,7 +4465,7 @@ sub stateManager
      @lexerFlags{qw(ils eol el)}=(LEXER_SPACE, LEXER_TOKEN, LEXER_TOKEN);
 
      # activate special characters as necessary
-     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', 'heredoc', 'colon', 'tag', 'embedded', 'number')}=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0);
+     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0);
 
      # trace, if necessary
      warn "[Trace] Entered verbatim state.\n" if $flags{trace} & TRACE_SEMANTIC;
@@ -3973,7 +4481,7 @@ sub stateManager
      @lexerFlags{qw(ils eol el)}=(LEXER_SPACE, LEXER_TOKEN, LEXER_TOKEN);
 
      # activate special characters as necessary
-     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', 'heredoc', 'colon', 'tag', 'embedded', 'number')}=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0);
+     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0);
 
      # trace, if necessary
      warn "[Trace] Entered embedding state.\n" if $flags{trace} & TRACE_SEMANTIC;
@@ -3989,7 +4497,7 @@ sub stateManager
      @lexerFlags{qw(ils eol el)}=(LEXER_SPACE, LEXER_SPACE, LEXER_TOKEN);
 
      # activate special characters as necessary
-     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', 'heredoc', 'colon', 'tag', 'embedded', 'number')}=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
      # trace, if necessary
      warn "[Trace] Entered condition state.\n" if $flags{trace} & TRACE_SEMANTIC;
@@ -4005,7 +4513,7 @@ sub stateManager
      @lexerFlags{qw(ils eol el)}=(LEXER_IGNORE, LEXER_IGNORE, LEXER_TOKEN);
 
      # activate special characters as necessary
-     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', 'heredoc', 'colon', 'tag', 'embedded', 'number')}=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
      # trace, if necessary
      warn "[Trace] Entered control state.\n" if $flags{trace} & TRACE_SEMANTIC;
@@ -4202,6 +4710,31 @@ will then receive exactly the code of their target language, if provided.
 Please note that you cannot filter out PerlPoint code or example files.
 
 By default, no filter is set.
+
+
+=item headlineLinks
+
+this optional flag causes the parser to register all headline
+titles as anchors automatically. (Headlines are stored without
+possibly included tags which are stripped off.)
+
+Registering anchors does \I<not> mean there are anchors included
+to the stream, it just means that they are known to exist at
+parsing time because they are added to an internal C<PerlPoint::Anchor>
+object which is passed to all tag hooks and can be evaluated there.
+See \C<PerlPoint::Tags> and C<PerlPoint::Anchors> for details.
+
+It is recommended to make use of this feature if your converter
+automatically makes headlines an anchor named like the headline
+(this feature was introduced by Lorenz Domkes C<pp2html> initially).
+(Nevertheless, usefulness may depend on dealing with the parsers
+anchor collection in tag hooks. See the documentations of used
+tag modules for details.)
+
+If your converter does not support automatic headline anchors
+the mentioned way, it is recommended to omit this option because
+it could confuse tag hooks that evaluate the parsers anchor collection.
+
 
 =item linehints
 
@@ -4409,7 +4942,7 @@ sub run
     }
 
   # variables
-  my ($rc)=(1);
+  my ($rc, %docHints)=(1);
 
   # init internal data
   (
@@ -4426,8 +4959,10 @@ sub run
    $flags{activeBaseData},   # 11
    $flags{activeDataInit},   # 12
    $flags{nestedTables},     # 13
-   $macroChecksum,           # 14
-   $varChecksum,             # 15
+   $flags{headlineLinks},    # 14
+   $macroChecksum,           # 15
+   $varChecksum,             # 16
+   $anchors,                 # 17
   )=(
      $pars{stream},                                                              #  1
      (                                                                           #  2
@@ -4447,9 +4982,28 @@ sub run
      exists $pars{activeBaseData} ? $pars{activeBaseData} : 0,                   # 11
      exists $pars{activeDataInit} ? $pars{activeDataInit} : 0,                   # 12
      exists $pars{nestedTables} ? $pars{nestedTables} : 0,                       # 13
-     0,                                                                          # 14
+     exists $pars{headlineLinks} ? $pars{headlineLinks} : 0,                     # 14
      0,                                                                          # 15
+     0,                                                                          # 16
+     PerlPoint::Anchors->new,                                                    # 17
     );
+
+  # prepare stream data structure and appropriate handlers
+  unless (@$resultStreamRef and $resultStreamRef->[STREAM_IDENT] eq '__PerlPoint_stream__')
+    {
+     # empty stream
+     @$resultStreamRef=();
+     # initiate
+     @{$resultStreamRef}[
+                         STREAM_IDENT,
+                         STREAM_TOKENS,
+                         STREAM_HEADLINES,
+                        ]=(
+                           '__PerlPoint_stream__',     # stream identifier;
+                           [],                         # base stream;
+                           [],                         # headline stream;
+                          );
+    }
 
   # declare helper subroutines to be used in active contents
   if ($safeObject)
@@ -4570,7 +5124,7 @@ EOC
         # clean up old format caches
         unless (
                     exists $checksums->{sha1_base64('version')}
-                and $checksums->{sha1_base64('version')}>=0.34
+                and $checksums->{sha1_base64('version')}>=0.36
 
                 and exists $checksums->{sha1_base64('constants')}
                 and $checksums->{sha1_base64('constants')}==$PerlPoint::Constants::VERSION
@@ -4594,7 +5148,10 @@ EOC
        }
 
      # store a document start directive (done here to save memory)
-     push(@$resultStreamRef, [DIRECTIVE_DOCUMENT, DIRECTIVE_START, basename($file)]);
+     push(@{$resultStreamRef->[STREAM_TOKENS]}, [\%docHints, DIRECTIVE_DOCUMENT, DIRECTIVE_START, basename($file)]);
+
+     # update tag finish memory by the way
+     updateTagFinishMem(scalar(@{$resultStreamRef->[STREAM_TOKENS]}));
 
      # enter first (and most common) lexer state
      stateManager(STATE_DEFAULT);
@@ -4612,7 +5169,7 @@ EOC
      warn "\n       $file was parsed in ", time-$flags{started}, " seconds.\n" unless $flags{display} & DISPLAY_NOINFO;
 
      # store a document completion directive (done here to save memory)
-     push(@$resultStreamRef, [DIRECTIVE_DOCUMENT, DIRECTIVE_COMPLETE, basename($file)]);
+     push(@{$resultStreamRef->[STREAM_TOKENS]}, [\%docHints, DIRECTIVE_DOCUMENT, DIRECTIVE_COMPLETE, basename($file)]);
 
      # reset the input handle and flags
      $readCompletely=0;
@@ -4630,6 +5187,114 @@ EOC
      chdir($startupDirectory);
     }
 
+
+  # make a simple helper backend object
+  my $helperBackend=new PerlPoint::Backend(
+                                           name    => 'parsers helper backend',
+                                           display => DISPLAY_NOINFO+DISPLAY_NOWARN,
+                                           trace   => TRACE_NOTHING,
+                                          );
+
+  # get toc
+  $helperBackend->bind($resultStreamRef);
+  my $toc=$helperBackend->toc;
+
+  # store headlines as anchors, if necessary
+  if (@$toc and $flags{headlineLinks})
+    {
+     # scopy
+     my @headlinePath;
+
+     foreach (@$toc)
+       {
+        # get data
+        my ($level, $title)=@$_;
+
+        # update headline path and numbers
+        $headlinePath[$level]=$title;
+
+        # store both plain and composite headline
+        $anchors->add($title, $title);
+        $anchors->add(join('|', map {defined($_) ? $_ : ''} @headlinePath[1..$level]), $title);
+       }
+    }
+
+  # add complete headline titles to streamed headline tokens
+  if (@$toc)
+   {
+    for (my $index=0; $index<=$#{$toc}; $index++)
+     {
+      push (
+            @{$resultStreamRef->[STREAM_TOKENS][$resultStreamRef->[STREAM_HEADLINES][$index]]},
+            $toc->[$index][1],
+           );
+     }
+   }
+
+  # finish tags, if necessary
+  if (@$pendingTags==3)
+   {
+    # get number of tokens
+    my $lastIndex=$#{$resultStreamRef->[STREAM_TOKENS]};
+
+    # handle all marked sections
+    foreach my $section (@{$pendingTags->[2]})
+      {
+       # scan the stream till all pending tags were handled,
+       # begin as near as possible
+       for (my $position=$section->[0]; $position<=$lastIndex; $position++)
+        {
+         # get token
+         my $token=$resultStreamRef->[STREAM_TOKENS][$position];
+
+         # skip everything except tag beginners of tags with finish hooks
+         next unless     ref($token)
+                     and $token->[STREAM_DIR_TYPE]==DIRECTIVE_TAG
+                     and $token->[STREAM_DIR_STATE]==DIRECTIVE_START
+                     and exists $tagsRef->{$token->[STREAM_DIR_DATA]}{finish};
+
+         # make an option hash
+         my $options=dclone($token->[STREAM_DIR_DATA+1]);
+
+         # call hook function (use eval() to guard yourself)
+         my $rc;
+         eval {$rc=&{$tagsRef->{$token->[STREAM_DIR_DATA]}{finish}}($options, $anchors)};
+
+         # check result
+         unless ($@)
+          {
+           {
+            # Error? (Treat syntactic errors as semantic ones at this pointto give PARSING_FAILED a meaning.)
+            ++$semErr, last if $rc==PARSING_ERROR or $rc==PARSING_FAILED;
+
+            # update options (might be modified, and checking for a difference
+            # might take more time then just copying the replied values)
+            $token->[STREAM_DIR_DATA+1]=$options;
+
+            # all right? (several values just mean "ok" at this point)
+            last if $rc==PARSING_OK or $rc==PARSING_COMPLETED;
+
+            # backend hints to store?
+            $token->[STREAM_DIR_HINTS]{ignore}=1, last if $rc==PARSING_IGNORE;
+            $token->[STREAM_DIR_HINTS]{hide}=1,   last if $rc==PARSING_ERASE;
+
+            # something is wrong here
+            warn "[Warn] Tags ", $token->[STREAM_DIR_DATA], " tag finish hook replied unexpected result $rc, ignored.\n";
+           }
+          }
+         else
+          {warn "[Warn] Error in tags ", $token->[STREAM_DIR_DATA], " finish hook (ignored): $@\n"}
+
+         # update counter and leave loop if all pending tags in this section were handled
+         last unless --$section->[1];
+        }
+      }
+   }
+
+  # clean up
+  undef $pendingTags;
+
+
   # success?
   if ($rc and not $semErr)
     {
@@ -4640,14 +5305,14 @@ EOC
 
        Statistics:
        -----------
-       ${\(statisticsHelper(DIRECTIVE_HEADLINE, 'headline'))},
-       ${\(statisticsHelper(DIRECTIVE_TEXT, 'text'))},
-       ${\(statisticsHelper(DIRECTIVE_UPOINT, 'unordered list point'))},
-       ${\(statisticsHelper(DIRECTIVE_OPOINT, 'ordered list point'))},
-       ${\(statisticsHelper(DIRECTIVE_DPOINT, 'definition list point'))},
-       ${\(statisticsHelper(DIRECTIVE_BLOCK, 'block'))},
-       ${\(statisticsHelper(DIRECTIVE_VERBATIM, 'verbatim block'))},
-       ${\(statisticsHelper(DIRECTIVE_TAG, 'tag'))}
+       ${\(statisticsHelper(DIRECTIVE_HEADLINE,    'headline'))},
+       ${\(statisticsHelper(DIRECTIVE_TEXT,        'text'))},
+       ${\(statisticsHelper(DIRECTIVE_UPOINT,      'unordered list point'))},
+       ${\(statisticsHelper(DIRECTIVE_OPOINT,      'ordered list point'))},
+       ${\(statisticsHelper(DIRECTIVE_DPOINT,      'definition list point'))},
+       ${\(statisticsHelper(DIRECTIVE_BLOCK,       'block'))},
+       ${\(statisticsHelper(DIRECTIVE_VERBATIM,    'verbatim block'))},
+       ${\(statisticsHelper(DIRECTIVE_TAG,         'tag'))}
        ${\(statisticsHelper(DIRECTIVE_LIST_RSHIFT, 'right list shifter'))},
        ${\(statisticsHelper(DIRECTIVE_LIST_LSHIFT, 'left list shifter'))},
        and ${\(statisticsHelper(DIRECTIVE_COMMENT, 'comment'))} were detected in ${\(join('', scalar(@{$pars{files}}), ' file', @{$pars{files}}==1?'':'s'))}.
@@ -4698,7 +5363,7 @@ sub updateChecksums
   return if    not ($flags{cache} & CACHE_ON)
             or exists {
                        DIRECTIVE_COMMENT() => 1,
-                      }->{$streamPart->[0][0]};
+                      }->{$streamPart->[0][STREAM_DIR_TYPE]};
 
   if (exists $flags{checksummed} and $flags{checksummed})
     {
@@ -4720,6 +5385,7 @@ sub updateChecksums
 
 
 # --------------------------------------------------------
+
 # Extend all table rows to the number of columns found
 # in the first table line ("table headline"). On request,
 # automatically format the first table line as "headline".
@@ -4743,47 +5409,47 @@ sub normalizeTableRows
   foreach (@$stream)
     {
      # search for *embedded* tables - which are already normalized!
-     $nested+=($_->[1]==DIRECTIVE_START ? 1 : -1)
-       if ref($_) eq 'ARRAY' and $_->[0]==DIRECTIVE_TAG and $_->[2] eq 'TABLE';
+     $nested+=($_->[STREAM_DIR_STATE]==DIRECTIVE_START ? 1 : -1)
+       if ref($_) eq 'ARRAY' and $_->[STREAM_DIR_TYPE]==DIRECTIVE_TAG and $_->[STREAM_DIR_DATA] eq 'TABLE';
 
      # Inside an embedded table? Just pass the stream unchanged then.
      push(@improvedStream, $_), next if $nested;
 
      # check state, set flags
-     $flags[1]=(ref($_) eq 'ARRAY' and $_->[0]==DIRECTIVE_TAG);
-     $flags[2]=($flags[1] and $_->[2] eq 'TABLE_COL');
-     $flags[3]=($flags[1] and $_->[1]==DIRECTIVE_COMPLETE and $_->[2] eq 'TABLE_ROW');
-     $flags[4]=1 if $flags[2] and $_->[1]==DIRECTIVE_START;
-     $flags[4]=0 if $flags[2] and $_->[1]==DIRECTIVE_COMPLETE;
+     $flags[1]=(ref($_) eq 'ARRAY' and $_->[STREAM_DIR_TYPE]==DIRECTIVE_TAG);
+     $flags[2]=($flags[1] and $_->[STREAM_DIR_DATA] eq 'TABLE_COL');
+     $flags[3]=($flags[1] and $_->[STREAM_DIR_STATE]==DIRECTIVE_COMPLETE and $_->[STREAM_DIR_DATA] eq 'TABLE_ROW');
+     $flags[4]=1 if $flags[2] and $_->[STREAM_DIR_STATE]==DIRECTIVE_START;
+     $flags[4]=0 if $flags[2] and $_->[STREAM_DIR_STATE]==DIRECTIVE_COMPLETE;
 
      # update counter of current row columns
      $columns+=0.5 if $flags[2];
 
-        # end of column reached?
-        if ($flags[2] and not $flags[4])
-          {
-           # remove all trailing whitespaces in the last recent data entry,
-           # remove data which becomes empty this way
-           $improvedStream[-1]=~s/\s+$//;
-           pop(@improvedStream) unless $improvedStream[-1];
-          }
+     # end of column reached?
+     if ($flags[2] and not $flags[4])
+       {
+        # remove all trailing whitespaces in the last recent data entry,
+        # remove data which becomes empty this way
+        $improvedStream[-1]=~s/\s+$//;
+        pop(@improvedStream) unless length($improvedStream[-1]);
+       }
 
-        # first data after opening a new column?
-        if ($flags[4] and not $flags[2])
-          {
-           # reset flag
-           $flags[4]=0;
+     # first data after opening a new column?
+     if ($flags[4] and not $flags[2])
+       {
+        # reset flag
+        $flags[4]=0;
 
-           # remove all leading whitespaces, skip data which becomes empty this way
-           s/^\s+//;
-           next unless $_;
-          }
+        # remove all leading whitespaces, skip data which becomes empty this way
+        s/^\s+//;
+        next unless length($_);
+       }
 
      # table headline row?
      if ($flags[0])
        {
         # ok: mark columns as headline parts if necessary, take other elements unchanged
-        push(@improvedStream, ($flags[2] and $autoHeadline)? [@{$_}[0, 1], 'TABLE_HL'] : $_);
+        push(@improvedStream, ($flags[2] and $autoHeadline) ? [@{$_}[STREAM_DIR_HINTS .. STREAM_DIR_STATE], 'TABLE_HL'] : $_);
         # at the end of this first row, marks that it is reached, store the number
         # of its columns as a reference for the complete table, and reset the column counter
         # (which will be used slightly differently in the following lines)
@@ -4799,8 +5465,8 @@ sub normalizeTableRows
            # yes: insert additional columns, if necessary
            push(
                 @improvedStream,
-                [DIRECTIVE_TAG, DIRECTIVE_START, 'TABLE_COL'],
-                [DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TABLE_COL'],
+                [{}, DIRECTIVE_TAG, DIRECTIVE_START, 'TABLE_COL'],
+                [{}, DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TABLE_COL'],
                ) for 1 .. ($refColumns-$columns);
            
            # reset column counter
@@ -4819,7 +5485,7 @@ sub normalizeTableRows
 
 # predeclare variables
 sub predeclareVariables
- {
+ {#warn "PREDECLARING VARIABLES!\n";
   # get and check parameters
   my ($declarations, $preserveNames)=@_;
   confess "[BUG] Missing declaration parameter.\n" unless defined $declarations;
@@ -4841,7 +5507,7 @@ sub predeclareVariables
      $variables{$var}=$declarations->{$var};
 
      # propagate the setting to the stream, if necessary
-     push(@$resultStreamRef, [DIRECTIVE_VARSET, DIRECTIVE_START, {var=>$var, value=>$declarations->{$var}}]) if $flags{var2stream};
+     push(@{$resultStreamRef->[STREAM_TOKENS]}, [{}, DIRECTIVE_VARSET, DIRECTIVE_START, {var=>$var, value=>$declarations->{$var}}]) if $flags{var2stream};
 
      # make the new variable setting available to embedded Perl code, if necessary
      if ($safeObject)
@@ -4850,11 +5516,219 @@ sub predeclareVariables
         ${join('::', ref($safeObject) ? $safeObject->root : 'main', $var)}=$declarations->{$var};
        }
     }
+
+   # update tag finish memory by the way
+   updateTagFinishMem(scalar(@{$resultStreamRef->[STREAM_TOKENS]}));
  }
 
 
+# update tag finish memory
+sub updateTagFinishMem
+ {
+  # get and check parameters
+  my ($lastKnownStreamIndex)=@_;
+  confess "[BUG] Missing last known stream index parameter.\n" unless defined $lastKnownStreamIndex;
+
+  # update tag finish memory, if necessary
+  if ($pendingTags->[1])
+    {
+     # store current collection
+     push(@{$pendingTags->[2]}, [@{$pendingTags}[0, 1]]);
+
+     # reset tag counter
+     $pendingTags->[1]=0;
+    }
+
+  # in any case, update the "last known index" memory
+  $pendingTags->[0]=$lastKnownStreamIndex;
+ }
+
+
+# perform paragraph filter calls
+sub pfilterCall
+ {
+  # get and check parameters
+  my ($filters, $pstream, $lineNr)=@_;
+  confess "[BUG] Missing filter list.\n" unless $filters;
+  confess "[BUG] Filter list is no array reference.\n" unless ref($filters) eq 'ARRAY';
+  confess "[BUG] Missing paragraph stream.\n" unless $pstream;
+  confess "[BUG] Paragraph stream is no array reference.\n" unless ref($pstream) eq 'ARRAY';
+  confess "[BUG] Missing line number.\n" unless $lineNr;
+
+
+  # declare and init variables
+  my ($streamRef, %tableCounters);
+  $retranslationBuffer='';
+
+  # build retranslator, if necessary
+  unless ($retranslator)
+    {
+     # the retranslator is a backend object
+     $retranslator=new PerlPoint::Backend(
+                                          name    => 'retranslator',
+                                          display => DISPLAY_NOINFO+DISPLAY_NOWARN,
+                                          trace   => TRACE_NOTHING,
+                                         );
+
+     # various callbacks perform the retranslation
+     $retranslator->register(DIRECTIVE_SIMPLE, sub
+                                                {
+                                                 # get parameters
+                                                 my ($opcode, $mode, @contents)=@_;
+
+                                                 # add contents to the source text collection
+                                                 $retranslationBuffer.=join('', @contents);
+                                                }
+                            );
+
+     my $handleListPoint=sub
+                          {
+                           # get parameters
+                           my ($opcode, $mode, @data)=@_;
+
+                           # act mode dependend
+                           if ($mode==DIRECTIVE_START)
+                             {$retranslationBuffer.=$opcode==DIRECTIVE_UPOINT ? '* ' : $opcode==DIRECTIVE_OPOINT ? '# ' : ':';}
+                           else
+                             {$retranslationBuffer.="\n\n"}
+                          };
+
+     my $handleDListPointItem=sub
+                               {
+                                # get parameters
+                                my ($opcode, $mode, @data)=@_;
+
+                                # complete the item part if necessary
+                                $retranslationBuffer.=': ' if $mode==DIRECTIVE_COMPLETE;
+                               };
+
+     my $handleListShift=sub
+                          {
+                           # get parameters
+                           my ($opcode, $mode, $offset)=@_;
+
+                           # anything to do?
+                           $retranslationBuffer.=join('',
+                                                      $opcode==DIRECTIVE_LIST_RSHIFT ? '>' : '<',
+                                                      "$offset\n\n",
+                                                     ) if $mode==DIRECTIVE_START;
+                          };
+
+     $retranslator->register($_, $handleListPoint) foreach (DIRECTIVE_UPOINT, DIRECTIVE_OPOINT, DIRECTIVE_DPOINT);
+     $retranslator->register($_, $handleListShift) foreach (DIRECTIVE_LIST_LSHIFT, DIRECTIVE_LIST_RSHIFT);
+     $retranslator->register(DIRECTIVE_DPOINT_ITEM, $handleDListPointItem);
+
+     $retranslator->register(DIRECTIVE_TAG, sub
+                                             {
+                                              # get parameters
+                                              my ($opcode, $mode, $tag, $settings)=@_;
+
+                                              # table tags need special care, is it one?
+                                              unless ($tag=~/^TABLE/)
+                                                {
+                                                 # act mode dependend
+                                                 $retranslationBuffer.=$mode==DIRECTIVE_START ? join('', "\\$tag", (defined $settings and %$settings) ? join('', '{', join(' ', map {qq($_="$settings->{$_}")} grep(!/^__/, keys %$settings)), '}') : (), '<') : '>';
+                                                }
+                                              else
+                                                {
+                                                 # TABLE declared by paragraph?
+                                                 if ($tag eq 'TABLE' and exists $settings->{__paragraph__})
+                                                   {
+                                                    # translate TABLE into paragraph start or completion
+                                                    $retranslationBuffer.=$mode==DIRECTIVE_START ? join('', '@', $settings->{separator}, "\n") : '';
+                                                    # init counters, store separators
+                                                    @tableCounters{qw(row col rowsep colsep)}=(0, 0, "\n", " $settings->{separator} ");
+                                                   }
+                                                 # TABLE declared by tags?
+                                                 elsif ($tag eq 'TABLE')
+                                                   {
+                                                    # translate TABLE into TABLE and END_TABLE
+                                                    $retranslationBuffer.=$mode==DIRECTIVE_START ? join('', '\TABLE{', join(' ', map {qq($_="$settings->{$_}")} grep(!/^__/, keys %$settings)), '}', $settings->{rowseparator} eq '\\\n' ? "\n" : '') : join('', $settings->{rowseparator} eq '\\\n' ? "\n" : '', '\END_TABLE');
+                                                    # init counters, store separators
+                                                    @tableCounters{qw(row col rowsep colsep)}=(0, 0, $settings->{rowseparator} eq '\\\n' ? "\n" : $settings->{rowseparator}, $settings->{separator} eq '\\\n' ? "\n" : " $settings->{separator} ");
+                                                   }
+                                                 # TABLE_ROW?
+                                                 elsif ($tag eq 'TABLE_ROW')
+                                                   {
+                                                    # we only need to act at startup
+                                                    if ($mode==DIRECTIVE_START)
+                                                      {
+                                                       # write a row separator if there was a row before
+                                                       $retranslationBuffer.=$tableCounters{rowsep} if $tableCounters{row};
+                                                       # update row counter, reset column counter
+                                                       $tableCounters{row}++;
+                                                       $tableCounters{col}=0;
+                                                      }
+                                                   }
+                                                 # TABLE_HL or TABLE_COL?
+                                                 elsif ($tag=~/TABLE_(HL|COL)/)
+                                                   {
+                                                    # we only need to act at startup
+                                                    if ($mode==DIRECTIVE_START)
+                                                      {
+                                                       # write a column separator if there was a column before
+                                                       $retranslationBuffer.=$tableCounters{colsep} if $tableCounters{col};
+                                                       # update row counter
+                                                       $tableCounters{col}++;
+                                                      }
+                                                   }
+                                                }
+                                             }
+                            );
+    }
+
+  # embed paragraph stream into a structure looking like a complete stream
+  @{$streamRef}[
+                STREAM_IDENT,
+                STREAM_TOKENS,
+                STREAM_HEADLINES,
+               ]=(
+                  '__PerlPoint_stream__',     # stream identifier;
+                  $pstream,                   # base stream: paragraph stream;
+                  [],                         # headline stream (dummy);
+                 );
+
+  # retranslate paragraph
+  $retranslator->run($streamRef);
+
+  # init paragraph text
+  # $retranslationBuffer=join('', @{$pstream}[1..($#{$pstream}-1)]);
+
+  # warn "BUFFER: $retranslationBuffer\n";
+
+  foreach my $perl (@$filters)
+    {
+     # we currently support verbatim block paragraphs *only*, so we can provide
+     # the paragraph text simply - for a general solution, we need to use an object
+     # of a handy subclass of PerlPoint::Backend (still to be written)
+     {
+      no strict 'refs';
+      ${join('::', ref($safeObject) ? $safeObject->root : 'main', '_pfilterText')}=$retranslationBuffer;
+     }
+
+     # filters cannot be run, inform user
+     warn qq([Warn] $sourceFile, line $lineNr: Running paragraph filter "$perl".\n) if $flags{trace} & TRACE_ACTIVE;
+
+     # call the filter
+     $retranslationBuffer=ref($safeObject) ? $safeObject->reval($perl) : eval(join(' ', '{package main; no strict;', $perl, '}'));
+
+     # check result
+     if ($@)
+       {
+        # inform user, if necessary
+        warn "[Error ", ++$semErr, qq(] $sourceFile, line $lineNr: paragraph filter "$perl" could not be evaluated: $@.\n);
+
+        # stop processing, flag error
+        return undef;
+       }
+    }
+
+   # success: reply result (embed it into empty lines to avoid paragraph mismatch)
+   defined $retranslationBuffer ? [("\n") x 2, split(/(\n)/, $retranslationBuffer), ("\n") x 2] : '';
+  }
 
 1;
+
 
 # declare a helper package used for token "delay" after bodyless macros
 # (implemented the oo way to determine the data)

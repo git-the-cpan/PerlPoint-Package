@@ -32,6 +32,7 @@ sub includeDirectoryFiles
         next unless /^=+(.+)$/;
         # and store it
         push(@{$headlines{$1}}, $source);
+        last;
        }
 
      # close file

@@ -1,4 +1,8 @@
 
+// include macro definitions shared by all basic tag docs
+\INCLUDE{type=pp file="basic-tag-macros.pp" smart=1}
+
+
 
 =READY
 
@@ -52,5 +56,5 @@ to use it in a line of its own (as demonstrated by the example).
 
 \B<See also>
 
-More basic set tags: \B<\\B>, \B<\\C>, \B<\\I> and \B<\\IMAGE>.
+More basic set tags: \OTHER_BASIC_TAGS{current=TABLE}.
 

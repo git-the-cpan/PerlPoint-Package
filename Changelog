@@ -1,4 +1,631 @@
 
+// -- macro declarations: start reading with first headline
++BC:\B<\C<__body__>>
+
+// -- end of "preface"
+
+
+
+=0.36
+
+This is a major update - in the sense that it modifies a lot of internals,
+especially stream handling. Nevertheless, it's almost completely compatible
+with earlier versions of the package (and the few \REF{name="Summary:
+Incompatible changes" type=linked}<incompatible changes> most likely do
+\I<not> affect existing converters).
+
+So \I<this version should run whereever 0.35 could be used.>
+
+While working on this version, I began to make use of the modified internals
+myself. As a result, there are various new \I<visible> features as well.
+See section "\REF{name="Visible Changes" type=linked}" below for all details.
+Internals are described in chapter "\REF{name=Internals type=linked}".
+
+\I<Please note that there's a new dependancy to run the installation tests because I switched to \BC<Test::More>> (included in CPAN package \C<Test::Simple> - do \I<not> install the still available standalone distribution of \C<Test::More>). You may have to update \C<Test::Harness> as well.
+
+
+==Bugfixes
+
+* Several very slight fixes in calls of \C<PerlPoint::Parser::run()>
+  (these bugs caused no errors).
+
+* \C<pp2sdf> embedded native SDF incorrectly into the produced result.
+  Thanks to Lorenz for the bug report.
+
+* \C<pp2sdf>: unintended SDF recognitions caused by ">" characters
+  are now avoided by generating ">" as "{{CHAR:gt}}" (outside verbatim
+  blocks).
+
+* If the only contents of a table cell was a \C<0>, this number was removed.
+  Fixed.
+
+* If a macro overwrote a tag with the same name and a (parsing) hook, the
+  tag hook was invoked when the macro had been used.
+
+* Tag parsing hooks received tag options instead of the tag body.
+
+* Helmut Steinbach found that the closing sequences of verbatim blocks
+  made by Active Content were not recognized correctly. This could be
+  fixed.
+
+* Investigating the previous point I found that is was also impossible
+  to dynamically make a usual example block or a paragraph that starts
+  with a tag or macro. This is now fixed as well.
+
+* Internal bugfix in macro body reparsing. The bug could cause infinite
+  parsing loops.
+
+
+==Internals
+
+This chapter can be safely skipped by "pure" PerlPoint users which might
+like to continue with chapter "\REF{name="0.36 | Visible Changes" type=linked}".
+
+This chapter describes these news:
+
+\LOCALTOC{type=linked}
+
+
+===PerlPoint::Backend, stream format
+
+\B<\I<The format of the intermediate stream was changed.>> I do not know
+of any direct stream access in a converter, but \I<if> anyone did access
+the stream directly, he will need to adapt his code. Code using
+\C<PerlPoint::Backend> does \I<not> need to be adapted.
+
+The stream is still a stream basically, but with additional structural
+hints stored in parallel, which are currently a stream of headline
+index numbers. This way I hope to stay with the performance advantages
+of a stream while enabling things like chapter inspection and arbitrary
+chapter navigation.
+
+For example, \C<pp2html> 0.11 in fact needs to process the stream twice
+because it needs the whole picture of the headline structure when building
+slides. Now it would be possible to inspect headlines in the first pass
+\I<only>, and to process \I<all> tokens in the 2nd pass then. This is a
+common task - \C<pp2html> might be modified or not, but future converters
+can definitely make use of this. (And there's an even better and faster
+way now to grab the TOC, see below.)
+
+To make use of the new structure, \C<PerlPoint::Backend> provides several
+new methods:
+
+* \C<run()> now works in \I<modes>. By default, it processes all tokens
+  as usual. This is called the "token mode". In \I<headline mode>, it
+  processes \I<headlines only>. Switch modes by \BC<mode()> - even from
+  within a callback!
+
+* Navigate within the stream: \BC<reset()> goes back to the very beginning,
+  while \BC<move2chapter()> allows you to jump to a certain chapter.
+
+* Get the number of all headlines by \BC<headlineNr()>, and the number
+  of the current chapter by \BC<currentChapterNr()>.
+
+* The stream data structure is now bound to a backend object while
+  \C<run()> is running. If navigation methods, \C<headlineNr()> or
+  \C<currentChapterNt()> shall be called outside \C<run()> - which
+  means outside a callback - \BC<bind()> can be used to perform
+  this binding manually. 
+
+* Instead of using \C<run()>, converter authors may prefer to process
+  the stream step by step having full control (e.g. to use the stream
+  while presenting instead of in format translation). This is possible
+  by using \C<bind()>, sequential calls of \BC<next()> and finally
+  \BC<unbind()>.
+
+The new backend method \BC<toc()> uses the new features to provide a
+table of contents. If called for a certain chapter, all subchapters are
+listed. The reported depth can be limited.
+
+  # get the complete \I<table of contents>
+  $toc=$backend->\B<toc>;
+
+  # get a list of all \I<current subchapters>
+  $subchapters=$backend->toc($backend->currentChapterNr);
+
+  # get a list of the subchapters \I<one level below the
+  # current one> (do not list the complete tree, if there
+  # are more levels)
+  $subchapters=$backend->toc($backend->currentChapterNr, \B<1>);
+
+All backend extensions are documented both in \C<PerlPoint::Backend>'s
+POD and in the converter tutorial. Hopefully.
+
+
+===More stream enhancements
+
+* Headline start directives provide the full headline title (plained, which
+  means without possibly used tags) as new data.
+
+* Unordered and description list directives now reserve a parameter at the
+  position where \I<ordered list> directives traditionally pass a list startup
+  level. This parameter is currently unused.
+
+* All list directives provide four new additional parameters to give
+  converter authors a hint about subsequent or preceeding \I<list shifts>.
+  For reasons of stream construction, hints about \I<preceeding> level
+  shifts are provided in list \I<start> directives \I<only>, while hints
+  about \I<subsequent> level shifts are provided in list \I<completion>
+  directives \I<only>. (But these are exactly the places where these
+  informations can help, so symmetry is the only thing lost here.) This
+  feature is intended to help a converter to build really \I<nested> lists.
+  (In PerlPoint, a list level shift implicitly closes a previous list,
+  but this is different in various target languages.)
+
+* Parser and backend now interact via directive hints. This is an internal
+  interface. For example, it is used to flag that a tag and / or its contents
+  should be skipped (see below).
+
+
+===New finish hook to complete tags
+
+With the new tag declarations by module introduced by version \REF{name="0.34"
+type=linked}, it became possible to hook into tag parsing. Now there's another
+hook to \I<complete> a tag \I<after> parsing - this means, when all input
+informations are available.
+
+ The new \C<\\REF> macro makes use of this feature
+ to verify links and to complete itself by linked content.
+
+The new hook interface is quite similar to parsing hooks except that it does
+not provide informations only available at parsing time (like the tag body).
+See \C<PerlPoint::Tags> for a detailed doc.
+
+
+===New hook return codes PARSING_IGNORE and PARSING_ERASE
+
+Tag \I<parsing> hooks can return two new codes:
+
+* \BC<PARSING_IGNORE> causes the parser to ignore the tag.
+  The result is just the body.
+
+* \BC<PARSING_ERASE> removes the tag \I<completely> which
+  means together with all its content. See the new basic
+  tag \\HIDE for an example.
+
+Finish hooks can return these codes as well, with exactly the same effect.
+(The tag remains streamed (as well as its body), but will be bypassed by
+the backend.) See \C<PerlPoint::Tags> for a detailed doc.
+
+
+===Hooks can now be interchanged
+
+It is now possible to use hooks of a "foreign" tag (declared by another tag
+module) in your own tag hooks. This helps to emulate other tags, for example
+if an \I<old interface> (tag and option names) shall be preserved but the
+\I<new functionality> shall be used. To invoke a foreign hook, call
+\C<PerlPoint::Tags::call()> anywhere in your own hook, passing tag name, hook
+type and parameters, like so:
+
+ $rc=PerlPoint::Tags::call('TAG', 'hook', @_);
+
+If the tag is not registered, or has no hook of the specified type, an
+undefined value is supplied, otherwise the return code of the invoked
+function.
+
+
+===New anchor management
+
+The parser can relieve converters from anchor management partially now.
+This is an \I<offer>.
+
+* A new minimal class \BC<PerlPoint::Anchors> provides basic anchor
+  collection services. Addresses and related values can be added and
+  queried.
+
+* The parser maintains a \C<PerlPoint::Anchors> object.
+
+* On request, headline titles (stripped off of tags) are automatically
+  added to the parsers anchor collection. (This is inspired by the
+  automatic headline anchors idea by Lorenz, built into \C<pp2html>
+  for versions and already imitated by \C<pp2sdf>. Why not make it a
+  general feature?) To activate this feature call \C<run()> with
+  \C<headlineLinks> set to a true value.
+
+* The parsers anchor collection object is passed to all tag hooks (both
+  parsing and finishing ones), where the collection can be extended (most
+  probably by parsing hooks) or queried (supposedly by finish hooks).
+
+This is the complete management for now. The parsers collection is \I<not>
+made part of the stream. It's just a help to verify links at parsing time,
+and to insert named values into the stream.
+
+  The new \C<\\REF> macro uses the parsers
+  anchor collection to resolve values not
+  available at parsing time, like sequence
+  numbers generated by the new \C<\\SEQ> tag.
+
+Again: with this feature (and tag finish hooks), it becomes easy to reference
+strings defined \I<later> than the reference.
+
+
+
+===Summary: Incompatible changes
+
+Various incompatible modifications might have been mentioned before,
+but it might be useful to have a check list:
+
+* The stream format was \I<significantly> extended, both in structur
+  and semantics. \C<PerlPoint::Backend> manages this for you. (And
+  you already used it, didn't you? ;-)
+
+* List shift paragraphs are no longer streamed by opening \I<and>
+  closing directives. There's only an \I<opening> directive from now
+  on.
+
+* Tag (parsing) hooks have a modified interface: the tag body is now
+  passed by reference, no longer as a list. This was necessary to add
+  new parameters to the interface.
+
+* Tag completion directives in the stream no longer provide exactly
+  the same informations as corresponding start directives, because
+  the new finish hooks are only invoked for startup directives. So,
+  if a tag finish hook modifies tag options, this will affect the
+  startup directive only. (Let me know if this causes problems.)
+
+* Likewise, headline start directives in the stream now provide
+  more informations than related completion directives: the full
+  (plained) headline title is only provided with the startup hint.
+
+* \C<\\TABLE> tags are streamed with additional informations about
+  the separators used (options \C<separator> and options
+  \C<rowseparator>). If they were made from a table \I<paragraph>,
+  there's an additional option \C<_paragraph_> set to 1. These
+  informations are intended to be used when a paragraph is retranslated
+  for a \REF{name="New type of active contents: paragraph
+  filters" type=linked}<paragraph filter>.
+
+
+==Visible Changes
+
+While the modified internals are especially of converter authors interest
+and do not affect existing documents, there are already \I<new> features
+in this version implemented on base of the new internals which \I<might>
+find your interest and help you in writing documents. These new features
+include: 
+
+\LOCALTOC{type=linked}
+
+Please see the \REF{name="0.36 | Misc" type=linked}<"Misc"> section below
+for more visible changes which are not based on the modified internals.
+
+
+===More active content: tags and macros can be made optional
+
+If a tag or macro has an option \BC<_cnd_>, the parser treats this option
+as a \I<condition> to activate the tag/macro or not. The condition is
+evaluated as Active Content. If Active Content is disabled, the condition
+defaults to "false".
+
+  \\IMAGE{_cnd_="$illustrate" src="piegraph.gif"}
+
+Unfortunately, because it is done via option, only tags and macros
+\I<providing> options can be made conditional. So,
+
+  \\I{_cnd_="$italics"}<conditionally italic text>
+
+cannot be written because of a parsing error. That's bad. If anyone
+has an idea for a well fitting general solution, please let me know.
+
+(Hint for converter authors: the condition option is stripped off of
+the options hash if the condition (and therefore the tag) turns out
+to be valid. You cannot evaluate it yourself again.)
+
+
+===New basic tag \\LOCALTOC
+
+\BC<\\LOCALTOC> inserts all subsections of the current chapter (in
+requested depth). Simply say:
+
+  =Parent chapter
+
+  In this chapter:
+
+  \B<\\LOCALTOC>
+
+  ==Subchapter 1
+
+  ===Subchapter 1.1
+
+  ==Subchapter 2
+
+, and a converter will produce results according to \I<this> source:
+
+  =Parent chapter
+
+  In this chapter:
+
+  \B<* Subchapter 1>
+
+  \B<* Subchapter 1.1>
+
+  \B<* Subchapter 2>
+
+  ==Subchapter 1
+
+  ==Subchapter 2
+
+I missed something like this tag for a long time, indeed. Think of all the
+empty pages produced by headlines which just collect various subchapters,
+but without own text. 
+
+It is possible to limit the subhierarchy depth taken into account (suppress
+the display of subchapter 1.1 in the example above by setting \C<depth> to 1),
+to format the produced list in various ways (ordered, unordered, with chapter
+numbers) and even to make the chapter titles hyperlinks to their related
+chapters (if supported by the target format).
+
+The transformation has to be done \I<by the converters>. As I know, the tag
+shall be supported by \C<\PP::Converters> 0.12. For now, you may get an
+impression by using \C<pp2sdf> which as a reference implementation is already
+supporting \C<\\LOCALTOC>.
+
+
+===New basic tag \\SEQ
+
+Generates the next value of a certain sequence "type" which is declared by
+option:
+
+  \\SEQ{type=example}, \\SEQ{type=example}, \\SEQ{type=example}
+
+will produce \C<1, 2, 3>, while
+
+  \\SEQ{type=example}, \\SEQ{type=image}, \\SEQ{type=table}
+
+results in \C<1, 1, 1> (provided no sequence was started before).
+
+It is possible to name the generated number, which makes it easy to reference
+it. Naming is done by option \BC<name>.
+
+  \SEQ{type=image name="Blue water"}
+
+(Note: Converter authors have to deal with this tag a special way because
+the number is passed by a generated tag \I<option>, not by tag body.
+Nevertheless, it's quite simple, see \C<pp2html> for an example and
+"Writing converters" for a description.)
+
+
+===New basic tag \\REF
+
+This is intended to be a very general reference tag. We already have several
+reference tags, mostly introduced by \C<pp2html> - this one is intended to
+continue their tradition a generalized (and generally available) way and is
+implemented on base of new parser features (see \REF{name="0.36 | Internals |
+New anchor management" type=linked}<"anchor management"> above).
+
+There's a complete doc. Here's an overview:
+
+* At least one option is required, which is \C<name>. It specifies what
+  shall be referenced.
+
+* Option \C<type> to say if the result should be made a hyperlink or not.
+  Defaults to \C<"plain"> (text) which means that the value of the
+  referenced object is replied (think of a named sequence number).
+
+* The body is optional in general, but forbidden in conjunction with a
+  \C<"plain"> result formatting (if a body is specified, there's no room
+  for the referenced text).
+
+* Alternative references can be specified via an optional \C<alt> option,
+  delimited by commata. (This delimiter might not be optimal because
+  commata can be used in headlines, I'm open to better ideas.)
+
+  \\REF{name=A alt="B, C, D"}
+
+* The final link is checked by the parser.
+
+* Optional option \C<occasion> (set to a true value) specifies that a
+  missing link is no error. In this case, the tag will be ignored.
+
+
+===New basic tag \\FORMAT
+
+This is another generalized tag, this time in the tradition of \C<pp2html>'s
+tags which configure the rendering of examples. \C<\\FORMAT> is just a
+container which can be filled by various options which represent the
+settings to made.
+
+  \\FORMAT{\B<align=left>}
+
+This should make all following text paragraphs and table cells left justified,
+until the end of the document or another alignment setting is made. So the
+meaning of \C<\\FORMAT> is to configure \I<default> formattings.
+
+As formatting is very target language specific, each converter can define
+valid settings it accepts and evaluates. C<\\FORMAT> may then be used to
+make settings interpreted by \I<various> converters \I<at once>:
+
+  // this example uses imaginary settings
+  \\FORMAT{\B<html_xxx=2 sdf_xxx=5>}
+
+Nevertheless, certain configurations may have a common meaning. I encourage
+converter authors to establish conventions. The first conventional setting
+established is \C<align> which shall accept the values \C<left>, \C<center>,
+\C<justify> and \C<right>.
+
+This tag was invented after Carlos Malvar suggested we could offer
+justification. Thanks, Carlos.
+
+
+
+===New basic tag \\HIDE
+
+This tag removes all its contents. This makes sense if used together
+with a tag condition.
+
+ \\HIDE{_cnd_="$hideSecrets"}<\SECRETS>
+
+
+===New basic tag \\STOP
+
+Another tag that makes most sense if used with tag conditions. It
+raises a syntactical error and thereby stops document processing
+immediately. So, to check if the used parser version meets the needs
+of your up to date document, write
+
+  \\STOP{_cnd_="\$_PARSER_VERSION<0.36"}
+
+
+===New type of active contents: paragraph filters
+
+Carlos Malvar asked me for automatic example highlightning.
+Thinking about how users could afford automatic highlightning
+without having to support various example languages by PerlPoint
+directly, I thought a general solution might meet such needs.
+So now users can declare \I<paragraph filters> which means they
+declare that certain paragraphs should be passed to a specified
+piece of code when parsed. This is, obviously, Active Content.
+The filters results must be valid PerlPoint which will then be
+reparsed.
+
+So finally those filters are there. Here is a complete example to
+demonstrate how this feature can be used. The example document
+contains a verbatim block of Perl code, which is made a block by
+a user filter. The simple filter marks all Perl comments bold
+(using a straight forward comment detection).
+
+  // define the paragraph filter
+  \\EMBED{lang=perl}
+
+  sub formatComments
+   {
+    # $main::_pfilterText is used to
+    # pass the paragraph content
+    $main::_pfilterText=~s/(#.+)$/\\\\B<$1>/mg;
+    $main::_pfilterText;
+   }
+
+  \\END_EMBED
+
+  Now, an example in a verbatim block paragraph:
+
+  \B<||formatComments||><<EOM
+
+    # 1st comment
+    This is my example. # 2nd comment
+
+    Continued.
+
+    # another comment
+    $c=5+10;
+
+  EOM
+
+  Example completed.
+
+Please note the preamble which installs the filter to use.
+
+Here is another filter that automatically numbers example lines:
+
+  sub filter2
+   {
+    # init line counter
+    my $c;
+
+    # transform example text
+    my $t=$main::_pfilterText;
+    $t=~s/^([ \t]*)/join('', ' ', ++$c, ": $1")/mge;
+
+    # provide result
+    $t;
+   }
+
+Filters can be chained by using a single pipe character:
+
+  ||markComments\B<|>numberLines||<<EOM
+
+  ...
+
+  EOM
+
+To try this successfully, Active Content has to be enabled
+(converter option \C<-active>). If Active Content is disabled,
+filters cannot be installed. (Copy the example from a converters
+result, not from this Changelog source to avoid backslash trouble.)
+
+Paragraph filters can be assigned to almost all types of paragraphs,
+not only verbatim blocks. But because they work after a paragraph is
+processed, they make no sense for paragraphs which do not produce
+output directly. So filters are not allowed for conditions,
+alias definitions and variable assignments (for grammatical reasons
+filters \I<can> be assigned to the last mentioned paragraph type,
+but I hope to fix this in future releases).
+
+There is no loop check currently. If a filter produces a filtered
+paragraph, things might end in an endless loop.
+
+As always, feedback is highly appreciated. Documentation and tests
+are planned to be added.
+
+
+
+==pp2sdf
+
+* Supports the new features.
+
+* "{" characters outside verbatim blocks and embedded HTML or SDF are
+  now replaced by SDF escape \C<{{CHAR:lbrace}}> to avoid SDF confusion
+  by unbalanced braces;
+
+
+==New demo converter pp2ppresenter
+
+The first XML converter is here, producing input for PPresenter's XML
+interface. PPresenter is a Perl/Tk presentation software by Mark Overmeer,
+with an XML interface by Johan Vromans. See ppresenter.org for details
+about this software.
+
+This demo is not complete yet, but I hope Mark will take it over ;-)
+
+The XML generation is by no means perfect, but a first proof of XML
+generation from PerlPoint. Suggestions are very welcome, as there are
+various more presenters using XML.
+
+As with all demos feel free to make this a starting point of an own
+converter. Just let us know.
+
+
+==Docs
+
+* "Writing converters" is up to date now, including a reference of the
+  backend callback interface.
+
+* Added \C<\\LOCALTOC>, \C<\\SEQ>, \C<\\REF> and \C<\\HIDE> tag docs.
+  Updated other docs where appropriate.
+
+
+==Misc
+
+* Improved error messages visualize where an error was detected.
+
+  [Error] test.pp, line 6: found " ", expected:
+           =.
+
+          \B<org.: \\IM{src="blibblub.gif"}
+          exp.: \\B<\\C<\\I<\\IMAGE{src "blibblub.gif"}\>\>\>
+                                   ^
+          _________________________|>
+
+
+* Removed \C<Safe> invokation in installation tests where it was unnecessary.
+
+* There's a new dependancy to run the installation tests because I switched
+  to \BC<Test::More> (included in CPAN package \C<Test::Simple>).
+
+* Helmut Steinbach suggested that macro definitions could declare parameters.
+  That's implemented now. To declare defaults, simply add an option list to
+  the macros name:
+
+  +MACRO\B<{value="default value"}>:value is __value__
+
+  Now I'm using the macro the usual way, \MACRO{value=passed}.
+  And the new way: \MACRO.
+
+* Several modules were stored in DOS format (with \r\n line endings). This
+  confused perldoc on Solaris and is fixed. Thanks to Lorenz who detected it.
+
+
+
 
 =0.35
 
@@ -33,7 +660,7 @@ especially enjoy it in case you are running perl 5.00503 or Windows
 
 ==Docs
 
-* New intro \I<"Getting started (with PerlPoint)".
+* New intro \I<"Getting started (with PerlPoint)">.
 
 * Now doc \I<"How to write a PerlPoint converter">.
 
@@ -54,7 +681,7 @@ converters will stop working after installation of package version 0.34.
 
 ==Bugfixes
 
-* Lorenz detected that \B<\C<0>>'s were not allowed in macro names:
+* Lorenz detected that \BC<0>'s were not allowed in macro names:
   fixed (this integrates patch \C<0.3301>);
 
 * Verbatim blocks were documented as something left completely
@@ -291,7 +918,7 @@ converters will stop working after installation of package version 0.34.
   1 | 2 | 3\B<\\END_TABLE>
 
 * Tag declared tables can be \I<inlined> now, declaring a string as
-  row separator by the new option \B<\C<rowseparator>>. This means
+  row separator by the new option \BC<rowseparator>. This means
   that you can write
 
   Look at this table! \B<\\TABLE{rowseparator="+++"} A | B | C +++ 1 | 2
@@ -310,7 +937,7 @@ converters will stop working after installation of package version 0.34.
 
 * Inlining tables enables us to \I<nest> tables. In fact, this is
   still blocked by the parser \I<by default> but \I<can> easily be
-  permitted by setting the new parser option \B<\C<nestedTables>>
+  permitted by setting the new parser option \BC<nestedTables>
   to a true value. The only question is how to handle nested tables
   converting PerlPoint to languages which do \I<not> support them,
   like SDF, and that's why it is made optional and is recommended
@@ -331,12 +958,12 @@ converters will stop working after installation of package version 0.34.
 * The parser as well makes use of variable predeclaration. His
   settings can be overwritten by converters if necessary. For converter
   authors convenience, predeclared parser variables begin with an
-  underscore. The first implemented settings are \B<\C<\$_STARTDIR>> which
+  underscore. The first implemented settings are \BC<\$_STARTDIR> which
   contains the absolute path of the startup directory where parsing
-  was initiated, as provided by Cwd::cwd(), and \B<\C<\$_PARSER_VERSION>>
+  was initiated, as provided by Cwd::cwd(), and \BC<\$_PARSER_VERSION>
   providing the version of PerlPoint::Parser being used.
 
-* \B<\C<\\INCLUDE>> got another special option called \C<"localize">, enabling
+* \BC<\\INCLUDE> got another special option called \C<"localize">, enabling
   document authors to declare variables to be restored when the included source
   is processed completely. This idea was born while building documents from
   numerous \I<partial> documents by different authors, each of them setting
@@ -353,9 +980,9 @@ converters will stop working after installation of package version 0.34.
 
 * To make variable restoration possible in backends as well, all changes are
   propagated if \C<var2stream> is set. A new directive is introduced to flag
-  that all variables are reset (or deleted): \B<\C<DIRECTIVE_VARRESET>>.
+  that all variables are reset (or deleted): \BC<DIRECTIVE_VARRESET>.
 
-* The new variable \B<\C<\$_SOURCE_LEVEL>> reflects the sourcefile nesting
+* The new variable \BC<\$_SOURCE_LEVEL> reflects the sourcefile nesting
   level. Files passed to a translator reside on level 1, this number
   is increased with every source nesting. Let's say certain document
   data should only be processed if the source is parsed as a top
@@ -388,7 +1015,7 @@ converters will stop working after installation of package version 0.34.
   Using \C<eval()> and \C<do()> would be the lowest level from a
   security point of view. So, we already have the convention to provide
   options \C<-activeContents> and \C<-safeOpcode> by all converters.
-  Let's say that the opcode \B<\C<ALL>> switches to code execution by
+  Let's say that the opcode \BC<ALL> switches to code execution by
   \C<eval()> and \C<do()>.
 
 * Another related convention: converters should avoid using namespace
@@ -430,7 +1057,7 @@ EOE
 
 * Implemented first functions of a simplified condition interface
   which is intended to allow non (Perl) programming users to learn
-  and perform common checks easily. The first function \B<\C<flagSet()>>
+  and perform common checks easily. The first function \BC<flagSet()>
   checks if a certain setting was made. Dealing with Safe was tricky again
   (and therefore this function has no parameter check), but finally
   there's a working version!
@@ -443,7 +1070,7 @@ EOE
 
    ? \B<flagSet(>myFlag\B<)>
 
-* There's another function \B<\C<varValue()>> providing the value of
+* There's another function \BC<varValue()> providing the value of
   a passed variable, so now you can write conditions like
 
    ? \B<varValue(>'privateVar'\B<)> eq 'confidental'
@@ -607,7 +1234,7 @@ EOE
 
 * adapted \C<parser-paragraphs.pp> documentation slightly;
 
-* New option \B<\C<smart>> makes the \C<\\INCLUDE> tag
+* New option \BC<smart> makes the \C<\\INCLUDE> tag
   working like Perl's \C<require> or \C<use> for nested
   PerlPoint sources: the file is only read unless it was
   already seen before.
@@ -708,7 +1335,7 @@ EOE
 ==pp2sdf
 
 * "}" characters outside verbatim blocks and embedded HTML
-  are now replaced by SDF escape \C<{{CHAR::rbrace}}> to guard
+  are now replaced by SDF escape \C<{{CHAR:rbrace}}> to guard
   translations of things like \C<\\B\<{key=\>value}\>>
 
 

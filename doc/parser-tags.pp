@@ -2,6 +2,9 @@
 // declare helpful macros
 +BC:\B<\C<__body__>>
 
+// include macro definitions of basic tag docs (to gt an up to date list of basic macros)
+\INCLUDE{type=pp file="tags/basic-tag-macros.pp" smart=1}
+
 
 =Tags in general
 
@@ -22,6 +25,16 @@ not match it. Option settings are separated by whitespace(s).
 
   \\TAG\B<{par1=value1 par2="www.perl.com" par3="words and blanks"}>
 
+If a tag accepts options, it can be made \I<conditional> which means it can be
+activated depending on the result of passed Perl code, which is evaluated as
+\REF{occasion=1 name="Active contents" type=linked}<Active Content>. This code
+is passed by option \C<_cnd_>.
+
+  \\IMAGE{\B<_cnd_="$illustrate"> src="piegraph.gif"}
+
+If Active Contents is disabled, the condition defaults to be false.
+
+
 The \I<tag body> may be optional. If used, it is anything you want to make the tag
 valid for. It immediately follows the optional parameters, enclosed by angle brackets:
 
@@ -35,9 +48,11 @@ Tags can be \I<nested>.
   \\TAG1<\\TAG2<body>>
 
 \I<Every PerlPoint translator defines its own tags>, but usually all of them support
-\C<\\I>, \C<\\B>, \C<\\C>, \C<\\IMAGE> and \C<\\READY> as a base set. Additionally,
+\OTHER_BASIC_TAGS{current=showAll} as a base set. Additionally,
 there are a few reserved tags which are implemented by \I<every> translator. See the
 next section for details.
+
+
 
 =Special purpose tags
 
@@ -320,9 +335,11 @@ paragraphs. Well, there is a tag variant of this:
 <<EOE
 
   \TABLE{bg=blue separator="|" border=2}
+
   \B<column 1>  |  \B<column 2>  | \B<column 3>
      aaaa       |     bbbb       |  cccc
      uuuu       |     vvvv       |  wwww
+
   \END_TABLE
 
 EOE

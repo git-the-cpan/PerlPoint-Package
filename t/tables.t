@@ -5,6 +5,10 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.08    |16.08.2001| JSTENZEL | no need to build a Safe object;
+#         |01.12.2001| JSTENZEL | adapted to TABLEs modified parameter passing
+#         |          |          | (which was built in to support retranslations
+#         |          |          | performed when a paragraph filter is assigned);
 # 0.07    |20.03.2001| JSTENZEL | adapted to tag templates;
 #         |          | JSTENZEL | adapted to new TABLE tag behaviour;
 #         |          | JSTENZEL | added table normalization checks;
@@ -32,7 +36,6 @@ use strict;
 
 # load modules
 use Carp;
-use Safe;
 use Test;
 use PerlPoint::Backend;
 use PerlPoint::Parser 0.34;
@@ -51,7 +54,6 @@ my ($parser)=new PerlPoint::Parser;
 $parser->run(
              stream       => \@streamData,
              files        => ['t/tables.pp'],
-             safe         => new Safe,
              nestedTables => 1,
              trace        => TRACE_NOTHING,
              display      => DISPLAY_NOINFO+DISPLAY_NOWARN,
@@ -92,8 +94,8 @@ ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TABLE');
  {
   my $pars=shift(@results);
   ok(ref($pars), 'HASH');
-  ok(join(' ', sort keys %$pars), '__nestingLevel__ bg border separator');
-  ok(join(' ', sort values %$pars), '1 2 blue |');
+  ok(join(' ', sort keys %$pars), '__nestingLevel__ bg border rowseparator separator');
+  ok(join(' ', sort values %$pars), '1 2 \\\n blue |');
  }
 ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TABLE_ROW');
 ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TABLE_COL');
@@ -144,8 +146,8 @@ ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TABLE');
  {
   my $pars=shift(@results);
   ok(ref($pars), 'HASH');
-  ok(join(' ', sort keys %$pars), '__nestingLevel__ bg border separator');
-  ok(join(' ', sort values %$pars), '1 2 blue |');
+  ok(join(' ', sort keys %$pars), '__nestingLevel__ bg border rowseparator separator');
+  ok(join(' ', sort values %$pars), '1 2 \\\n blue |');
  }
 
 
@@ -207,8 +209,8 @@ ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TABLE');
  {
   my $pars=shift(@results);
   ok(ref($pars), 'HASH');
-  ok(join(' ', sort keys %$pars), '__nestingLevel__ bg border separator');
-  ok(join(' ', sort values %$pars), '1 2 blue |');
+  ok(join(' ', sort keys %$pars), '__nestingLevel__ bg border rowseparator separator');
+  ok(join(' ', sort values %$pars), '1 2 \\\n blue |');
  }
 
 ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TABLE_ROW');
@@ -233,8 +235,8 @@ ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TABLE');
  {
   my $pars=shift(@results);
   ok(ref($pars), 'HASH');
-  ok(join(' ', sort keys %$pars), '__nestingLevel__ bg border separator');
-  ok(join(' ', sort values %$pars), '1 2 blue |');
+  ok(join(' ', sort keys %$pars), '__nestingLevel__ bg border rowseparator separator');
+  ok(join(' ', sort values %$pars), '1 2 \\\n blue |');
  }
 
 # next table (by paragraph)
@@ -267,8 +269,8 @@ ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TABLE');
  {
   my $pars=shift(@results);
   ok(ref($pars), 'HASH');
-  ok(join(' ', sort keys %$pars), '__nestingLevel__ bg border separator');
-  ok(join(' ', sort values %$pars), '1 2 blue |');
+  ok(join(' ', sort keys %$pars), '__nestingLevel__ bg border rowseparator separator');
+  ok(join(' ', sort values %$pars), '1 2 \\\n blue |');
  }
 
 ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TABLE_ROW');
@@ -343,8 +345,8 @@ ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TABLE');
  {
   my $pars=shift(@results);
   ok(ref($pars), 'HASH');
-  ok(join(' ', sort keys %$pars), '__nestingLevel__ bg border separator');
-  ok(join(' ', sort values %$pars), '1 2 blue |');
+  ok(join(' ', sort keys %$pars), '__nestingLevel__ bg border rowseparator separator');
+  ok(join(' ', sort values %$pars), '1 2 \\\n blue |');
  }
 
 
@@ -428,8 +430,8 @@ ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TABLE');
  {
   my $pars=shift(@results);
   ok(ref($pars), 'HASH');
-  ok(join(' ', sort keys %$pars), '__nestingLevel__ separator');
-  ok(join(' ', sort values %$pars), '1 |');
+  ok(join(' ', sort keys %$pars), '__nestingLevel__ rowseparator separator');
+  ok(join(' ', sort values %$pars), '1 \\\n |');
  }
 ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TABLE_ROW');
 ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TABLE_COL');
@@ -457,8 +459,8 @@ ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TABLE');
  {
   my $pars=shift(@results);
   ok(ref($pars), 'HASH');
-  ok(join(' ', sort keys %$pars), '__nestingLevel__ separator');
-  ok(join(' ', sort values %$pars), '1 |');
+  ok(join(' ', sort keys %$pars), '__nestingLevel__ rowseparator separator');
+  ok(join(' ', sort values %$pars), '1 \\\n |');
  }
 
 
@@ -471,8 +473,8 @@ ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TABLE');
  {
   my $pars=shift(@results);
   ok(ref($pars), 'HASH');
-  ok(join(' ', sort keys %$pars), '__nestingLevel__ bg border separator');
-  ok(join(' ', sort values %$pars), '1 2 blue |');
+  ok(join(' ', sort keys %$pars), '__nestingLevel__ bg border rowseparator separator');
+  ok(join(' ', sort values %$pars), '+++ 1 2 blue |');
  }
 ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TABLE_ROW');
 ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TABLE_COL');
@@ -523,8 +525,8 @@ ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TABLE');
  {
   my $pars=shift(@results);
   ok(ref($pars), 'HASH');
-  ok(join(' ', sort keys %$pars), '__nestingLevel__ bg border separator');
-  ok(join(' ', sort values %$pars), '1 2 blue |');
+  ok(join(' ', sort keys %$pars), '__nestingLevel__ bg border rowseparator separator');
+  ok(join(' ', sort values %$pars), '+++ 1 2 blue |');
  }
 
 ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
@@ -539,8 +541,8 @@ ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TABLE');
  {
   my $pars=shift(@results);
   ok(ref($pars), 'HASH');
-  ok(join(' ', sort keys %$pars), '__nestingLevel__');
-  ok(join(' ', sort values %$pars), '1');
+  ok(join(' ', sort keys %$pars), '__nestingLevel__ rowseparator');
+  ok(join(' ', sort values %$pars), '+++ 1');
  }
 
 ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TABLE_ROW');
@@ -561,8 +563,8 @@ ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TABLE');
  {
   my $pars=shift(@results);
   ok(ref($pars), 'HASH');
-  ok(join(' ', sort keys %$pars), '__nestingLevel__');
-  ok(join(' ', sort values %$pars), '2');
+  ok(join(' ', sort keys %$pars), '__nestingLevel__ rowseparator');
+  ok(join(' ', sort values %$pars), '%%% 2');
  }
 
 ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TABLE_ROW');
@@ -592,8 +594,8 @@ ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TABLE');
  {
   my $pars=shift(@results);
   ok(ref($pars), 'HASH');
-  ok(join(' ', sort keys %$pars), '__nestingLevel__');
-  ok(join(' ', sort values %$pars), '2');
+  ok(join(' ', sort keys %$pars), '__nestingLevel__ rowseparator');
+  ok(join(' ', sort values %$pars), '%%% 2');
  }
 
 # --- nested table completed ---
@@ -636,8 +638,8 @@ ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TABLE');
  {
   my $pars=shift(@results);
   ok(ref($pars), 'HASH');
-  ok(join(' ', sort keys %$pars), '__nestingLevel__');
-  ok(join(' ', sort values %$pars), '1');
+  ok(join(' ', sort keys %$pars), '__nestingLevel__ rowseparator');
+  ok(join(' ', sort values %$pars), '+++ 1');
  }
 
 ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
@@ -647,8 +649,8 @@ ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TABLE');
  {
   my $pars=shift(@results);
   ok(ref($pars), 'HASH');
-  ok(join(' ', sort keys %$pars), '__nestingLevel__');
-  ok(join(' ', sort values %$pars), '1');
+  ok(join(' ', sort keys %$pars), '__nestingLevel__ __paragraph__ separator');
+  ok(join(' ', sort values %$pars), '1 1 |');
  }
 
 ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TABLE_ROW');
@@ -669,8 +671,8 @@ ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TABLE');
  {
   my $pars=shift(@results);
   ok(ref($pars), 'HASH');
-  ok(join(' ', sort keys %$pars), '__nestingLevel__');
-  ok(join(' ', sort values %$pars), '2');
+  ok(join(' ', sort keys %$pars), '__nestingLevel__ rowseparator');
+  ok(join(' ', sort values %$pars), '%%% 2');
  }
 
 ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TABLE_ROW');
@@ -700,8 +702,8 @@ ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TABLE');
  {
   my $pars=shift(@results);
   ok(ref($pars), 'HASH');
-  ok(join(' ', sort keys %$pars), '__nestingLevel__');
-  ok(join(' ', sort values %$pars), '2');
+  ok(join(' ', sort keys %$pars), '__nestingLevel__ rowseparator');
+  ok(join(' ', sort values %$pars), '%%% 2');
  }
 
 # --- nested table completed ---
@@ -744,8 +746,8 @@ ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TABLE');
  {
   my $pars=shift(@results);
   ok(ref($pars), 'HASH');
-  ok(join(' ', sort keys %$pars), '__nestingLevel__');
-  ok(join(' ', sort values %$pars), '1');
+  ok(join(' ', sort keys %$pars), '__nestingLevel__ __paragraph__ separator');
+  ok(join(' ', sort values %$pars), '1 1 |');
  }
 
 ok(shift(@results), $_) foreach (DIRECTIVE_DOCUMENT, DIRECTIVE_COMPLETE, 'tables.pp');

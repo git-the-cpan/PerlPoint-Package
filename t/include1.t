@@ -6,6 +6,8 @@
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
 # 0.08    |22.07.2001| JSTENZEL | adapted to improved lexer;
+#         |13.10.2001| JSTENZEL | adapted to headline title providing;
+#         |          | JSTENZEL | switched to Test::More;
 # 0.07    |20.03.2001| JSTENZEL | adapted to tag templates;
 #         |24.05.2001| JSTENZEL | adapted to paragraph reformatting: text paragraphs
 #         |          |          | no longer contain a final whitespace string;
@@ -30,13 +32,10 @@ use strict;
 # load modules
 use Carp;
 use Safe;
-use Test;
+use Test::More qw(no_plan);
 use PerlPoint::Backend;
 use PerlPoint::Parser 0.34;
 use PerlPoint::Constants;
-
-# prepare tests
-BEGIN {plan tests=>219;}
 
 # declare variables
 my (@streamData, @results);
@@ -82,117 +81,117 @@ $backend->register($_, \&handler) foreach (
 $backend->run(\@streamData);
 
 # perform checks
-ok(shift(@results), $_) foreach (DIRECTIVE_DOCUMENT, DIRECTIVE_START, 'include.pp');
-ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'We include ');
-ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
-ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'This text was included.');
-ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_DOCUMENT, DIRECTIVE_START, 'include.pp');
+is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'We include ');
+is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'This text was included.');
+is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 
-ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 
-ok(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 11);
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'First level headline moved to level 11');
-ok(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 11);
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 11, 'First level headline moved to level 11');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'First level headline moved to level 11');
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 11);
 
-ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'This is the 2nd included');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'PP file in this test.');
-ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'This is the 2nd included');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'PP file in this test.');
+is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 
-ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'This was the source');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ':');
-ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'This was the source');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ':');
+is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 
-ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_VERBATIM, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "  \n");
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "  =First level headline moved to level 11\n");
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "  \n");
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "  This is the 2nd included\n");
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "  PP file in this test.\n");
-ok(shift(@results), $_) foreach (DIRECTIVE_VERBATIM, DIRECTIVE_COMPLETE);
-ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_VERBATIM, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "  \n");
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "  =First level headline moved to level 11\n");
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "  \n");
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "  This is the 2nd included\n");
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "  PP file in this test.\n");
+is(shift(@results), $_) foreach (DIRECTIVE_VERBATIM, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 
-ok(shift(@results), $_) foreach (DIRECTIVE_BLOCK, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'something.');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "\n");
-ok(shift(@results), $_) foreach (DIRECTIVE_BLOCK, DIRECTIVE_COMPLETE);
-ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Continued frame source.');
-ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_BLOCK, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'something.');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "\n");
+is(shift(@results), $_) foreach (DIRECTIVE_BLOCK, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Continued frame source.');
+is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 
-ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Now we include another file type ');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '- by declaration: ');
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'EMBED');
+is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Now we include another file type ');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '- by declaration: ');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'EMBED');
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), 'lang');
- ok(join(' ', sort values %$pars), 'anything');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 'lang');
+ is(join(' ', sort values %$pars), 'anything');
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "\n");
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "This text was included.\n");
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "\n");
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "\\INCLUDE{type=pp file=\"include2.pp\" headlinebase=10}\n");
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "\n");
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "This was the source:\n");
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "\n");
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, qq(\\INCLUDE{type=example file="include2.pp" indent=2}\n));
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "\n");
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'EMBED');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "\n");
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "This text was included.\n");
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "\n");
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "\\INCLUDE{type=pp file=\"include2.pp\" headlinebase=10}\n");
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "\n");
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "This was the source:\n");
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "\n");
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, qq(\\INCLUDE{type=example file="include2.pp" indent=2}\n));
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "\n");
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'EMBED');
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), 'lang');
- ok(join(' ', sort values %$pars), 'anything');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 'lang');
+ is(join(' ', sort values %$pars), 'anything');
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'This can be done multiply, look: ');
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'EMBED');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'This can be done multiply, look: ');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'EMBED');
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), 'lang');
- ok(join(' ', sort values %$pars), 'anything');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 'lang');
+ is(join(' ', sort values %$pars), 'anything');
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "\n");
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "This text was included.\n");
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "\n");
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "\\INCLUDE{type=pp file=\"include2.pp\" headlinebase=10}\n");
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "\n");
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "This was the source:\n");
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "\n");
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, qq(\\INCLUDE{type=example file="include2.pp" indent=2}\n));
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "\n");
-ok(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'EMBED');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "\n");
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "This text was included.\n");
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "\n");
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "\\INCLUDE{type=pp file=\"include2.pp\" headlinebase=10}\n");
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "\n");
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "This was the source:\n");
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "\n");
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, qq(\\INCLUDE{type=example file="include2.pp" indent=2}\n));
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "\n");
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'EMBED');
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), 'lang');
- ok(join(' ', sort values %$pars), 'anything');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 'lang');
+ is(join(' ', sort values %$pars), 'anything');
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
-ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
+is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 
-ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, q(Now, let's include ));
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Perl code.');
-ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, q(Now, let's include ));
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Perl code.');
+is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 
-ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Ready this test.');
-ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Ready this test.');
+is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 
-ok(shift(@results), $_) foreach (DIRECTIVE_DOCUMENT, DIRECTIVE_COMPLETE, 'include.pp');
+is(shift(@results), $_) foreach (DIRECTIVE_DOCUMENT, DIRECTIVE_COMPLETE, 'include.pp');
 
 
 # SUBROUTINES ###############################################################################

@@ -5,6 +5,7 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.06    |16.08.2001| JSTENZEL | no need to build a Safe object;
 # 0.05    |20.03.2001| JSTENZEL | adapted to tag templates;
 #         |01.06.2001| JSTENZEL | adapted to modified lexing algorithm which takes
 #         |          |          | "words" as long as possible;
@@ -23,7 +24,6 @@ use strict;
 
 # load modules
 use Carp;
-use Safe;
 use Test;
 use PerlPoint::Backend;
 use PerlPoint::Parser 0.34;
@@ -42,7 +42,6 @@ my ($parser)=new PerlPoint::Parser;
 $parser->run(
              stream  => \@streamData,
              files   => ['t/simple.pp'],
-             safe    => new Safe,
              trace   => TRACE_NOTHING,
              display => DISPLAY_NOINFO+DISPLAY_NOWARN,
             );

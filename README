@@ -42,13 +42,6 @@ both the module set (PerlPoint::Backend,
 PerlPoint::Constants, PerlPoint::Parser) and
 the translator pp2sdf.
 
-Note: please make sure your version of fields.pm
-      provides the phash() function. The version
-      in the perl 5.00503 core does *not* do this
-      while perl 5.6 comes with an up to date
-      module. A 5.005 installation can simply be
-      updated by copying fields.pm from a 5.6
-      distribution.
 
 
 DOCUMENTATION
@@ -70,6 +63,22 @@ KNOWN TRANSLATOR SOFTWARE
 Translators using this package are *pp2html* and
 *pp2latex* by Lorenz Domke. A *pp2sdf* software comes
 with this package itself, see the demo directory.
+
+
+
+DEMO TRANSLATORS
+
+The demo directory contains several converters on base
+of this package. Except for pp2sdf which serves as a
+reference implementation, these are just illustrations
+intended to show how the package can be used. So they
+are not fully functional but really worth a look.
+
+To run pp2ppresenter, XML::Generator needs to be installed.
+
+If someone wants to take over the demos to make them
+full featured converters provided in an own CPAN package,
+feel free to do so. Just let me know.
 
 
 SUPPPORT

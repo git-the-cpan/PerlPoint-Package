@@ -5,6 +5,10 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.08    |16.08.2001| JSTENZEL | no need to build a Safe object;
+#         |13.11.2001| JSTENZEL | DIRECTIVE_COMPLETE entries for list shifts are gone;
+#         |          | JSTENZEL | switched to Test::More;
+#         |27.11.2001| JSTENZEL | adapted to additional shift hints in list directives;
 # 0.07    |20.03.2001| JSTENZEL | adapted to tag templates;
 #         |01.06.2001| JSTENZEL | adapted to modified lexing algorithm which takes
 #         |          |          | "words" as long as possible;
@@ -25,14 +29,10 @@ use strict;
 
 # load modules
 use Carp;
-use Safe;
-use Test;
+use Test::More qw(no_plan);
 use PerlPoint::Backend;
 use PerlPoint::Parser 0.08;
 use PerlPoint::Constants;
-
-# prepare tests
-BEGIN {plan tests=>157;}
 
 # declare variables
 my (@streamData, @results);
@@ -44,7 +44,6 @@ my ($parser)=new PerlPoint::Parser;
 $parser->run(
              stream  => \@streamData,
              files   => ['t/lists.pp'],
-             safe    => new Safe,
              trace   => TRACE_NOTHING,
              display => DISPLAY_NOINFO+DISPLAY_NOWARN,
             );
@@ -66,115 +65,111 @@ $backend->run(\@streamData);
 shift(@results) until $results[0] eq DIRECTIVE_ULIST or not @results;
 
 # 1st level
-ok(shift(@results), $_) foreach (DIRECTIVE_ULIST, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_UPOINT, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_ULIST, DIRECTIVE_START, (0) x 5);
+is(shift(@results), $_) foreach (DIRECTIVE_UPOINT, DIRECTIVE_START);
 shift(@results) until $results[0] eq DIRECTIVE_UPOINT or not @results;
-ok(shift(@results), $_) foreach (DIRECTIVE_UPOINT, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_UPOINT, DIRECTIVE_COMPLETE);
 
-ok(shift(@results), $_) foreach (DIRECTIVE_UPOINT, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_UPOINT, DIRECTIVE_START);
 shift(@results) until $results[0] eq DIRECTIVE_UPOINT or not @results;
-ok(shift(@results), $_) foreach (DIRECTIVE_UPOINT, DIRECTIVE_COMPLETE);
-ok(shift(@results), $_) foreach (DIRECTIVE_ULIST, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_UPOINT, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_ULIST, DIRECTIVE_COMPLETE, (0) x 5);
 
-ok(shift(@results), $_) foreach (DIRECTIVE_OLIST, DIRECTIVE_START, 1);
-ok(shift(@results), $_) foreach (DIRECTIVE_OPOINT, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_OLIST, DIRECTIVE_START, 1, (0) x 4);
+is(shift(@results), $_) foreach (DIRECTIVE_OPOINT, DIRECTIVE_START);
 shift(@results) until $results[0] eq DIRECTIVE_OPOINT or not @results;
-ok(shift(@results), $_) foreach (DIRECTIVE_OPOINT, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_OPOINT, DIRECTIVE_COMPLETE);
 
-ok(shift(@results), $_) foreach (DIRECTIVE_OPOINT, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_OPOINT, DIRECTIVE_START);
 shift(@results) until $results[0] eq DIRECTIVE_OPOINT or not @results;
-ok(shift(@results), $_) foreach (DIRECTIVE_OPOINT, DIRECTIVE_COMPLETE);
-ok(shift(@results), $_) foreach (DIRECTIVE_OLIST, DIRECTIVE_COMPLETE, 1);
+is(shift(@results), $_) foreach (DIRECTIVE_OPOINT, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_OLIST, DIRECTIVE_COMPLETE, 1, 0, 0, DIRECTIVE_LIST_RSHIFT, 1);
 
 # shift right
-ok(shift(@results), $_) foreach (DIRECTIVE_LIST_RSHIFT, DIRECTIVE_START, 1);
-ok(shift(@results), $_) foreach (DIRECTIVE_LIST_RSHIFT, DIRECTIVE_COMPLETE, 1);
+is(shift(@results), $_) foreach (DIRECTIVE_LIST_RSHIFT, DIRECTIVE_START, 1);
 
 # 2nd level
-ok(shift(@results), $_) foreach (DIRECTIVE_OLIST, DIRECTIVE_START, 1);
-ok(shift(@results), $_) foreach (DIRECTIVE_OPOINT, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_OLIST, DIRECTIVE_START, 1, DIRECTIVE_LIST_RSHIFT, 1, 0, 0);
+is(shift(@results), $_) foreach (DIRECTIVE_OPOINT, DIRECTIVE_START);
 shift(@results) until $results[0] eq DIRECTIVE_OPOINT or not @results;
-ok(shift(@results), $_) foreach (DIRECTIVE_OPOINT, DIRECTIVE_COMPLETE);
-ok(shift(@results), $_) foreach (DIRECTIVE_OLIST, DIRECTIVE_COMPLETE, 1);
+is(shift(@results), $_) foreach (DIRECTIVE_OPOINT, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_OLIST, DIRECTIVE_COMPLETE, 1, (0) x 4);
 
-ok(shift(@results), $_) foreach (DIRECTIVE_ULIST, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_UPOINT, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_ULIST, DIRECTIVE_START, (0) x 5);
+is(shift(@results), $_) foreach (DIRECTIVE_UPOINT, DIRECTIVE_START);
 shift(@results) until $results[0] eq DIRECTIVE_UPOINT or not @results;
-ok(shift(@results), $_) foreach (DIRECTIVE_UPOINT, DIRECTIVE_COMPLETE);
-ok(shift(@results), $_) foreach (DIRECTIVE_ULIST, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_UPOINT, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_ULIST, DIRECTIVE_COMPLETE, (0) x 5);
 
-ok(shift(@results), $_) foreach (DIRECTIVE_OLIST, DIRECTIVE_START, 2);
-ok(shift(@results), $_) foreach (DIRECTIVE_OPOINT, DIRECTIVE_START, 2);
+is(shift(@results), $_) foreach (DIRECTIVE_OLIST, DIRECTIVE_START, 2, (0) x 4);
+is(shift(@results), $_) foreach (DIRECTIVE_OPOINT, DIRECTIVE_START, 2);
 shift(@results) until $results[0] eq DIRECTIVE_OPOINT or not @results;
-ok(shift(@results), $_) foreach (DIRECTIVE_OPOINT, DIRECTIVE_COMPLETE, 2);
-ok(shift(@results), $_) foreach (DIRECTIVE_OLIST, DIRECTIVE_COMPLETE, 2);
+is(shift(@results), $_) foreach (DIRECTIVE_OPOINT, DIRECTIVE_COMPLETE, 2);
+is(shift(@results), $_) foreach (DIRECTIVE_OLIST, DIRECTIVE_COMPLETE, 2, 0, 0, DIRECTIVE_LIST_RSHIFT, 2);
 
 # shift right 2 levels
-ok(shift(@results), $_) foreach (DIRECTIVE_LIST_RSHIFT, DIRECTIVE_START, 2);
-ok(shift(@results), $_) foreach (DIRECTIVE_LIST_RSHIFT, DIRECTIVE_COMPLETE, 2);
+is(shift(@results), $_) foreach (DIRECTIVE_LIST_RSHIFT, DIRECTIVE_START, 2);
 
 # 4th level
-ok(shift(@results), $_) foreach (DIRECTIVE_ULIST, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_UPOINT, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_ULIST, DIRECTIVE_START, 0, DIRECTIVE_LIST_RSHIFT, 2, 0, 0);
+is(shift(@results), $_) foreach (DIRECTIVE_UPOINT, DIRECTIVE_START);
 shift(@results) until $results[0] eq DIRECTIVE_UPOINT or not @results;
-ok(shift(@results), $_) foreach (DIRECTIVE_UPOINT, DIRECTIVE_COMPLETE);
-ok(shift(@results), $_) foreach (DIRECTIVE_ULIST, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_UPOINT, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_ULIST, DIRECTIVE_COMPLETE, (0) x 5);
 
-ok(shift(@results), $_) foreach (DIRECTIVE_OLIST, DIRECTIVE_START, 1);
-ok(shift(@results), $_) foreach (DIRECTIVE_OPOINT, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_OLIST, DIRECTIVE_START, 1, (0) x 4);
+is(shift(@results), $_) foreach (DIRECTIVE_OPOINT, DIRECTIVE_START);
 shift(@results) until $results[0] eq DIRECTIVE_OPOINT or not @results;
-ok(shift(@results), $_) foreach (DIRECTIVE_OPOINT, DIRECTIVE_COMPLETE);
-ok(shift(@results), $_) foreach (DIRECTIVE_OLIST, DIRECTIVE_COMPLETE, 1);
+is(shift(@results), $_) foreach (DIRECTIVE_OPOINT, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_OLIST, DIRECTIVE_COMPLETE, 1, 0, 0, DIRECTIVE_LIST_LSHIFT, 2);
 
 # shift left 2 levels
-ok(shift(@results), $_) foreach (DIRECTIVE_LIST_LSHIFT, DIRECTIVE_START, 2);
-ok(shift(@results), $_) foreach (DIRECTIVE_LIST_LSHIFT, DIRECTIVE_COMPLETE, 2);
+is(shift(@results), $_) foreach (DIRECTIVE_LIST_LSHIFT, DIRECTIVE_START, 2);
 
 # 2nd level
-ok(shift(@results), $_) foreach (DIRECTIVE_ULIST, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_UPOINT, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_ULIST, DIRECTIVE_START, 0, DIRECTIVE_LIST_LSHIFT, 2, 0, 0);
+is(shift(@results), $_) foreach (DIRECTIVE_UPOINT, DIRECTIVE_START);
 shift(@results) until $results[0] eq DIRECTIVE_UPOINT or not @results;
-ok(shift(@results), $_) foreach (DIRECTIVE_UPOINT, DIRECTIVE_COMPLETE);
-ok(shift(@results), $_) foreach (DIRECTIVE_ULIST, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_UPOINT, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_ULIST, DIRECTIVE_COMPLETE, 0, 0, 0, DIRECTIVE_LIST_LSHIFT, 1);
 
 # shift left
-ok(shift(@results), $_) foreach (DIRECTIVE_LIST_LSHIFT, DIRECTIVE_START, 1);
-ok(shift(@results), $_) foreach (DIRECTIVE_LIST_LSHIFT, DIRECTIVE_COMPLETE, 1);
+is(shift(@results), $_) foreach (DIRECTIVE_LIST_LSHIFT, DIRECTIVE_START, 1);
 
 # 1st level
-ok(shift(@results), $_) foreach (DIRECTIVE_OLIST, DIRECTIVE_START, 1);
-ok(shift(@results), $_) foreach (DIRECTIVE_OPOINT, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_OLIST, DIRECTIVE_START, 1, DIRECTIVE_LIST_LSHIFT, 1, 0, 0);
+is(shift(@results), $_) foreach (DIRECTIVE_OPOINT, DIRECTIVE_START);
 shift(@results) until $results[0] eq DIRECTIVE_OPOINT or not @results;
-ok(shift(@results), $_) foreach (DIRECTIVE_OPOINT, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_OPOINT, DIRECTIVE_COMPLETE);
 
-ok(shift(@results), $_) foreach (DIRECTIVE_OPOINT, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_OPOINT, DIRECTIVE_START);
 shift(@results) until $results[0] eq DIRECTIVE_OPOINT or not @results;
-ok(shift(@results), $_) foreach (DIRECTIVE_OPOINT, DIRECTIVE_COMPLETE);
-ok(shift(@results), $_) foreach (DIRECTIVE_OLIST, DIRECTIVE_COMPLETE, 1);
+is(shift(@results), $_) foreach (DIRECTIVE_OPOINT, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_OLIST, DIRECTIVE_COMPLETE, 1, (0) x 4);
 
-ok(shift(@results), $_) foreach (DIRECTIVE_ULIST, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_UPOINT, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_ULIST, DIRECTIVE_START, (0) x 5);
+is(shift(@results), $_) foreach (DIRECTIVE_UPOINT, DIRECTIVE_START);
 shift(@results) until $results[0] eq DIRECTIVE_UPOINT or not @results;
-ok(shift(@results), $_) foreach (DIRECTIVE_UPOINT, DIRECTIVE_COMPLETE);
-ok(shift(@results), $_) foreach (DIRECTIVE_ULIST, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_UPOINT, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_ULIST, DIRECTIVE_COMPLETE, (0) x 5);
 
 
-ok(shift(@results), $_) foreach (DIRECTIVE_DLIST, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_DPOINT, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_DPOINT_ITEM, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'definition');
-ok(shift(@results), $_) foreach (DIRECTIVE_DPOINT_ITEM, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_DLIST, DIRECTIVE_START, (0) x 5);
+is(shift(@results), $_) foreach (DIRECTIVE_DPOINT, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_DPOINT_ITEM, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'definition');
+is(shift(@results), $_) foreach (DIRECTIVE_DPOINT_ITEM, DIRECTIVE_COMPLETE);
 shift(@results) until $results[0] eq DIRECTIVE_DPOINT or not @results;
-ok(shift(@results), $_) foreach (DIRECTIVE_DPOINT, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_DPOINT, DIRECTIVE_COMPLETE);
 
-ok(shift(@results), $_) foreach (DIRECTIVE_DPOINT, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_DPOINT_ITEM, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'definition with spaces ');
-ok(shift(@results), $_) foreach (DIRECTIVE_DPOINT_ITEM, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_DPOINT, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_DPOINT_ITEM, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'definition with spaces ');
+is(shift(@results), $_) foreach (DIRECTIVE_DPOINT_ITEM, DIRECTIVE_COMPLETE);
 shift(@results) until $results[0] eq DIRECTIVE_DPOINT or not @results;
-ok(shift(@results), $_) foreach (DIRECTIVE_DPOINT, DIRECTIVE_COMPLETE);
-ok(shift(@results), $_) foreach (DIRECTIVE_DLIST, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_DPOINT, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_DLIST, DIRECTIVE_COMPLETE, (0) x 5);
 
 
 

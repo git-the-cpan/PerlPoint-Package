@@ -11,7 +11,7 @@ use ExtUtils::MakeMaker;
 # the package requires modern perl
 require 5.00503;
 
-my $version='0.35';
+my $version='0.36';
 
 # write makefile
 $ok=WriteMakefile(
@@ -19,9 +19,11 @@ $ok=WriteMakefile(
                   ABSTRACT     => 'A framework to write PerlPoint converters.',
                   VERSION      => $version,
                   PREREQ_PM    => {
-		                   Digest::SHA1 => 1,
-                                   IO::File     => 1,
-                                   Storable     => 1,
+		                   Digest::SHA1  => 1,
+                                   IO::File      => 1,
+                                   Storable      => 1,
+                                   Test::Harness => 1.25,
+                                   Test::More    => 0.11,
                                   },
                   dist         => {
                                    COMPRESS     => 'gzip -9',
@@ -46,10 +48,11 @@ successfull installation of this package.
 You can use the Changelog or TODO file as a
 first PerlPoint input to run the demo scripts.
 (With exception of pp2sdf, they do not
-implement the full language but show how
-translators can be built.)
+implement the full language but demonstrate
+how converters can be built.)
 
 pp2sdf will be installed together with the
-package modules.
+package modules. It serves as a reference
+implementation of a converter.
 
 EOM

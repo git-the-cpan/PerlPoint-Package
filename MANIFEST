@@ -7,6 +7,7 @@ TODO
 
 ppParser.yp
 
+lib/PerlPoint/Anchors.pm
 lib/PerlPoint/Backend.pm
 lib/PerlPoint/Constants.pm
 lib/PerlPoint/Parser.pm
@@ -15,10 +16,11 @@ lib/PerlPoint/Tags/Basic.pm
 lib/PerlPoint/Tags/CPPP.pm
 lib/PerlPoint/Tags/SDF.pm
 
-demo/.pp2sdf
 demo/pp2cppp
 demo/pp2pod
 demo/pp2pp
+demo/pp2ppresenter
+demo/.pp2sdf
 demo/pp2sdf
 demo/pp2tree
 
@@ -47,15 +49,27 @@ doc/tagdoc-example.pp
 doc/tags/image.gif
 doc/tags/tag-B.pp
 doc/tags/tag-C.pp
+doc/tags/tag-FORMAT.pp
+doc/tags/tag-HIDE.pp
 doc/tags/tag-I.pp
 doc/tags/tag-IMAGE.pp
+doc/tags/tag-LOCALTOC.pp
 doc/tags/tag-READY.pp
+doc/tags/tag-REF.pp
+doc/tags/tag-SEQ.pp
+doc/tags/tag-STOP.pp
 doc/tags/tag-TABLE.pp
+doc/tags/basic-tag-macros.pp
 
 t/PerlPoint/Tags/_macros.pm
 t/PerlPoint/Tags/_tags.pm
 
-t/backend.t
+t/backend-base.t
+t/backend-modes.t
+t/backend-modes.pp
+t/backend-navi.t
+t/backend-toc.pp
+t/backend-toc.t
 
 t/cache-fill.t
 t/cache-hits.t

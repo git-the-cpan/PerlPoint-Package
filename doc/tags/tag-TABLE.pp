@@ -1,4 +1,8 @@
 
+// include macro definitions shared by all basic tag docs
+\INCLUDE{type=pp file="basic-tag-macros.pp" smart=1}
+
+
 
 =TABLE and END_TABLE
 
@@ -42,9 +46,11 @@ The usual usage is
 <<EOE
 
   \TABLE{separator="|"}
+
   \B<column 1>  |  \B<column 2>  | \B<column 3>
      aaaa       |     bbbb       |  cccc
      uuuu       |     vvvv       |  wwww
+
   \END_TABLE
 
 EOE
@@ -52,13 +58,18 @@ EOE
 The \C<separator> option is even optional because columns are separated by "|" \I<by default>.
 So you could write
 
-  \TABLE
-  \B<column 1>  |  \B<column 2>  | \B<column 3>
+  \\TABLE
+
+  \\B<column 1> |  \\B<column 2> | \\B<column 3>
      aaaa       |     bbbb       |  cccc
      uuuu       |     vvvv       |  wwww
-  \END_TABLE
+
+  \\END_TABLE
 
 as well.
+
+
+\I<Inlining>
 
 By default, all enclosed lines are evaluated as table rows, which means that
 each source line between \C<\\TABLE> and \C<\\END_TABLE> is treated as a table
@@ -76,9 +87,28 @@ EOE
 
 This is exactly the same table as in the example section above.
 
+
+\I<Nesting>
+
+Inlining tables enables us to \I<nest> them as well. In fact, it depends on the
+converter features if this feature is enabled, it is \I<blocked> \I<by default>
+because there might be target languages which do \I<not> support table nesting.
+
+Nested tables look like this:
+
+  \\TABLE{rowseparator="+++"} column 1 | column 2 |
+  \B<\\TABLE{rowseparator="%%%"} n1 | n2 %%% n3 | n4 \\END_TABLE>
+  +++ xxxx | yyyy | zzzzz +++ uuuu | vvvv | wwwww \\END_TABLE
+
+
+\I<Trimming>
+
 Similar to table paragraphs, leading and trailing whitespaces of a cell are
 automatically removed, so you can use as many of them as you want to
 improve the readability of your source.
+
+
+\I<Normalization>
 
 Tables are \I<normalized> automatically, which means that all table rows will
 be provided with the same number of columns as the first table row (or "table headline").
@@ -96,5 +126,5 @@ See \I<discussion> above.
 
 \B<See also>
 
-More basic set tags: \B<\\C>, \B<\\I>, \B<\\IMAGE> and \B<\\READY>.
+More basic set tags: \OTHER_BASIC_TAGS{current=TABLE}.
 

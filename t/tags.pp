@@ -14,6 +14,8 @@ Complete: \TEST{t=test}<test>
 Sequence: \TEST{t=test}<test>\TOAST{t=toast}<toast>.
 Nested: \TEST{t=test}<tested \TOAST{t=toast}<toast>>.
 
+Headline reference (forward): \REF{name="Tag in a headline"}.
+
 =Tag in a \TEST<headline>
 
 * \TEST<Tags>
@@ -33,3 +35,5 @@ Nested: \TEST{t=test}<tested \TOAST{t=toast}<toast>>.
 EOM
 
 String parameter: \TEST{t=test addr="http://www.perl.com"}<test>
+
+Headline reference (backwards): \REF{name="Tag in a headline"}.

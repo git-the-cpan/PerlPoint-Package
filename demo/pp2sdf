@@ -5,6 +5,30 @@
 # ---------------------------------------------------------------------------------------
 # version | date   | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.09    |27.09.01| JSTENZEL | bugfix: SDF embedding was not really implemented;
+#         |01.10.01| JSTENZEL | added \LOCALTOC support;
+#         |02.10.01| JSTENZEL | does no longer load Carp (was unused);
+#         |        | JSTENZEL | updated \LOCALTOC support to new conventions (started);
+#         |03.10.01| JSTENZEL | avoiding backslash prefixing of paragraphs following
+#         |        |          | an empty text paragraph by resetting flags{textstart}
+#         |        |          | when a text paragraph ends (empty text paragraphs can
+#         |        |          | appear when there is only a bodyless tag in the text);
+#         |        | JSTENZEL | \LOCALTOC support acc. to new conventions completed;
+#         |07.10.01| JSTENZEL | "{" characters outside verbatim blocks and embedded HTML/SDF
+#         |        |          | are now replaced by SDF escape "{{CHAR:lbrace}}" to avoid
+#         |        |          | SDF confusion by unbalanced braces;
+#         |11.10.01| JSTENZEL | avoided possible perl warnings (caused by unfilled
+#         |        |          | headline levels);
+#         |13.10.01| JSTENZEL | added \SEQ and \REF support;
+#         |16.10.01| JSTENZEL | activated automatically collected headline links;
+#         |31.10.01| JSTENZEL | added \FORMAT support;
+#         |02.12.01| JSTENZEL | bugfix in curly brace replacements (added in this version);
+#         |        | JSTENZEL | ">" characters outside verbatim blocks are now replaced by
+#         |        |          | SDF escapes ({{CHAR:gt}}) to avoid SDF confusion which ignored
+#         |        |          | the plain characters sometimes;
+# 0.08    |16.08.01| JSTENZEL | fixed a comment and the call of <parser>->run() by
+#         |        |          | adapting them to new tag declarations finally
+#         |        |          | (but the bugs caused no error);
 # 0.07    |16.06.01| JSTENZEL | simplified code pieces;
 #         |        | JSTENZEL | POD fix;
 # 0.06    |13.03.01| JSTENZEL | activated new backend process visualization;
@@ -27,7 +51,7 @@
 #         |10.06.01| JSTENZEL | modified namespace to avoid conflicts with active contents;
 #         |13.06.01| JSTENZEL | replaced still existing references to old namespace main::;
 # 0.05    |27.01.01| JSTENZEL | "}" characters outside verbatim blocks and embedded HTML
-#         |        |          | are now replaced by SDF escape "{{CHAR::rbrace}}" to guard
+#         |        |          | are now replaced by SDF escape "{{CHAR:rbrace}}" to guard
 #         |        |          | translations of things like "\B<{key=>value}>";
 #         |01.02.01| JSTENZEL | prefixing text paragraphs by a backslash now unless they
 #         |        |          | start with an SDF paragraph style keyword, to avoid
@@ -56,7 +80,7 @@ B<pp2sdf> - translates PerlPoint to SDF
 
 =head1 VERSION
 
-This manual describes version B<0.07>.
+This manual describes version B<0.09>.
 
 =head1 DESCRIPTION
 
@@ -568,13 +592,12 @@ distribution for more details.
 package PerlPoint::Converter::pp2sdf;
 
 # declare version
-$VERSION=$VERSION=0.07;
+$VERSION=$VERSION=0.09;
 
 # pragmata
 use strict;
 
 # load modules
-use Carp;
 use Safe;
 use Getopt::Long;
 use File::Basename;
@@ -582,7 +605,7 @@ use PerlPoint::Tags;
 use PerlPoint::Backend;
 use PerlPoint::Constants;
 use PerlPoint::Tags::SDF;
-use PerlPoint::Parser 0.34;
+use PerlPoint::Parser 0.36;
 use Getopt::ArgvFile qw(argvFile);
 
 
@@ -593,12 +616,14 @@ my (
     @streamData,                # PerlPoint stream;
     @openLists,
     @openTags,                  # a buffer used to autoclose / autoopen tags exceeding example lines;
-    @headlinePath,              # composite headline (consisting of all hierarchy levels)
+    @headlinePath,              # composite headline (consisting of all hierarchy levels);
+    @headlineNumbers,           # internal headline number memory, used for \LOCALTAG;
 
     %flags,
     %options,                   # option hash;
     %table,                     # a table buffer
     %tagHash,                   # accepted PerlPoint tags;
+    %formatting,                # formatting configurations;
    );
 
 # precompile a pattern describing accepted SDF paragraph style markers
@@ -644,17 +669,16 @@ die "[Fatal] Usage: $0 [<options>] <PerlPoint source(s)>\n" unless @ARGV>=1;
 # check passed sources
 -r or die "[Fatal] Source file $_ does not exist or is unreadable.\n" foreach @ARGV;
 
-# import tags
+# import tags as wished
 PerlPoint::Tags::addTagSets(@{$options{tagset}}) if exists $options{tagset};
 
-# declare list of accepted tag openers (pass SDF translations where appropriate)
+# declare SDF tag translations
 %tagHash=(
           # base
 	  B     => 'B',
 	  C     => 'EX',
 	  E     => 'E',
 	  I     => 'I',
-	  IMAGE => 1,
 
           # imported tags
           U     => 'U',
@@ -682,7 +706,6 @@ if (exists $options{safeOpcode})
 # and call it
 $parser->run(
              stream          => \@streamData,
-             tags            => \%tagHash,
              files           => \@ARGV,
 
              filter          => 'perl|sdf|html',
@@ -699,6 +722,7 @@ $parser->run(
                                 },
 
              vispro          => 1,
+             headlineLinks   => 1,
              cache           =>   (exists $options{cache} ? CACHE_ON : CACHE_OFF)
                                 + (exists $options{cacheCleanup} ? CACHE_CLEANUP : 0),
              display         =>   DISPLAY_ALL
@@ -742,7 +766,7 @@ $backend->register($_, \&handleListShift) foreach (DIRECTIVE_LIST_LSHIFT, DIRECT
 
 
 # init several variables
-@flags{qw(listlevel html textstart headline)}=(1, 0, 0, 0);
+@flags{qw(listlevel sdf html textstart headline)}=(1, 0, 0, 0, 0);
 
 # and run it
 $backend->run(\@streamData);
@@ -756,49 +780,66 @@ sub handleSimple
   # get parameters
   my ($opcode, $mode, @contents)=@_;
 
-  @contents=map
-             {
-              # guard translations of things like "\B<{key=>value}>";
-              s/\}/{{CHAR:rbrace}}/g;
+  # build a small translation tables to handle curly braces
+  my %curlyBraceTranslations=('{' => '{{CHAR:lbrace}}', '}' => '{{CHAR:rbrace}}');
 
-              # complete block lines as necessary
-              if ($flags{block})
-                {
-                 if (@openTags)
-                   {
-                    # reopen automatically closed tags, if any
-                    if ($flags{openTags} and /\S/)
-                      {
-                       my $opener=join('', map {"{{$_:"} @openTags);
-                       s/^(\s*)/$opener$1/;
-                       $flags{openTags}=0;
-                      }
-
-                    # handle line breaks: automatically close open tags, if necessary, and start lines by a prefix
-                    if (/\n/)
-                      {
-                       my $trailer='}}' x @openTags;
-                       s/\n/$trailer\n$flags{block}/;
-                       $flags{openTags}=1;
-                      }
-                   }
-                 else
-                   {
-                    # no open tag: simply add the correct intro
-                    s/\n/\n$flags{block}/;
-                   }
-                }
-              $_;
-             } @contents;
-
-  # prepare beginning of text blocks if necessary
-  if ($flags{textstart})
+  unless ($flags{sdf})
     {
-     # avoid special SDF interpretations
-     unshift(@contents, '\\') unless $contents[0]=~/^$paragraphStyles/;
+     @contents=map
+                {
+		 # Guard translations of things like "\B<{key=>value}>" by translating "{".
+                 # *Opening* curly braces might confuse SDF as well (unless corresponding
+                 # closing braces will follow).
+		 s/([{}])/$curlyBraceTranslations{$1}/g;
 
-     # reset flag
-     $flags{textstart}=0;
+		 # complete block lines as necessary
+		 if ($flags{block})
+		   {
+		    if (@openTags)
+		      {
+		       # reopen automatically closed tags, if any
+		       if ($flags{openTags} and /\S/)
+			 {
+			  my $opener=join('', map {"{{$_:"} @openTags);
+			  s/^(\s*)/$opener$1/;
+			  $flags{openTags}=0;
+			 }
+
+		       # handle line breaks: automatically close open tags, if necessary, and start lines by a prefix
+		       if (/\n/)
+			 {
+			  my $trailer='}}' x @openTags;
+			  s/\n/$trailer\n$flags{block}/;
+			  $flags{openTags}=1;
+			 }
+		      }
+		    else
+		      {
+		       # no open tag: simply add the correct intro
+		       s/\n/\n$flags{block}/;
+		      }
+		   }
+		 $_;
+		} @contents;
+
+     # prepare beginning of text blocks if necessary
+     if ($flags{textstart})
+       {
+        # shall we add formatting hints?
+        if (exists $formatting{align})
+          {
+           # ok, begin paragraph by formatting
+           unshift(@contents, qq(N[align="$formatting{align}"]\n));
+          }
+        else
+          {
+           # avoid special SDF interpretations
+           unshift(@contents, '\\') unless $contents[0]=~/^$paragraphStyles/;
+          }
+
+	# reset flag
+	$flags{textstart}=0;
+       }
     }
 
   # store token in a duplication buffer if we are currently processing a headline
@@ -818,7 +859,7 @@ sub handleHeadline
   if ($mode==DIRECTIVE_START)
     {
      # open headline
-     print "H$level\[id=\"";
+     print qq(H$level\[id=");
 
      # mark that we process a headline now
      $flags{headlineString}='';
@@ -826,12 +867,17 @@ sub handleHeadline
     }
   else
     {
-     # update headline path
+     # update headline path and numbers
      $headlinePath[$level]=$flags{headlineString};
+     splice(@headlineNumbers, $level+1); $headlineNumbers[$level]++;
 
      # complete headline, including an additional composite anchor
-     print("\"]{{N[id=\"", join('|', @headlinePath[1..$level]), "\"]$flags{headlineString}}}\n\n");
-     
+     print(
+           qq("]{{N[id="),
+           join('|', map {defined($_) ? $_ : ''} @headlinePath[1..$level]),
+           qq("]$flags{headlineString}}}\n\n)
+          );
+
      # reset flags
      $flags{headlineString}='';
      $flags{headline}=0;
@@ -848,7 +894,7 @@ sub handleText
   my ($opcode, $mode)=@_;
 
   # act mode dependend
-  $flags{textstart}=1 if $_[1]==DIRECTIVE_START;
+  $flags{textstart}=$_[1]==DIRECTIVE_START ? 1 : 0;
   print "\n\n" if $_[1]==DIRECTIVE_COMPLETE;
  }
 
@@ -859,7 +905,7 @@ sub handleTag
   my ($opcode, $mode, $tag, $settings)=@_;
 
   # reset flag, if necessary
-  $flags{textstart}=0 if $flags{textstart} and ($tag=~/^(IMAGE|TABLE|TABLE_ROW|TABLE_COL|TABLE_HL)$/ or exists $tagHash{$tag});
+  $flags{textstart}=0 if $flags{textstart} and ($tag=~/^(IMAGE|LOCALTOC|REF|SEQ|TABLE|TABLE_ROW|TABLE_COL|TABLE_HL)$/ or exists $tagHash{$tag});
 
   # handle image tags a special way
   if ($tag eq 'IMAGE')
@@ -942,6 +988,23 @@ sub handleTag
      # ok, well done
      return(1);
     }
+  elsif ($tag eq 'EMBED' and $settings->{lang}=~/^sdf$/i)
+    {
+     # act mode dependend
+     if ($mode==DIRECTIVE_START)
+       {
+        # flag that we are within embedded SDF
+        $flags{sdf}=1;
+       }
+     else
+       {
+        # flag that embedded SDF is completed
+        $flags{sdf}=0;
+       }
+
+     # ok, well done
+     return(1);
+    }
   elsif ($tag eq 'EMBED' and $settings->{lang}=~/^html$/i)
     {
      # act mode dependend
@@ -950,8 +1013,8 @@ sub handleTag
         # flag that we are within embedded HTML
         $flags{html}=1;
 
-        # reset text start flag (otherwise, the inlined HTML would be prefixed by a backslash if placed
-        # at the beginning of a paragraph)
+        # reset text start flag (otherwise, the inlined HTML would be prefixed
+        # by a backslash if placed at the beginning of a paragraph)
         $flags{textstart}=0;
        }
      else
@@ -1005,10 +1068,48 @@ sub handleTag
      # ok, well done
      return(1);
     }
+  elsif ($tag eq 'REF')
+    {
+     # plain text? (never has a body)
+     if ($settings->{type} eq 'plain')
+       {
+        # insert just the referenced value
+        present($settings->{__value__}) if $mode==DIRECTIVE_START;
+       }
+     # link?
+     elsif ($settings->{type} eq 'linked')
+       {
+        # catch target
+        my $target=$settings->{name};
+        $target=~s/\s*\|\s*/\|/g;
+
+        # is there a body?
+        if ($settings->{__body__})
+          {
+           # Yes, there is a body. This is equal to XREF. Act mode dependend.
+           if ($mode==DIRECTIVE_START)
+             {
+              present("{{CMD[jump=\"#$target\"]");
+             }
+           else
+             {present("}}");}
+          }
+        else
+          {
+           # No body: this means the referenced value becomes the linked text.
+           present("{{CMD[jump=\"#$target\"]$settings->{__value__}}}") if $mode==DIRECTIVE_START;
+          }
+       }
+     else
+       {die "[BUG] Unhandled case $settings->{type}."}
+
+     # ok, well done
+     return(1);
+    }
   elsif ($tag eq 'A')
     {
      # act mode dependend
-     present("{{N[id=\"$settings->{name}\"]") if $mode==DIRECTIVE_START;
+     present(qq({{N[id="$settings->{name}"])) if $mode==DIRECTIVE_START;
      present("}}") if $mode==DIRECTIVE_COMPLETE;
 
      # ok, well done
@@ -1020,6 +1121,105 @@ sub handleTag
      present("{{CMD[jump=\"$settings->{url}\"]") if $mode==DIRECTIVE_START;
      present("}}") if $mode==DIRECTIVE_COMPLETE;
 #     present(" ({{URL:$settings->{url}}})") if $mode==DIRECTIVE_COMPLETE;
+
+     # ok, well done
+     return(1);
+    }
+  elsif ($tag eq 'LOCALTOC')
+    {
+     # act mode dependend - we only need to handle this once, there is no tag body
+     if ($mode==DIRECTIVE_START)
+       {
+        # get local toc
+        my $toc=$backend->toc($backend->currentChapterNr, $settings->{depth});
+
+        # anything found?
+        if (@$toc)
+          {
+           # get type flag, store it more readable
+           my $plain=($settings->{type} eq 'plain');
+
+           # make a temporary headline path array copy
+           my @localHeadlinePath=@headlinePath;
+
+           # prepare a subroutine to build links, if necessary
+           my $link;
+           unless ($plain)
+             {
+              $link=sub
+                     {
+                      # take parameters
+                      my ($level, $title)=@_;
+
+                      # update headline path (so that it describes the complete
+                      # path of the future chapter then)
+                      $localHeadlinePath[$level]=$title;
+
+                      # supply the path of the upcoming chapter
+                      join('', qq({{CMD[jump="#), join('|', map {defined($_) ? $_ : ''} @localHeadlinePath[1..$level]), qq("]$title}}));
+                     }
+             }
+
+           # preformatting
+           print "\n\n";
+
+           # make it a list of the requested format
+           if ($settings->{format} eq 'bullets')
+             {print '*', ' ', $plain ? $_->[1] : $link->(@$_), "\n\n" for @$toc;}
+           elsif ($settings->{format} eq 'enumerated')
+             {print '^', ' ', $plain ? $_->[1] : $link->(@$_), "\n\n" for @$toc;}
+           elsif ($settings->{format} eq 'numbers')
+             {
+              # make a temporary headline number array copy
+              my @localHeadlineNumbers=@headlineNumbers;
+
+              # handle all provided subchapters
+              for (@$toc)
+                {
+                 # get level and title
+                 my ($level, $title)=@$_;
+
+                 # update headline numbering
+                 splice(@headlineNumbers, $level+1);
+                 $headlineNumbers[$level]++;
+
+                 # build result
+                 print '*', ' ',
+                       join('.', @headlineNumbers[1..$level]), '. ',
+                       $plain ? $title : $link->(@$_),
+                       "\n\n";
+                }
+             }
+           else
+             {die "[BUG] Unhandled case $settings->{format}."}
+          }
+       }
+
+     # ok, well done
+     return(1);
+    }
+  elsif ($tag eq 'SEQ')
+    {
+     # act mode dependend (all we have to do is to present a number)
+     present($settings->{__nr__}) if $mode==DIRECTIVE_START;
+
+     # ok, well done
+     return(1);
+    }
+  elsif ($tag eq 'FORMAT')
+    {
+     # act mode dependend (all we have to do is to store informations)
+     if ($mode==DIRECTIVE_START)
+       {
+        # alignment
+        if (exists $settings->{align})
+          {
+           $settings->{align}=ucfirst(lc($settings->{align}));
+           $settings->{align}='Full' if $settings->{align} eq 'Justify';
+           $formatting{align}=$settings->{align} if $settings->{align}=~/^(Left|Full|Center|Right)$/;
+           delete $formatting{align} if $settings->{align} eq 'Default';
+          }
+       }
 
      # ok, well done
      return(1);
@@ -1138,8 +1338,11 @@ sub present
   my $string=join('', @_);
 
   # replace characters which may confuse sdf
-  unless (($flags{block} and $flags{block} eq '>') or $flags{html})
-    {$string=~s/</{{CHAR:lt}}/g;}
+  unless (($flags{block} and $flags{block} eq '>') or $flags{sdf} or $flags{html})
+    {
+     $string=~s/</{{CHAR:lt}}/g;
+     $string=~s/>/{{CHAR:gt}}/g;
+    }
 
   # present result
   if ($flags{html}==1)

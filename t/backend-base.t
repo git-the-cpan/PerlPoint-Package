@@ -5,6 +5,8 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.05    |16.08.2001| JSTENZEL | no need to build a Safe object;
+#         |17.08.2001| JSTENZEL | switched from Test to Test::More;
 # 0.04    |20.03.2001| JSTENZEL | adapted to tag templates;
 # 0.03    |09.12.2000| JSTENZEL | new namespace: "PP" => "PerlPoint";
 # 0.02    |05.10.2000| JSTENZEL | parser takes a Safe object now;
@@ -19,14 +21,10 @@ use strict;
 
 # load modules
 use Carp;
-use Safe;
-use Test;
+use Test::More qw(no_plan);
 use PerlPoint::Backend;
 use PerlPoint::Parser 0.08;
 use PerlPoint::Constants;
-
-# prepare tests
-BEGIN {plan tests=>12;}
 
 # declare variables
 my (@streamData, @results);
@@ -38,15 +36,15 @@ my ($parser)=new PerlPoint::Parser;
 $parser->run(
              stream  => \@streamData,
              files   => ['t/empty1.pp'],
-             safe    => new Safe,
+             safe    => undef,
              trace   => TRACE_NOTHING,
              display => DISPLAY_NOINFO+DISPLAY_NOWARN,
             );
 
 # build a first backend
 my $backend1=new PerlPoint::Backend(
-                                    name    =>'installation test: backend1',
-                                    trace   =>TRACE_NOTHING,
+                                    name    => 'installation test: backend1',
+                                    trace   => TRACE_NOTHING,
                                     display => DISPLAY_NOINFO,
                                    );
 
@@ -70,15 +68,15 @@ $backend1->register($_, \&handler1) foreach (
 $backend1->run(\@streamData);
 
 # start first checks
-ok(shift(@results), $_) foreach (
+is(shift(@results), $_) foreach (
                                  DIRECTIVE_DOCUMENT, DIRECTIVE_START,    'empty1.pp',
                                  DIRECTIVE_DOCUMENT, DIRECTIVE_COMPLETE, 'empty1.pp',
                                 );
 
 # install a second backend
 my $backend2=new PerlPoint::Backend(
-                                    name    =>'installation test: backend2',
-                                    trace   =>TRACE_NOTHING,
+                                    name    => 'installation test: backend2',
+                                    trace   => TRACE_NOTHING,
                                     display => DISPLAY_NOINFO,
                                    );
 
@@ -102,7 +100,7 @@ $backend2->register($_, \&handler2) foreach (
 $backend2->run(\@streamData);
 
 # start second check suite
-ok(shift(@results), $_) foreach (1..6);
+is(shift(@results), $_) foreach (1..6);
 
 
 
