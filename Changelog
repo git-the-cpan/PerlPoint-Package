@@ -1,5 +1,51 @@
 
 
+=0.35
+
+This is a minor update, but it is strongly recommended. You will
+especially enjoy it in case you are running perl 5.00503 or Windows
+(or both ;-).
+
+==Bugfixes
+
+* The lexer did not combine plain strings as completely as
+  possible because of a pattern bug.
+
+* \C<pp2pod> now completes examples ((verbatim) blocks) by
+  additional empty lines.
+
+
+==Features
+
+* Adapted to perl 5.005 (once more ;-). Please note that under
+  perl 5.005, parent classes need to be loaded explicitly, so
+  \I<to make your converter run under this perl version please
+  include a \C<use PerlPoint::Tags;> statement>. See the demos
+  for examples.
+
+* The package now passes all tests under Windows as well. They
+  failed because files need to be prepared by \C<binmode()>
+  under DOS to make \C<seek()> work correctly.
+
+* New demo application \C<pp2cppp> converts PerlPoint into
+  Clinton Pierce's PerlProjector format.
+
+
+==Docs
+
+* New intro \I<"Getting started (with PerlPoint)".
+
+* Now doc \I<"How to write a PerlPoint converter">.
+
+* Providing a POD version of "Getting started". I'd like to add a POD
+  version of the converter tutorial as well, but unfortunatley there
+  are limitations because POD (as I know it) does support neither
+  tables nor headlines of a level greater than 2.
+
+* Slightly rearranged existing docs.
+
+
+
 =0.34
 
 \B<This is a major release.> It needs adapted translators. Old fashioned

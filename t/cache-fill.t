@@ -5,6 +5,8 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.05    |22.07.2001| JSTENZEL | adapted to perl 5.005;
+#         |          | JSTENZEL | adapted to improved lexer;
 # 0.04    |20.03.2001| JSTENZEL | adapted to tag templates;
 #         |23.03.2001| JSTENZEL | adapted to by line lexing of verbatim blocks;
 #         |23.05.2001| JSTENZEL | adapted to field trimming;
@@ -12,8 +14,8 @@
 #         |          |          | containing only a table become just a table now;
 #         |25.05.2001| JSTENZEL | adapted to paragraph reformatting: text paragraphs
 #         |          |          | no longer contain a final whitespace string;
-#         |26.05.2001| JSTENZEL | adapeted to new table nesting information;
-#         |01.06.2001| JSTENZEL | adapeted to modified lexing algorithm which takes
+#         |26.05.2001| JSTENZEL | adapted to new table nesting information;
+#         |01.06.2001| JSTENZEL | adapted to modified lexing algorithm which takes
 #         |          |          | "words" as long as possible;
 # 0.03    |30.01.2001| JSTENZEL | ordered lists now provide the entry level number;
 # 0.02    |09.12.2000| JSTENZEL | new namespace: "PP" => "PerlPoint";
@@ -36,10 +38,11 @@ use PerlPoint::Constants 0.09;
 
 # declare test tags
 use lib qw(t);
+use PerlPoint::Tags;
 use PerlPoint::Tags::_tags;
 
 # prepare tests
-BEGIN {plan tests=>971;}
+BEGIN {plan tests=>956;}
 
 # declare variables
 my (@streamData, @results);
@@ -627,8 +630,7 @@ ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
 ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'at the beginning.');
 ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'And these are number (17)');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, q(, double ("double quotes") and single quoted ('single quotes') strings.));
+ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, q(And these are number (17), double ("double quotes") and single quoted ('single quotes') strings.));
 ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
 ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'This was assigned in a multiline');
@@ -644,8 +646,7 @@ ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
 ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'at the beginning.');
 ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'And these are number (17)');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, q(, double ("double quotes") and single quoted ('single quotes') strings.));
+ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, q(And these are number (17), double ("double quotes") and single quoted ('single quotes') strings.));
 ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
 ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'This was assigned in a multiline');
@@ -677,16 +678,13 @@ ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '${variables
 ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
 ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'value is 1st');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
+ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'value is 1st.');
 ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'value is 2nd');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
+ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'value is 2nd.');
 ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'value is 3rd');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
+ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'value is 3rd.');
 ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
 ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '17 word 3rd 17');

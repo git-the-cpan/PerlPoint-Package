@@ -1,78 +1,32 @@
-#!/usr/local/perl5.6/bin/perl -w
+#!/usr/bin/perl -w
 
 # = HISTORY SECTION =====================================================================
 
 # ---------------------------------------------------------------------------------------
 # version | date   | author   | changes
 # ---------------------------------------------------------------------------------------
-# 0.07    |16.06.01| JSTENZEL | simplified code pieces;
-#         |        | JSTENZEL | POD fix;
-# 0.06    |13.03.01| JSTENZEL | activated new backend process visualization;
-#         |  .03.01| JSTENZEL | adapted to new tag templates, added option -tagset;
-#         |08.04.01| JSTENZEL | removed option -allTags;
-#         |11.04.01| JSTENZEL | using new feature of predeclared variables;
-#         |16.04.01| JSTENZEL | avoiding paragraph prefix backslashes in examples;
-#         |        | JSTENZEL | avoiding paragraph prefix backslashes in inlined HTML
-#         |        |          | (if it is placed at the beginning of a paragraph);
-#         |19.04.01| JSTENZEL | added support for several pp2html tags: SECTIONREF,
-#         |        |          | PAGEREF, L and U;
-#         |20.04.01| JSTENZEL | multiline tags in examples handled correctly now;
-#         |22.04.01| JSTENZEL | like pp2html, pp2sdf now generates headline anchors
-#         |        |          | automatically;
-#         |        | JSTENZEL | improved SECTIONREF and PAGEREF support: these tags are
-#         |        |          | now translated into hypertext links to the referenced
-#         |        |          | chapters (SECTIONREF support is now equivalent to pp2html);
-#         |        | JSTENZEL | added support for more pp2html tags: A and XREF;
-#         |23.04.01| JSTENZEL | added support for nested title references;
-#         |10.06.01| JSTENZEL | modified namespace to avoid conflicts with active contents;
-#         |13.06.01| JSTENZEL | replaced still existing references to old namespace main::;
-# 0.05    |27.01.01| JSTENZEL | "}" characters outside verbatim blocks and embedded HTML
-#         |        |          | are now replaced by SDF escape "{{CHAR::rbrace}}" to guard
-#         |        |          | translations of things like "\B<{key=>value}>";
-#         |01.02.01| JSTENZEL | prefixing text paragraphs by a backslash now unless they
-#         |        |          | start with an SDF paragraph style keyword, to avoid
-#         |        |          | subsequent sdf error messages about unknown p. styles
-#         |        |          | in texts starting by "<word>:" (or sdf confusion if <word>
-#         |        |          | *is* a paragraph style marker in SDF but was not intended
-#         |        |          | this way in the PerlPoint text;
-#         |03.02.01| JSTENZEL | slight POD bugfix (head3);
-# 0.04    |21.12.00| JSTENZEL | using new active contents base data feature;
-#         |22.12.00| JSTENZEL | added SDF and HTML filters;
-#         |        | JSTENZEL | supports embedded HTML now;
-#         |27.12.00| JSTENZEL | new option "set" to pass user settings to the PerlPoint
-#         |        |          | parser;
-# 0.03    |07.12.00| JSTENZEL | new module namespace "PerlPoint";
-# 0.02    |28.11.00| JSTENZEL | "<" characters outside verbatim blocks are now replaced by
-#         |        |          | SDF escapes ({{CHAR:lt}}) to avoid SDF confusion assuming
-#         |        |          | phrases;
-# 0.01    |24.11.00| JSTENZEL | derived from my pp2pod demo script.
+# 0.01    |16.06.01| JSTENZEL | derived from my pp2sdf.
 # ---------------------------------------------------------------------------------------
 
 # = POD SECTION =========================================================================
 
 =head1 NAME
 
-B<pp2sdf> - translates PerlPoint to SDF
+B<pp2cppp> - translates PerlPoint to Clinton Pierce's Perl Projector
 
 =head1 VERSION
 
-This manual describes version B<0.07>.
+This manual describes version B<0.01>.
 
 =head1 DESCRIPTION
 
 This is a demonstration application of the PerlPoint package. It
-translates PerlPoint into SDF.
-
-SDF is, of course, no presentation format by itself. Nevertheless
-it I<is> useful as a target format because sdf can produce
-various other formats. Presentation formats are fine but often
-one wants to provide additional handouts, notes or a printed version.
-pp2sdf opens a simple way to do this.
-
+translates PerlPoint into Clinton Pierce's Perl Projector format
+(see ). In this documentation, I call this format "CPPP".
 
 =head1 SYNOPSIS
 
-pp2sdf [<options>] <PerlPoint sources>
+pp2cppp [<options>] <PerlPoint sources>
 
 =head2 Options
 
@@ -152,7 +106,7 @@ example, your PerlPoint code could contain a condition like
   ? 1
 
 . The special part enclosed by the two conditions would then be processed I<only> if you
-call B<pp2sdf> with
+call B<pp2cppp> with
 
   -set special
 
@@ -215,7 +169,7 @@ command line, but may be spread to several lines and extended by comment lines w
 with a "#" character. To mark an option file in the commandline, simply enter its (path and)
 name prededed by a "@" character, for example
 
-  pp2sdf @myOptions ppfile
+  pp2cppp @myOptions ppfile
 
   where the file myOptions could look like
 
@@ -230,10 +184,10 @@ the first time it is detected.
   -noinfo @moreOptions
 
 The script also takes care of I<default option files> which means that usual options can
-be stored in files named C<.pp2sdf>. If such a file is placed in the directory where the script itself
-resides, options in the file are read in automatically by all pp2sdf calls. These are global
+be stored in files named C<.pp2cppp>. If such a file is placed in the directory where the script itself
+resides, options in the file are read in automatically by all pp2cppp calls. These are global
 settings. If you place such a file in your home directory, it is read automatically as well
-but only if pp2sdf is called under your account, so this is for personal preferences.
+but only if pp2cppp is called under your account, so this is for personal preferences.
 
 A personal default option file overwrites global settings, and all default options are
 overwritten by options passed to the script call.
@@ -241,70 +195,23 @@ overwritten by options passed to the script call.
 
 =head1 SUPPORTED TAGS
 
-All supported tags are declared by B<PerlPoint::Tags::SDF>. Please see there for a
+All supported tags are declared by B<PerlPoint::Tags::CPPP>. Please see there for a
 complete list.
 
-B<pp2sdf> supports foreign tags like B<PAGEREF> and B<SECTIONREF> initially introduced
-by C<pp2html>. Support means that they are handled, but possibly different to the original
+B<pp2cppp> supports several foreign tags initially introduced by C<pp2html>.
+Support means that they are handled, but possibly different to the original
 handling:
 
 =over 4
 
-=item A
-
-Makes the body a named anchor.
-
- Example:
-
-  \A{name="an anchor"}<text> becomes "{{N[id="an anchor"]text}}".
-
-
 =item L
 
-The tag body is made a hyperlink to the URL passed bz the C<url> option.
+The tag body becomes plain text, followed by the URL in paranthesis.
 Any other options besides C<url> are ignored.
 
  Example:
 
-  \L{url=link}<Look there!> becomes "{{CMD[jump="link"]Look there!}}".
-
-
-=item PAGEREF
-
-The section title provided by the C<name> option is treated as the text to be displayed.
-This text is made a hyperlink to the referenced chapter.
-
- Example:
-
-  \PAGEREF{name=chapter} becomes "{{CMD[jump="#chapter"]chapter".
-
-B<pp2sdf> currently does not replace the title by chapter numbers as usually intended
-by a page reference. This might be improved by later versions.
-
-
-=item SECTIONREF
-
-The section title provided by the C<name> option is treated as the text to be displayed.
-This text is made a hyperlink to the referenced chapter.
-
- Example:
-
-  \SECTIONREF{name=chapter} becomes "{{CMD[jump="#chapter"]chapter".
-
-
-=item XREF
-
-The tag body is made a hyperlink to an internal target, usually declared by an \A tag or
-(implicitly) by a headline.
-
- Example:
-
-  Do not miss \XREF{name=chapter}<this>
-
-is translated into
-
- "Do not miss {{CMD[jump="#chapter"]this".
-
+  \L{url=link}<Look there!> becomes "Look there! (link)".
 
 =item U
 
@@ -312,7 +219,7 @@ Marks the body to be underlined
 
  Example:
 
-  \U<text> becomes "{{U:text}}".
+  \U<text> becomes "u<text>".
 
 
 =back
@@ -325,108 +232,46 @@ them in PerlPoint. Well, PerlPoint lets you embed target code very easily direct
 the PerlPoint script. Nevertheless, it is recommended to use native PerlPoint wherever
 possible ;-).
 
-Please note that embedded target code intended for certain translators like B<pp2sdf>
+Please note that embedded target code intended for certain translators like B<pp2cppp>
 may be B<I<ignored>> if the PerlPoint document is processed by I<other> translators.
-pp2html, for example, accepts embedded HTML but ignores embedded SDF.
+pp2html, for example, accepts embedded HTML but ignores embedded CPPP.
 
-=head2 Embedding SDF
+=head2 Embedding CPPP
 
-Just use the B<\EMBED> and B<\END_EMBED> tags to place native SDF if really
+Just use the B<\EMBED> and B<\END_EMBED> tags to place native CPPP if really
 necessary:
 
   This is \I<PerlPoint> with embedded
-  \EMBED{lang=sdf}{{B:SDF}}\END_EMBED.
+  \EMBED{lang=cppp}{{B:CPPP}}\END_EMBED.
 
-  \EMBED{lang=sdf}
+  \EMBED{lang=cppp}
 
-  H2: An SDF chapter
+  =t An CPPP chapter
 
-  Note: An SDF note.
-
-  \END_EMBED
-
-You may as well I<include> complete SDF files by B<\INCLUDE>.
-
-  \INLUDE{type=sdf file="snippet.sdf"}
-
-
-=head2 Embedding HTML
-
-is as easy as embedding SDF directly. It is, of course, only useful if you plan
-to transform your presentation to an HTML page via SDF. You can embed complete
-HTML sections:
-
-  \EMBED{lang=html}
-
-  <h1>An HTML chapter</h1>
-
-  <p>
-  This was written in <i>HTML</i>.
+  =comment A CPPP comment.
 
   \END_EMBED
 
-This way B<pp2sdf> will produce SDF inline blocks like this:
+You may as well I<include> complete CPPP files by B<\INCLUDE>.
 
-  !block inline
-
-  <h1>An HTML chapter</h1>
-
-  <p>
-  This was written in <i>HTML</i>.
-
-  !endblock
-
-Further proceeding is up to sdf, so please refer to the SDF manuals for details.
-
-Alternatively, you may choose to embed HTML directly into a PerlPoint paragraph:
-
-  This is \I<PerlPoint> with embedded
-  \EMBED{lang=html}<b>HTML</b>\END_EMBED.
-
-This will be translated into an SDF inline I<phrase>:
-
-  This is {{I:PerlPoint}} with embedded {{INLINE:<b>HTML</b>}}.
-
-Please note that for unknown reasons SDF processes POD tags in inlined I<phrases> (even
-if it was not intended to use POD). In the example above, this causes a wrong result
-because an C<L> tag is assumed. This is currently a feature of sdf, not pp2sdf.
-
-HTML code can be embedded by complete I<files> as well, of course:
-
-  \INLUDE{type=html file="snippet.html"}
+  \INLUDE{type=cppp file="snippet.cppp"}
 
 
 =head2 Embedding other languages
 
-B<pp2sdf> will ignore any other embedded or included target language than SDF and HTML.
-
-
-=head1 HYPERLINKS
-
-Each headline is implicitly made an anchor named like the headline itself. For example,
-
- =Headline level 1
-
-is converted into
-
- H1[id="Headline level 1"]Headline level 1
-
-, making it easy to set links to certain headlines which is usually done by using the
-C<PAGEREF>, C<SECTIONREF> and C<XREF> tags.
-
-Anchors can be set explicitly as well. Please have a look at the description of the \A tag.
+B<pp2cppp> will ignore any other embedded or included target language than CPPP.
 
 
 =head1 PREDECLARED VARIABLES
 
-B<pp2sdf> predeclares several variables which can be used like any user defined PerlPoint
+B<pp2cppp> predeclares several variables which can be used like any user defined PerlPoint
 variable.
 
 =over 4
 
 =item CONVERTER_NAME
 
-The name of the converter currently processing the document ("pp2sdf").
+The name of the converter currently processing the document ("pp2cppp").
 
 =item CONVERTER_VERSION
 
@@ -451,73 +296,19 @@ are described with this option.
 
 =head1 NOTES
 
-=head2 The generated SDF is not handcrafted
-
-As B<pp2sdf> is a generator. It produces another kind of SDF than a human
-would write because its target is to make a file which can be processed
-by sdf without problems. Nevertheless, in most cases it should be simple
-to manually modify the results if necessary.
-
-=head2 Paragraph styles
-
-SDF markes paragraphs types by special prefixes followed by a colon, like in
-
- Note: Think twice.
-
-Now, authors of a PerlPoint document may start a text paragraph the same way,
-by a word and a colon, without thinking of SDF. If this would be plainly
-translated SDF could be confused (it may take words as paragraph style markers
-which were not intended to be this, or mention an unknown paragraph style
-and return an error code). That is why all text paragraphs in the generated
-SDF document are preceded by a backslash, except if they begin with "Note"
-or "Sign" because in these cases the special SDF formatting makes sense.
-Backslash prefixes are avoided as well if the paragraph starts with an SDF
-tag or inlined HTML.
-
-
-=head2 SDF does only support six headline levels
-
-While the headline level in PerlPoint is unlimited in depth, that is not the case
-in SDF. The sdf translator will warn you if such a headline level is detected.
-
-=head2 SDF phrases are not disabled
-
-SDF recognizes POD tags like I, B and C. If a string looks like such a tag, sdf
-tries to evaluate it the tag way. This should be suppressed.
-
-=head2 Foreign PerlPoint tags might cause confusion
-
 PerlPoint allows to process a document by all of its converters. Nevertheless,
 possibly several foreign tags might produce unexpected results.
-
-=head2 Multiline tags in examples are handled correctly
-
-While PerlPoint allows you to open a tag in a line and close it in a subsequent
-line even in examples, SDF requests a tag to be closed at the opening line. This
-means it is correct PerlPoint to write
-
-  My tag \I<encloses
-  line breaks>.
-
-but it needs to be transformed into the quiet differently structured
-
-  E: My tag {{I:encloses}}
-  E: {{I:line breaks}}.
-
-which is automatically arranged by \B<pp2sdf> for the PerlPoint tags \B, \C, \E,
-\I and \U. (These are the supported tags with bodies. \L, because of its special
-transformation, does not need to be handled this way.)
 
 
 =head1 FILES
 
-B<pp2sdf> activates the PerlPoint parser cache to accelerate repeated translations.
+B<pp2cppp> activates the PerlPoint parser cache to accelerate repeated translations.
 Because of this the usual PerlPoint parser cache files will be written next the
 parsed sources (as ".<source file name>.ppcache" in the source directory).
 
 =head1 SEE ALSO
 
-PerlPoint::Tags::SDF
+PerlPoint::Tags::CPPP
 
 PerlPoint::Parser
 
@@ -565,10 +356,10 @@ distribution for more details.
 =cut
 
 # declare script package
-package PerlPoint::Converter::pp2sdf;
+package PerlPoint::Converter::pp2cppp;
 
 # declare version
-$VERSION=$VERSION=0.07;
+$VERSION=$VERSION=0.01;
 
 # pragmata
 use strict;
@@ -581,29 +372,22 @@ use File::Basename;
 use PerlPoint::Tags;
 use PerlPoint::Backend;
 use PerlPoint::Constants;
-use PerlPoint::Tags::SDF;
-use PerlPoint::Parser 0.34;
+use PerlPoint::Tags::CPPP;
+use PerlPoint::Parser 0.35;
 use Getopt::ArgvFile qw(argvFile);
 
 
 # declare variables
 my (
-    $htmlBuffer,                # intermediate buffer for embedded HTML;
-
     @streamData,                # PerlPoint stream;
     @openLists,
     @openTags,                  # a buffer used to autoclose / autoopen tags exceeding example lines;
-    @headlinePath,              # composite headline (consisting of all hierarchy levels)
 
-    %flags,
+    %flags,                     # flag hash;
     %options,                   # option hash;
     %table,                     # a table buffer
     %tagHash,                   # accepted PerlPoint tags;
    );
-
-# precompile a pattern describing accepted SDF paragraph style markers
-my $paragraphStyles=qr(^(Note|Sign)$);
-
 
 # resolve option files
 argvFile(default=>1, home=>1);
@@ -632,7 +416,7 @@ $options{trace}=$ENV{SCRIPTDEBUG} if not exists $options{trace} and exists $ENV{
 warn "\n",
      basename($0), ' ',
      do {no strict 'refs'; ${join('::', __PACKAGE__, 'VERSION')}},
-     ", (c) J. Stenzel (perl\@jochen-stenzel.de) 2000, 2001. \n\n"
+     ", (c) J. Stenzel (perl\@jochen-stenzel.de) 2001. \n\n"
   unless exists $options{nocopyright};
 
 # check for a help request
@@ -647,17 +431,15 @@ die "[Fatal] Usage: $0 [<options>] <PerlPoint source(s)>\n" unless @ARGV>=1;
 # import tags
 PerlPoint::Tags::addTagSets(@{$options{tagset}}) if exists $options{tagset};
 
-# declare list of accepted tag openers (pass SDF translations where appropriate)
+# tag translation table
 %tagHash=(
           # base
-	  B     => 'B',
-	  C     => 'EX',
-	  E     => 'E',
-	  I     => 'I',
-	  IMAGE => 1,
+	  B     => 'u',
+	  C     => 'u',
+	  I     => 'u',
 
           # imported tags
-          U     => 'U',
+          U     => 'u',
 	 );
 
 # build parser
@@ -685,11 +467,11 @@ $parser->run(
              tags            => \%tagHash,
              files           => \@ARGV,
 
-             filter          => 'perl|sdf|html',
+             filter          => 'perl|cppp',
 
              safe            => exists $options{activeContents} ? $safe : undef,
              activeBaseData  => {
-                                 targetLanguage => 'SDF',
+                                 targetLanguage => 'CPPP',
                                  userSettings   => {map {$_=>1} exists $options{set} ? @{$options{set}} : ()},
                                 },
 
@@ -714,7 +496,7 @@ $parser->run(
 
 # build a backend
 my $backend=new PerlPoint::Backend(
-                                   name    => 'pp2sdf',
+                                   name    => 'pp2cppp',
                                    display =>   DISPLAY_ALL
                                               + (exists $options{noinfo} ? DISPLAY_NOINFO : 0)
                                               + (exists $options{nowarn} ? DISPLAY_NOWARN : 0),
@@ -742,7 +524,7 @@ $backend->register($_, \&handleListShift) foreach (DIRECTIVE_LIST_LSHIFT, DIRECT
 
 
 # init several variables
-@flags{qw(listlevel html textstart headline)}=(1, 0, 0, 0);
+@flags{qw(listlevel textstart headline)}=(1, 0, 0, 0);
 
 # and run it
 $backend->run(\@streamData);
@@ -758,45 +540,20 @@ sub handleSimple
 
   @contents=map
              {
-              # guard translations of things like "\B<{key=>value}>";
-              s/\}/{{CHAR:rbrace}}/g;
-
               # complete block lines as necessary
               if ($flags{block})
                 {
-                 if (@openTags)
-                   {
-                    # reopen automatically closed tags, if any
-                    if ($flags{openTags} and /\S/)
-                      {
-                       my $opener=join('', map {"{{$_:"} @openTags);
-                       s/^(\s*)/$opener$1/;
-                       $flags{openTags}=0;
-                      }
-
-                    # handle line breaks: automatically close open tags, if necessary, and start lines by a prefix
-                    if (/\n/)
-                      {
-                       my $trailer='}}' x @openTags;
-                       s/\n/$trailer\n$flags{block}/;
-                       $flags{openTags}=1;
-                      }
-                   }
-                 else
-                   {
-                    # no open tag: simply add the correct intro
-                    s/\n/\n$flags{block}/;
-                   }
+                 # no open tag: simply add the correct intro
+                 s/\n/\n\t/;
                 }
+
+              # supply result
               $_;
              } @contents;
 
   # prepare beginning of text blocks if necessary
   if ($flags{textstart})
     {
-     # avoid special SDF interpretations
-     unshift(@contents, '\\') unless $contents[0]=~/^$paragraphStyles/;
-
      # reset flag
      $flags{textstart}=0;
     }
@@ -818,7 +575,7 @@ sub handleHeadline
   if ($mode==DIRECTIVE_START)
     {
      # open headline
-     print "H$level\[id=\"";
+     print "\n=t ";
 
      # mark that we process a headline now
      $flags{headlineString}='';
@@ -826,12 +583,9 @@ sub handleHeadline
     }
   else
     {
-     # update headline path
-     $headlinePath[$level]=$flags{headlineString};
+     # complete headline
+     print "\n";
 
-     # complete headline, including an additional composite anchor
-     print("\"]{{N[id=\"", join('|', @headlinePath[1..$level]), "\"]$flags{headlineString}}}\n\n");
-     
      # reset flags
      $flags{headlineString}='';
      $flags{headline}=0;
@@ -848,8 +602,8 @@ sub handleText
   my ($opcode, $mode)=@_;
 
   # act mode dependend
-  $flags{textstart}=1 if $_[1]==DIRECTIVE_START;
-  print "\n\n" if $_[1]==DIRECTIVE_COMPLETE;
+  $flags{textstart}=1, print "=i " if $_[1]==DIRECTIVE_START;
+  print "\n" if $_[1]==DIRECTIVE_COMPLETE;
  }
 
 # tags
@@ -864,9 +618,8 @@ sub handleTag
   # handle image tags a special way
   if ($tag eq 'IMAGE')
     {
-     # compose an SDF image macro
-     my @image=fileparse($settings->{src});
-     present(qq(\n\n!import "$image[0]"; ), $image[1] ? qq(base="$image[1]"; ) : '', join('; ', map {join('=', $_, map {/\s/ ? "\"$_\"" : $_} ucfirst(lc($settings->{$_})))} grep(lc($_) ne 'src', keys %$settings)), "\n\n") if $mode==DIRECTIVE_START;
+     # compose an CPPP image macro
+     present(qq(=g $settings->{src}\n)) if $mode==DIRECTIVE_START;
 
      # ok, well done
      return(1);
@@ -887,28 +640,9 @@ sub handleTag
         my $rowNr=0;
         $rowNr>=@$_ or $rowNr=@$_ for (@{$table{rows}});
 
-        # open table
-        print "\n\n!block table; noheadings\n";
-        print join(';', map {"c$_";} (1..$rowNr)), "\n";
-
-        foreach my $row (@{$table{rows}})
-          {
-           print join(';', map {
-                                # remove laeding and trailing whitespaces
-                                s/^\s+//;
-                                s/\s+$//;
-                                s/^(\{\{\w:)\s+/$1/;
-                                s/\s+(\}\})$/$1/;
-                                s/\}{3}$/\} \}\}/;
-
-                                # supply cell contents
-                                $_;
-                               } @$row
-                     ), "\n";
-          }
-
-        # close table
-        print "\n!endblock\n\n";
+        # print table
+        print "=table $rowNr;;;;;\n";
+        print join(';;;;;', @$_), "\n" foreach (@{$table{rows}});
 
         # clean up
         %table=();
@@ -936,80 +670,7 @@ sub handleTag
   elsif ($tag eq 'TABLE_HL')
     {
      # act mode dependend
-     push(@{$table{rows}[-1]}, '{{B:') if $mode==DIRECTIVE_START;
-     $table{rows}[-1][-1].='}}'        if $mode==DIRECTIVE_COMPLETE;
-
-     # ok, well done
-     return(1);
-    }
-  elsif ($tag eq 'EMBED' and $settings->{lang}=~/^html$/i)
-    {
-     # act mode dependend
-     if ($mode==DIRECTIVE_START)
-       {
-        # flag that we are within embedded HTML
-        $flags{html}=1;
-
-        # reset text start flag (otherwise, the inlined HTML would be prefixed by a backslash if placed
-        # at the beginning of a paragraph)
-        $flags{textstart}=0;
-       }
-     else
-       {
-        # flag that embedded HTML is now buffered completely
-        $flags{html}++;
-
-        # complete SDF inlining
-        present(
-                $htmlBuffer=~/\n/ ? "\n!block inline\n" : "{{INLINE:",
-                $htmlBuffer,
-                $htmlBuffer=~/\n/ ? "\n!endblock\n"     : "}}",
-               );
-
-        # flag that embedded HTML is completed
-        $flags{html}=0;
-
-        # clean up HTML buffer
-        $htmlBuffer='';
-       }
-
-     # ok, well done
-     return(1);
-    }
-  elsif ($tag eq 'SECTIONREF' or $tag eq 'PAGEREF')
-    {
-     # These tags do not have a body, so we can ignore the closing directive.
-     # The displayed text is the *final* part of the anchor name (which can be hierarchical).
-     if ($mode==DIRECTIVE_START)
-       {
-	my $target=$settings->{name};
-	$target=~s/\s*\|\s*/\|/g;
-	present("{{CMD[jump=\"#$target\"]", (reverse split(/\|/, $target))[0], "}}");
-       }
-
-     # ok, well done
-     return(1);
-    }
-  elsif ($tag eq 'XREF')
-    {
-     # act mode dependend
-     if ($mode==DIRECTIVE_START)
-       {
-	my $target=$settings->{name};
-	$target=~s/\s*\|\s*/\|/g;
-	present("{{CMD[jump=\"#$target\"]");
-       }
-     else
-       {present("}}");}
-
-     # ok, well done
-     return(1);
-    }
-  elsif ($tag eq 'A')
-    {
-     # act mode dependend
-     present("{{N[id=\"$settings->{name}\"]") if $mode==DIRECTIVE_START;
-     present("}}") if $mode==DIRECTIVE_COMPLETE;
+     push(@{$table{rows}[-1]}, '') if $mode==DIRECTIVE_START;
 
      # ok, well done
      return(1);
@@ -1017,26 +678,24 @@ sub handleTag
   elsif ($tag eq 'L')
     {
      # act mode dependend (we only need to add a "suffix" to the body)
-     present("{{CMD[jump=\"$settings->{url}\"]") if $mode==DIRECTIVE_START;
-     present("}}") if $mode==DIRECTIVE_COMPLETE;
-#     present(" ({{URL:$settings->{url}}})") if $mode==DIRECTIVE_COMPLETE;
+     present(" ($settings->{url})") if $mode==DIRECTIVE_COMPLETE;
 
      # ok, well done
      return(1);
     }
 
-  # act mode dependend
+  # translatable tags: act mode dependend
   if ($mode==DIRECTIVE_START and exists $tagHash{$tag})
     {
-     # open the SDF tag
-     present("{{$tagHash{$tag}:");
+     # open the CPPP tag
+     present("$tagHash{$tag}<");
      # remember this opened tag if we are in an example
      push(@openTags, $tagHash{$tag}) if $flags{block};
     }
   if ($mode==DIRECTIVE_COMPLETE and exists $tagHash{$tag})
     {
-     # close SDF tag
-     present('}}');
+     # close CPPP tag
+     present('>');
      # update opened tag hints if we are in an example
      pop(@openTags) if $flags{block};
     }
@@ -1049,15 +708,15 @@ sub handleBlock
   my ($opcode, $mode)=@_;
 
   # update global flag
-  $flags{block}=$opcode==DIRECTIVE_VERBATIM ? '>' : 'E: ' if $mode==DIRECTIVE_START;
-  $flags{block}=0 if $mode==DIRECTIVE_COMPLETE;
+  $flags{block}="\t" if $mode==DIRECTIVE_START;
+  $flags{block}=0    if $mode==DIRECTIVE_COMPLETE;
 
   # reset flag (if necessary)
   $flags{textstart}=0;
 
-  # prepare or complete the SDF block
-  print "\n\n$flags{block}" if $mode==DIRECTIVE_START;
-  print "\n\n" if $mode==DIRECTIVE_COMPLETE;
+  # prepare or complete the CPPP block
+  print "$flags{block}" if $mode==DIRECTIVE_START;
+  print "\n"            if $mode==DIRECTIVE_COMPLETE;
  }
 
 # list
@@ -1100,12 +759,12 @@ sub handleListPoint
   # act list and mode dependend
   if ($mode==DIRECTIVE_START)
     {
-     print STDOUT '*' x $flags{listlevel}, ' ' if $opcode==DIRECTIVE_UPOINT or $opcode==DIRECTIVE_DPOINT;
+     print STDOUT '=i', $flags{listlevel}>1 ? $flags{listlevel} : (), ' ' if $opcode==DIRECTIVE_UPOINT or $opcode==DIRECTIVE_DPOINT;
      print STDOUT scalar($flags{listpoints}==1 ? '^' : '+') x $flags{listlevel}, ' ' if $opcode==DIRECTIVE_OPOINT;
     }
   else
     {
-     print "\n\n";
+     print "\n";
     }
  }
 
@@ -1126,7 +785,7 @@ sub handleComment
   my ($opcode, $mode)=@_;
 
   # act list and mode dependend
-  print "# " if $mode==DIRECTIVE_START;
+  print "=comment " if $mode==DIRECTIVE_START;
   print "\n" if $mode==DIRECTIVE_COMPLETE;
  }
 
@@ -1137,14 +796,8 @@ sub present
   # build a string
   my $string=join('', @_);
 
-  # replace characters which may confuse sdf
-  unless (($flags{block} and $flags{block} eq '>') or $flags{html})
-    {$string=~s/</{{CHAR:lt}}/g;}
-
   # present result
-  if ($flags{html}==1)
-    {$htmlBuffer.=$string;}
-  elsif (%table)
+  if (%table)
     {$table{rows}[-1][-1].=$string;}
   else
     {print $string;}

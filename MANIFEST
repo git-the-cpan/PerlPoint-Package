@@ -12,13 +12,22 @@ lib/PerlPoint/Constants.pm
 lib/PerlPoint/Parser.pm
 lib/PerlPoint/Tags.pm
 lib/PerlPoint/Tags/Basic.pm
+lib/PerlPoint/Tags/CPPP.pm
 lib/PerlPoint/Tags/SDF.pm
 
 demo/.pp2sdf
+demo/pp2cppp
 demo/pp2pod
 demo/pp2pp
 demo/pp2sdf
 demo/pp2tree
+
+doc/getting-started.pp
+doc/getting-started.pod
+
+doc/writing-converters.pp
+doc/pp-src-stream-e.png
+doc/pp-stream-result-e.png
 
 doc/doc-functions.pp
 
@@ -41,6 +50,7 @@ doc/tags/tag-C.pp
 doc/tags/tag-I.pp
 doc/tags/tag-IMAGE.pp
 doc/tags/tag-READY.pp
+doc/tags/tag-TABLE.pp
 
 t/PerlPoint/Tags/_macros.pm
 t/PerlPoint/Tags/_tags.pm

@@ -12,8 +12,6 @@ The \B<\\READY> tag instructs PerlPoint to ignore remaining parts of a document.
 
 \B<Options>
 
-\B<Options>
-
 No options are allowed. Used options will not be recognized as belonging to this tag.
 
 \B<Body>

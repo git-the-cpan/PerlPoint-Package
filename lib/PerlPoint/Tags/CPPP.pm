@@ -5,28 +5,27 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
-# 0.02    |16.06.2001| JSTENZEL | namespace bugfix;
-# 0.01    |31.03.2001| JSTENZEL | new.
+# 0.01    |16.06.2001| JSTENZEL | new.
 # ---------------------------------------------------------------------------------------
 
 # = POD SECTION =========================================================================
 
 =head1 NAME
 
-B<PerlPoint::Tags::SDF> - PerlPoint tag set used by pp2sdf
+B<PerlPoint::Tags::CPPP> - PerlPoint tag set used by pp2cppp
 
 =head1 VERSION
 
-This manual describes version B<0.02>.
+This manual describes version B<0.01>.
 
 =head1 SYNOPSIS
 
-  # declare tags used by pp2sdf
-  use PerlPoint::Tags::SDF;
+  # declare tags used by pp2cppp
+  use PerlPoint::Tags::CPPP;
 
 =head1 DESCRIPTION
 
-This module declares PerlPoint tags used by C<pp2sdf>. Tag declarations
+This module declares PerlPoint tags used by C<pp2cppp>. Tag declarations
 are used by the parser to determine if a used tag is valid, if it needs
 options, if it needs a body and so on. Please see \B<PerlPoint::Tags>
 for a detailed description of tag declaration.
@@ -36,7 +35,7 @@ can declare this by using the module in the scope where it built the
 parser object.
 
   # declare basic tags
-  use PerlPoint::Tags::SDF;
+  use PerlPoint::Tags::CPPP;
 
   # load parser module
   use PerlPoint::Parser;
@@ -51,11 +50,11 @@ parser object.
 
 =head1 TAGS
 
-B<PerlPoint::Tags::SDF> declares all the tags of B<PerlPoint::Tags::Basic>.
+B<PerlPoint::Tags::CPPP> declares all the tags of B<PerlPoint::Tags::Basic>.
 
-Additionally, the B<PerlPoint::Tags::HTML> tags C<A>, C<L>, C<PAGEREF>,
-C<SECTIONREF>, C<U> and C<XREF> tags are supported. C<pp2sdf> might interprete them
-slightly different to C<pp2html>, please read its documentation for details.
+Additionally, the B<PerlPoint::Tags::HTML> tags C<L> and C<U> are supported.
+C<pp2cppp> might interprete them slightly different to C<pp2html>, please
+read its documentation for details.
 
 =head1 TAG SETS
 
@@ -70,10 +69,10 @@ require 5.00503;
 # = PACKAGE SECTION (internal helper package) ==========================================
 
 # declare package
-package PerlPoint::Tags::SDF;
+package PerlPoint::Tags::CPPP;
 
 # declare package version (as a STRING!!)
-$VERSION="0.02";
+$VERSION="0.01";
 
 # declare base "class"
 use base qw(PerlPoint::Tags);
@@ -87,9 +86,9 @@ use vars qw(%tags %sets);
 
 # = LIBRARY SECTION ======================================================================
 
-# declare tags - just combining other declarations
+# declare tags - slightly extending the basic set
 use PerlPoint::Tags::Basic;
-use PerlPoint::Tags::HTML qw(A L PAGEREF SECTIONREF U XREF);
+use PerlPoint::Tags::HTML qw(L U);
 
 1;
 
@@ -108,11 +107,11 @@ The tag declaration base "class".
 
 =item B<PerlPoint::Tags::Basic>
 
-Basic tags imported by B<PerlPoint::Tags::SDF>.
+Basic tags imported by B<PerlPoint::Tags::CPPP>.
 
 =item PerlPoint::Tags::HTML
 
-which declares the original C<A>, C<L>, C<PAGEREF>, C<SECTIONREF>, C<U> and C<XREF> tags.
+which declares the original C<L> and C<U> tags.
 
 =back
 

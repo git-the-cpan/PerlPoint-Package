@@ -5,6 +5,12 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.02    |22.07.2001| JSTENZEL | To make PerlPoint available under perl 5.005 which
+#         |          |          | is still widely used, I added a hint to include this
+#         |          |          | module under perl 5.005 (perl 5.6 loads parent modules
+#         |          |          | automatically). Further more, because explicit loading
+#         |          |          | causes a perl warning, code was added to suppress these
+#         |          |          | messages by additional but useless assignments.
 # 0.01    |19.03.2001| JSTENZEL | new.
 # ---------------------------------------------------------------------------------------
 
@@ -16,7 +22,7 @@ B<PerlPoint::Tags::Basic> - processes PerlPoint tag declarations
 
 =head1 VERSION
 
-This manual describes version B<0.01>.
+This manual describes version B<0.02>.
 
 =head1 SYNOPSIS
 
@@ -173,7 +179,9 @@ performed quickly.
 
 Now, in a translator software where a parser object should be built, tag
 declarations can be accessed by simply loading the declaration modules,
-just as usual (there is no need to load B<PerlPoint::Tags> directly there):
+just as usual (there is no need to load B<PerlPoint::Tags> directly there,
+unless the converter should run under perl 5.005 which I<needs> this
+parent module to be loaded explicitly (while perl 5.6 does is implicitly)):
 
   # declare all the tags to recognize
   use PerlPoint::Tags::New;
@@ -292,7 +300,7 @@ require 5.00503;
 package PerlPoint::Tags;
 
 # declare package version (as a STRING!!)
-$VERSION="0.01";
+$VERSION="0.02";
 
 
 
@@ -322,6 +330,10 @@ sub import
   # build shortcuts
   {
    no strict qw(refs);
+   $tags=\%{join('::', $class, 'tags')};
+   $sets=\%{join('::', $class, 'sets')};
+
+   # next lines only added to avoid perl warnings (which cannot be switched off)
    $tags=\%{join('::', $class, 'tags')};
    $sets=\%{join('::', $class, 'sets')};
   }

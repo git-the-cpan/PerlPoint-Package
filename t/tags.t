@@ -5,6 +5,7 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.09    |22.07.2001| JSTENZEL | adapted to perl 5.005;
 # 0.08    |20.03.2001| JSTENZEL | adapted to tag templates;
 #         |23.03.2001| JSTENZEL | adapted to by line lexing of verbatim blocks;
 #         |24.05.2001| JSTENZEL | adapted to paragraph reformatting: text paragraphs
@@ -34,6 +35,7 @@ use PerlPoint::Constants;
 
 # declare test tags
 use lib qw(t);
+use PerlPoint::Tags;
 use PerlPoint::Tags::_tags;
 
 # prepare tests

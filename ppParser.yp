@@ -14,6 +14,12 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.35    |16.06.2001| JSTENZEL | text paragraphs containing an image only are now
+#         |          |          | transformed into just the image;
+#         |22.07.2001| JSTENZEL | in order to make it run under 5.005 again, a pseudo
+#         |          |          | hash was replaced by a pure and simple standard hash;
+#         |22.07.2001| JSTENZEL | improved the "specials" pattern in lexer() by guarding "-";
+#         |23.07.2001| JSTENZEL | opening input files in binmode() for Windows compatibility;
 # 0.34    |14.03.2001| JSTENZEL | added parsing time report;
 #         |          | JSTENZEL | slight code optimizations;
 #         |20.03.2001| JSTENZEL | introduced tag templates declared via PerlPoint::Tags:
@@ -313,7 +319,7 @@ B<PerlPoint::Parser> - a PerlPoint Parser
 
 =head1 VERSION
 
-This manual describes version B<0.34>.
+This manual describes version B<0.35>.
 
 =head1 SYNOPSIS
 
@@ -1150,7 +1156,7 @@ B<Example:>
  require 5.00503;
 
  # declare module version
- $PerlPoint::Parser::VERSION=0.34;
+ $PerlPoint::Parser::VERSION=0.35;
  $PerlPoint::Parser::VERSION=$PerlPoint::Parser::VERSION; # to suppress a warning of exclusive usage only;
 
  # pragmata
@@ -1339,12 +1345,12 @@ paragraph : headline
                    # starting with a table tag?
                        ref($_[1][0][1]) eq 'ARRAY'
                    and $_[1][0][1][0]==DIRECTIVE_TAG
-                   and $_[1][0][1][2] eq 'TABLE'
+                   and $_[1][0][1][2]=~/^(IMAGE|TABLE)$/
 
                    # ending with a table tag?
                    and ref($_[1][0][-2]) eq 'ARRAY'
                    and $_[1][0][-2][0]==DIRECTIVE_TAG
-                   and $_[1][0][-2][2] eq 'TABLE'
+                   and $_[1][0][-2][2] eq $1
 
                    # both covering the same table?
                    and $_[1][0][-2][3] eq $_[1][0][1][3]
@@ -2936,6 +2942,7 @@ included : Include
                              );
                       close($inHandle);
                       open($inHandle, $tagpars{file});
+                      binmode($inHandle);
                       $_[0]->{USER}->{INPUT}='';
                       $sourceFile=$tagpars{file};
                       $lineNrs{$inHandle}=0;
@@ -3298,6 +3305,7 @@ sub lexer
              close($inHandle);
              $inHandle=new IO::File;
              open($inHandle, $sourceFile);
+             binmode($inHandle);
              seek($inHandle, $helper1, 0);
 
              # switch back to envelopes input stack
@@ -3716,12 +3724,13 @@ sub lexer
        {
         # build set of characters to be special
         my %translator;
-        @translator{'colon', 'number'}=(':', '0-9');
-        my $special=join('', '([', '\n\\\\', (map {exists $translator{$_} ? $translator{$_} : $_} grep(($specials{$_} and (length==1 or exists $translator{$_})), keys %specials)), '])');
+        @translator{'colon', 'number', '-'}=(':', '0-9', '\-');
+        my $special=join('', '([', (map {exists $translator{$_} ? $translator{$_} : $_} grep(($specials{$_} and (length==1 or exists $translator{$_})), keys %specials)), '\n\\\\', '])');
         $special=join('', $special, '|(', $tableSeparatorStack[0][0], ')|(', $tableSeparatorStack[0][1], ')') if @tableSeparatorStack;
 
         # reply next token: scan for word or single character (declared as "Word" as well)
         # warn("~~~~~~~~~> $special\n");
+        # warn("---------> $_\n");
         $found=$1, s/^\Q$1//,
         # warn("=====> $found\n"),
         (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Word \"$found\" in line $lineNrs{$inHandle}.\n")),
@@ -4435,7 +4444,7 @@ sub run
      exists $pars{cache} ? $pars{cache} : CACHE_OFF,                             #  8
      0,                                                                          #  9
      exists $pars{vispro} ? $pars{vispro} : 0,                                   # 10
-     exists $pars{activeBaseData} ? fields::phash(%{$pars{activeBaseData}}) : 0, # 11
+     exists $pars{activeBaseData} ? $pars{activeBaseData} : 0,                   # 11
      exists $pars{activeDataInit} ? $pars{activeDataInit} : 0,                   # 12
      exists $pars{nestedTables} ? $pars{nestedTables} : 0,                       # 13
      0,                                                                          # 14
@@ -4537,6 +4546,7 @@ EOC
 
      # open file and make the new handle the parsers input
      open($inHandle, $file) or confess("[Fatal] Could not open input file $file.\n");
+     binmode($inHandle);
 
      # store the filename in the list of opened sources, to avoid circular reopening
      # (it would be more perfect to store the complete path, is there a module for this?)
@@ -4560,7 +4570,7 @@ EOC
         # clean up old format caches
         unless (
                     exists $checksums->{sha1_base64('version')}
-                and $checksums->{sha1_base64('version')}>=$PerlPoint::Parser::VERSION
+                and $checksums->{sha1_base64('version')}>=0.34
 
                 and exists $checksums->{sha1_base64('constants')}
                 and $checksums->{sha1_base64('constants')}==$PerlPoint::Constants::VERSION

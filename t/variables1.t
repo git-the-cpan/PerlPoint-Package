@@ -5,6 +5,7 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.08    |22.07.2001| JSTENZEL | adapted to improved lexer;
 # 0.07    |20.03.2001| JSTENZEL | adapted to tag templates;
 #         |23.03.2001| JSTENZEL | adapted to by line lexing of verbatim blocks;
 #         |12.04.2001| JSTENZEL | added tests of predeclared variables;
@@ -36,7 +37,7 @@ use PerlPoint::Parser 0.34;
 use PerlPoint::Constants 0.11;
 
 # prepare tests
-BEGIN {plan tests=>298;}
+BEGIN {plan tests=>295;}
 
 # declare variables
 my (@streamData, @results);
@@ -273,8 +274,7 @@ ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '17 word 3rd
 ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 
 ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Predeclared were several variables');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
+ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Predeclared were several variables.');
 ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 
 ok(shift(@results), $_) foreach (DIRECTIVE_DOCUMENT, DIRECTIVE_COMPLETE, 'variables.pp');

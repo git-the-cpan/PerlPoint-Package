@@ -5,6 +5,7 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.05    |22.07.2001| JSTENZEL | adapted to perl 5.005;
 # 0.04    |20.03.2001| JSTENZEL | adapted to tag templates;
 #         |24.05.2001| JSTENZEL | adapted to paragraph reformatting: text paragraphs
 #         |          |          | no longer contain a final whitespace string;
@@ -32,6 +33,7 @@ use PerlPoint::Constants;
 
 # declare test tags
 use lib qw(t);
+use PerlPoint::Tags;
 use PerlPoint::Tags::_macros;
 
 # prepare tests

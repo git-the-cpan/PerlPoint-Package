@@ -5,6 +5,7 @@
 # ---------------------------------------------------------------------------------------
 # version | date   | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.05    |24.07.01| JSTENZEL | now adds additional lines to complete examples;
 # 0.04    |26.03.01| JSTENZEL | adapted to new tag templates;
 #         |10.06.01| JSTENZEL | new script namespace "PerlPoint::Converter::pp2pod";
 #         |        | JSTENZEL | more tag adaptations;
@@ -21,7 +22,7 @@ B<pp2pod> - a Perl Point demo translator to POD
 
 =head1 VERSION
 
-This manual describes version B<0.04>.
+This manual describes version B<0.05>.
 
 =head1 DESCRIPTION
 
@@ -57,7 +58,7 @@ Copyright (c) Jochen Stenzel (perl@jochen-stenzel.de), 2000. All rights reserved
 package PerlPoint::Converter::pp2pod;
 
 # declare version
-$VERSION=$VERSION=0.04;
+$VERSION=$VERSION=0.05;
 
 # pragmata
 use strict;
@@ -135,6 +136,9 @@ sub handleSimple
 
   # simply print the token
   print @contents;
+
+  # in case of an example, add additional lines to complete it
+  print "\n\n" if $mode==DIRECTIVE_COMPLETE and ($opcode==DIRECTIVE_BLOCK or $opcode==DIRECTIVE_VERBATIM)
  }
 
 # headlines
