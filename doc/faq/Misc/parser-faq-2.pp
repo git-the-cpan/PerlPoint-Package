@@ -3,7 +3,7 @@
 
 \BU<Question:>
 
-I used tags in an example and not it's difficult to find the correct line indentation.
+I used tags in an example and now it's difficult to find the correct line indentation.
 The result looks like
 
   %hash=(

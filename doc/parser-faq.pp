@@ -35,7 +35,7 @@
     foreach my $question (@questions)
       {
        # open file
-       open(Q, "faq/$category/$question") or warn(qq([Error] Cannot open question file "faq/$category/question"\n)), next;
+       open(Q, "faq/$category/$question") or warn(qq([Error] Cannot open question file "faq/$category/$question"\n)), next;
      
        # extract question
        while (<Q>)

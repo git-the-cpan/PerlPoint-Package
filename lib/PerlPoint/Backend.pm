@@ -5,6 +5,9 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.08    |13.03.2001| JSTENZEL | simplified code slightly;
+#         |          | JSTENZEL | added visibility feature to visualize processing;
+#         |14.03.2001| JSTENZEL | added mailing list hint to POD;
 # 0.07    |07.12.2000| JSTENZEL | new namespace PerlPoint;
 # 0.06    |19.11.2000| JSTENZEL | updated POD;
 # 0.05    |13.10.2000| JSTENZEL | slight changes;
@@ -25,7 +28,7 @@ B<PerlPoint::Backend> - frame class to transform PerlPoint::Parser output
 
 =head1 VERSION
 
-This manual describes version B<0.07>.
+This manual describes version B<0.08>.
 
 =head1 SYNOPSIS
 
@@ -70,7 +73,7 @@ target objects are discovered in the intermediate stream.
 package PerlPoint::Backend;
 
 # declare version
-$VERSION=$VERSION="0.07";
+$VERSION=$VERSION="0.08";
 
 # pragmata
 use strict;
@@ -80,7 +83,9 @@ use fields qw(
               display
               handler
               name
+              statistics
               trace
+              vis
              );
 
 # load modules
@@ -132,6 +137,20 @@ declared in B<PerlPoint::Constants>.
 
 Constants can be combined by addition.
 
+=item vispro
+
+activates "process visualization" which simply means that a user will see
+progress messages while the backend processes the stream. The I<numerical>
+value of this setting determines how often the progress message shall be
+updated by a I<chapter interval>:
+
+  # inform every five chapters
+  vispro => 5,
+
+Process visualization is automatically suppressed unless STDERR is
+connected to a terminal, if this option is omitted, I<display> was set
+to C<DISPLAY_NOINFO> or backend I<trace>s are activated.
+
 =back
 
 B<Returns:>
@@ -153,7 +172,7 @@ sub new
 
   # check parameters
   confess "[BUG] Missing class name.\n" unless $class;
-  confess "[BUG] Missing name parameter.\n" unless exists $pars{'name'};
+  confess "[BUG] Missing name parameter.\n" unless exists $pars{name};
 
   # build object
   my $me;
@@ -163,12 +182,13 @@ sub new
   }
 
   # init object
-  $me->{'handler'}={};
-  $me->{'name'}=$pars{'name'};
+  $me->{handler}={};
+  $me->{name}=$pars{name};
 
   # store trace and display settings
-  $me->{'trace'}=defined $pars{'trace'} ? $pars{'trace'} : TRACE_NOTHING;
-  $me->{'display'}=defined $pars{'display'} ? $pars{'display'} : DISPLAY_ALL;
+  $me->{trace}=defined $pars{trace} ? $pars{trace} : TRACE_NOTHING;
+  $me->{display}=defined $pars{display} ? $pars{display} : DISPLAY_ALL;
+  $me->{vis}=defined $pars{vispro} ? $pars{vispro} : 0;
 
   # reply the new object
   $me;
@@ -309,11 +329,11 @@ sub register
   confess "[BUG] Handler parameter is no code reference.\n" unless ref($handler) and ref($handler) eq 'CODE';
 
   # check for an already existing handler
-  warn "[Trace] Removing earlier handler setting (for directive $directive).\n" if $me->{'trace'} & TRACE_BACKEND and exists $me->{'handler'}{$directive};
+  warn "[Trace] Removing earlier handler setting (for directive $directive).\n" if $me->{trace} & TRACE_BACKEND and exists $me->{handler}{$directive};
 
   # well, all right, store the handler
-  $me->{'handler'}{$directive}=$handler;
-  warn "[Trace] Stored new handler (for directive $directive).\n" if $me->{'trace'} & TRACE_BACKEND;
+  $me->{handler}{$directive}=$handler;
+  warn "[Trace] Stored new handler (for directive $directive).\n" if $me->{trace} & TRACE_BACKEND;
  }
 
 # the walker
@@ -329,10 +349,13 @@ sub run
   confess "[BUG] Stream parameter is no array reference.\n" unless ref($stream) and ref($stream) eq 'ARRAY';
 
   # welcome user
-  warn "[Info] Perl Point backend \"$me->{'name'}\" starts.\n" unless $me->{'display'} & DISPLAY_NOINFO;
+  warn "[Info] Perl Point backend \"$me->{name}\" starts.\n" unless $me->{display} & DISPLAY_NOINFO;
 
   # declare variables
   my ($tokenNr)=0;
+
+  # init counter
+  $me->{statistics}{&DIRECTIVE_HEADLINE}=0;
 
   # now start your walk
   foreach my $token (@$stream)
@@ -344,21 +367,21 @@ sub run
      unless (ref($token))
        {
         # trace, if necessary
-        warn "[Trace] Token $tokenNr is a simple string.\n" if $me->{'trace'} & TRACE_BACKEND;
+        warn "[Trace] Token $tokenNr is a simple string.\n" if $me->{trace} & TRACE_BACKEND;
 
         # now check if there was a handler declared
-        if (exists $me->{'handler'}{DIRECTIVE_SIMPLE()})
+        if (exists $me->{handler}{DIRECTIVE_SIMPLE()})
           {
            # trace, if necessary
-           warn "[Trace] Using user defined handler.\n" if $me->{'trace'} & TRACE_BACKEND;
+           warn "[Trace] Using user defined handler.\n" if $me->{trace} & TRACE_BACKEND;
 
            # call the handler passing the string
-           &{$me->{'handler'}{DIRECTIVE_SIMPLE()}}(DIRECTIVE_SIMPLE, DIRECTIVE_START, $token);
+           &{$me->{handler}{DIRECTIVE_SIMPLE()}}(DIRECTIVE_SIMPLE, DIRECTIVE_START, $token);
           }
         else
           {
            # trace, if necessary
-           warn "[Trace] Using default handler.\n" if $me->{'trace'} & TRACE_BACKEND;
+           warn "[Trace] Using default handler.\n" if $me->{trace} & TRACE_BACKEND;
 
            # well, the default is to just print it out
            print $token;
@@ -367,21 +390,36 @@ sub run
      else
        {
         # trace, if necessary
-        warn "[Trace] Token $tokenNr is a directive.\n" if $me->{'trace'} & TRACE_BACKEND;
+        warn "[Trace] Token $tokenNr is a directive.\n" if $me->{trace} & TRACE_BACKEND;
+
+        # new headline?
+        if ($token->[0]==DIRECTIVE_HEADLINE and $token->[1]==DIRECTIVE_START)
+          {
+           # update "statistics"
+           $me->{statistics}{&DIRECTIVE_HEADLINE}++ if $token->[0]==DIRECTIVE_HEADLINE;
+
+           # let the user know that something is going on
+           print STDERR "\r", ' ' x length('[Info] '), '... ', $me->{statistics}{&DIRECTIVE_HEADLINE}, " chapters processed."
+            if     not $me->{display} & &DISPLAY_NOINFO
+               and not $me->{trace}>TRACE_NOTHING
+               and $me->{vis}
+               and -t STDERR
+               and not $me->{statistics}{&DIRECTIVE_HEADLINE} % $me->{vis};
+          }
 
         # now check if there was a handler declared
-        if (exists $me->{'handler'}{$token->[0]})
+        if (exists $me->{handler}{$token->[0]})
           {
            # trace, if necessary
-           warn "[Trace] Using user defined handler.\n" if $me->{'trace'} & TRACE_BACKEND;
+           warn "[Trace] Using user defined handler.\n" if $me->{trace} & TRACE_BACKEND;
 
            # call the handler passing additional informations, if any
-           &{$me->{'handler'}{$token->[0]}}(@$token);
+           &{$me->{handler}{$token->[0]}}(@$token);
           }
         else
           {
            # trace, if necessary
-           warn "[Trace] Acting by default (ignoring token).\n" if $me->{'trace'} & TRACE_BACKEND;
+           warn "[Trace] Acting by default (ignoring token).\n" if $me->{trace} & TRACE_BACKEND;
 
            # well, the default is to ignore it
           }
@@ -389,7 +427,7 @@ sub run
     }
 
   # inform user
-  warn "[Info] Backend \"$me->{'name'}\" is ready.\n" unless $me->{'display'} & DISPLAY_NOINFO;
+  warn(($me->{vis} ? "\n" : ''), "[Info] Backend \"$me->{name}\" is ready.\n") unless $me->{display} & DISPLAY_NOINFO;
  }
 
 1;
@@ -413,9 +451,20 @@ Public PerlPoint::... module constants.
 
 =back
 
+
+=head1 SUPPORT
+
+A PerlPoint mailing list is set up to discuss usage, ideas,
+bugs, suggestions and translator development. To subscribe,
+please send an empty message to perlpoint-subscribe@perl.org.
+
+If you prefer, you can contact me via perl@jochen-stenzel.de
+as well.
+
 =head1 AUTHOR
 
-Jochen Stenzel (perl@jochen-stenzel.de), 1999-2000. All rights reserved.
+Copyright (c) Jochen Stenzel (perl@jochen-stenzel.de), 1999-2001.
+All rights reserved.
 
 This module is free software, you can redistribute it and/or modify it
 under the terms of the Artistic License distributed with Perl version

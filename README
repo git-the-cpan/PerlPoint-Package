@@ -42,6 +42,14 @@ both the module set (PerlPoint::Backend,
 PerlPoint::Constants, PerlPoint::Parser) and
 the translator pp2sdf.
 
+Note: please make sure your version of fields.pm
+      provides the phash() function. The version
+      in the perl 5.00503 core does *not* do this
+      while perl 5.6 comes with an up to date
+      module. A 5.005 installation can simply be
+      updated by copying fields.pm from a 5.6
+      distribution.
+
 
 DOCUMENTATION
 
@@ -64,6 +72,16 @@ Translators using this package are *pp2html* and
 with this package itself, see the demo directory.
 
 
+SUPPPORT
+
+A PerlPoint mailing list is set up to discuss usage, ideas,
+bugs, suggestions and translator development. To subscribe,
+please send an empty message to perlpoint-subscribe@perl.org.
+
+If you prefer, you can contact me via perl@jochen-stenzel.de
+as well.
+
+
 CREDITS
 
 Thanks to Tom Christiansen for the idea and first implementation
@@ -82,15 +100,15 @@ Thanks to Stephen Riehm who shared his ideas of extensions for
 the original software with us. The final language was basically
 designed by a team of Lorenz, him and me.
 
-Thanks to Alex Sigel and Norbert Gruener who became our first
-testers outside the team and helped us by their usage reports.
-Special thanks to Alex for propagating the toolkit and his help
-to publish the software!
+Thanks to Alex Sigel, Norbert Gruener and Jeffrey S. Haemer who
+became our first users outside the team and helped us by their
+usage reports and suggestions. Special thanks to Alex for
+propagating the toolkit and his help to publish the software!
 
 
 AUTHOR
 
-Copyright (c) Jochen Stenzel (perl@jochen-stenzel.de), 1999-2000.
+Copyright (c) Jochen Stenzel (perl@jochen-stenzel.de), 1999-2001.
 All rights reserved.
 
 This module is free software, you can redistribute it and/or modify it

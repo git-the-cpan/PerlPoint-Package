@@ -1,5 +1,50 @@
 
 
+=0.33
+
+==Bugfixes
+
+* the value of an variable can now begin with any character:
+
+  $var=/usr/local
+
+* There was still a bug in continued list handling: if continuing
+  points were restored from cache they contained the \I<old>
+  level hint, so if one inserted points before this one after the
+  cache entry was built, the continuing point was restored at a
+  wrong level. This is fixed.
+
+* POD fix: \C<vispro> option of the \C<run()> method works on
+  base of \I<chapters>, not paragraphs.
+
+* If embedded Perl code replied an undefined value this thing
+  was tried to be parsed which caused a perl warning. Now it's
+  completely legal to embed such code, which is especially useful
+  to prepare variables or functions.
+
+* Starting an ordered list by a continuing point (using "##")
+  caused a perl warning. Code fixed.
+
+
+==Features
+
+* Installation now explicitly requires \C<fields.pm> 1.00. I'm not
+  sure if this was the first version of \C<fields> that contained
+  \C<phash()> but it should certainly be a version providing it.
+  An additional requirement hint was added to \C<README>.
+
+* The backend now provides optional process visualization as well
+  as the parser.
+
+* There's a new mailing list. Send an empty message to
+  \C<perlpoint-subscribe@perl.org> to subscribe.
+
+
+==pp2sdf
+
+* adapted to the new backend feature of process visualization;
+
+
 =0.32
 
 ==Bugfixes

@@ -5,6 +5,7 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.12    |14.03.2001| JSTENZEL | added mailing list hint to POD;
 # 0.11    |20.01.2001| JSTENZEL | added new constant DIRECTIVE_VARSET;
 # 0.10    |07.12.2000| JSTENZEL | new namespace PerlPoint;
 # 0.09    |18.11.2000| JSTENZEL | added new CACHE constants;
@@ -33,7 +34,7 @@ B<PerlPoint::Constants> - public PerlPoint::... module constants
 
 =head1 VERSION
 
-This manual describes version B<0.11>.
+This manual describes version B<0.12>.
 
 =head1 DESCRIPTION
 
@@ -53,7 +54,7 @@ of the using modules B<PerlPoint::Parser> and B<PerlPoint::Backend>.
 package PerlPoint::Constants;
 
 # declare version
-$VERSION=$VERSION=0.11;
+$VERSION=$VERSION=0.12;
 
 # startup actions
 BEGIN
@@ -384,9 +385,21 @@ A frame class to write Perl Point backends.
 
 =back
 
+
+=head1 SUPPORT
+
+A PerlPoint mailing list is set up to discuss usage, ideas,
+bugs, suggestions and translator development. To subscribe,
+please send an empty message to perlpoint-subscribe@perl.org.
+
+If you prefer, you can contact me via perl@jochen-stenzel.de
+as well.
+
+
 =head1 AUTHOR
 
-Copyright (c) Jochen Stenzel (perl@jochen-stenzel.de), 1999-2000. All rights reserved.
+Copyright (c) Jochen Stenzel (perl@jochen-stenzel.de), 1999-2001.
+All rights reserved.
 
 This module is free software, you can redistribute it and/or modify it
 under the terms of the Artistic License distributed with Perl version

@@ -14,6 +14,16 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.33    |22.02.2001| JSTENZEL | slightly improved PerlPoint::Parser::DelayedToken;
+#         |25.02.2001| JSTENZEL | variable values can now begin with every character;
+#         |13.03.2001| JSTENZEL | bugfix in handling cache hits for continued ordered lists:
+#         |          |          | list numbering is updated now;
+#         |14.03.2001| JSTENZEL | added mailing list hint to POD;
+#         |          | JSTENZEL | undefined return values of embedded Perl are no longer
+#         |          |          | tried to be parsed, this is for example useful to
+#         |          |          | predeclare functions;
+#         |          | JSTENZEL | slight bugfix in internal ordered list counting which
+#         |          |          | takes effect if an ordered list is *started* by "##";
 # 0.32    |07.02.2001| JSTENZEL | bugfix: bodyless macros can now be used without moving
 #         |          |          | subsequent tokens before the macro replacement;
 #         |10.02.2001| JSTENZEL | added new special type "example" to \INCLUDE to relieve
@@ -190,7 +200,7 @@ B<PerlPoint::Parser> - a PerlPoint Parser
 
 =head1 VERSION
 
-This manual describes version B<0.32>.
+This manual describes version B<0.33>.
 
 =head1 SYNOPSIS
 
@@ -861,7 +871,7 @@ B<Example:>
  require 5.00503;
 
  # declare module version
- $PerlPoint::Parser::VERSION=0.32;
+ $PerlPoint::Parser::VERSION=0.33;
  $PerlPoint::Parser::VERSION=$PerlPoint::Parser::VERSION; # to suppress a warning of exclusive usage only;
 
  # pragmata
@@ -1312,7 +1322,7 @@ opoint : opoint_opener
            $_[3][0][0][0]=$_[3][0][$#{$_[3][0]}][0]=&DIRECTIVE_OPOINT;
 
            # update list level hints as necessary
-           $olistLevels[0]=($flags{olist} or $_[1][0]) ? $olistLevels[0]+1 : 1;
+           $olistLevels[0]=(($flags{olist} or $_[1][0]) and @olistLevels) ? $olistLevels[0]+1 : 1;
 
 	   # add a level hint, if necessary
 	   if ($_[1][0] and not $flags{olist} and $olistLevels[0]>1)
@@ -1331,6 +1341,19 @@ opoint : opoint_opener
            $_[3];
           }
        | Opoint_cache_hit
+          {
+           # update list level hints as necessary
+           $olistLevels[0]=($flags{olist} and @olistLevels) ? $olistLevels[0]+1 : 1;
+
+           # update continued list points
+           $_[1][0][0][2]=$olistLevels[0] if @{$_[1][0][0]}>2;
+
+           # update ordered list flag
+           $flags{olist}=1;
+
+           # supply updated stream snippet
+           $_[1];
+          }
        ;
 
 # ordered list point opener sequence - determining if a former list should be continued
@@ -1613,14 +1636,22 @@ verbatim : Heredoc_open
          ;
 
 # variable assignment
-variable_assignment : Named_variable '=' text
+variable_assignment : Named_variable '='
+                       {
+                        # switch to text mode to allow *all* characters starting a variable value!
+                        stateManager(STATE_TEXT);
+
+                        # trace, if necessary
+                        warn "[Trace] $sourceFile, line $_[1][1]: Variable assignment starts.\n" if $flags{trace} & TRACE_PARAGRAPHS;
+                       }
+                      text
                        {
                         # remove text directives and the final space (made from the final EOL)
-                        shift(@{$_[3][0]});
-                        pop(@{$_[3][0]}) for (1..2);
+                        shift(@{$_[4][0]});
+                        pop(@{$_[4][0]}) for (1..2);
 
                         # make the text contents a string and store it
-                        $variables{$_[1][0]}=join('', @{$_[3][0]});
+                        $variables{$_[1][0]}=join('', @{$_[4][0]});
 
                         # propagate the setting to the stream, if necessary
                         push(@$resultStreamRef, [DIRECTIVE_VARSET, DIRECTIVE_START, {var=>$_[1][0], value=>$variables{$_[1][0]}}]) if $flags{var2stream};
@@ -1633,10 +1664,10 @@ variable_assignment : Named_variable '=' text
                          }
 
                         # trace, if necessary
-                        warn "[Trace] $sourceFile, line $_[3][1]: Variable assignment: \$$_[1][0]=$variables{$_[1][0]}.\n" if $flags{trace} & TRACE_PARAGRAPHS;
+                        warn "[Trace] $sourceFile, line $_[4][1]: Variable assignment: \$$_[1][0]=$variables{$_[1][0]}.\n" if $flags{trace} & TRACE_PARAGRAPHS;
 
                         # flag this paragraph as internal
-                        ['', $_[3][1]];
+                        ['', $_[4][1]];
                        }
                     ;
 
@@ -2301,8 +2332,8 @@ embedded : Embed
                      {warn "[Error ", ++$semErr, "] $sourceFile, line $_[5][1]: embedded Perl code could not be evaluated: $@.\n";}
                    else
                      {
-                      # success - make the result part of the input stream
-                      stackInput($_[0], split(/(\n)/, $result));
+                      # success - make the result part of the input stream, if any
+                      stackInput($_[0], split(/(\n)/, $result)) if defined $result;
 
                       # reset the "end of input reached" flag if necessary
                       $readCompletely=0 if $readCompletely;
@@ -3014,7 +3045,7 @@ sub lexer
      # reply next token: scan for tagnames
      $found=$1, s/^\\$1//,
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Tag opener $found in line $lineNrs{$inHandle}.\n")),
-     return('Tag_name', [$found, $lineNrs{$inHandle}]) if $specials{tag} and /^(?<!\\)\\([A-Z_]+)/ and (exists $tagsRef->{'\ACCEPT_ALL'} or exists $tagsRef->{$1} or exists $macros{$1});
+     return('Tag_name', [$found, $lineNrs{$inHandle}]) if $specials{tag} and /^(?<!\\)\\([A-Z_1-9]+)/ and (exists $tagsRef->{'\ACCEPT_ALL'} or exists $tagsRef->{$1} or exists $macros{$1});
      
      # reply next token: scan for special characters
      $found=$1, s/^\Q$1//,
@@ -3627,9 +3658,9 @@ The default value is 0.
 activates "process visualization" which simply means that a user will see
 progress messages while the parser reads the documents. The I<numerical>
 value of this setting determines how often the progress message shall be
-updated by a I<paragraph interval>:
+updated by a I<chapter interval>:
 
-  # inform every five paragraphs
+  # inform every five chapter
   vispro => 5,
 
 Process visualization is automatically suppressed unless STDERR is
@@ -3907,8 +3938,7 @@ sub new
   confess "[BUG] Missing token value parameter.\n" unless defined $value;
 
   # build and reply object
-  my $me=[$token, $value];
-  bless($me, $class);
+  bless([$token, $value], $class);
  }
 
 # reply token
@@ -4001,9 +4031,21 @@ by I<Lorenz Domke> using B<PerlPoint::Package>.
 
 =back
 
+
+=head1 SUPPORT
+
+A PerlPoint mailing list is set up to discuss usage, ideas,
+bugs, suggestions and translator development. To subscribe,
+please send an empty message to perlpoint-subscribe@perl.org.
+
+If you prefer, you can contact me via perl@jochen-stenzel.de
+as well.
+
+
 =head1 AUTHOR
 
-Copyright (c) Jochen Stenzel (perl@jochen-stenzel.de), 1999-2001. All rights reserved.
+Copyright (c) Jochen Stenzel (perl@jochen-stenzel.de), 1999-2001.
+All rights reserved.
 
 This module is free software, you can redistribute it and/or modify it
 under the terms of the Artistic License distributed with Perl version

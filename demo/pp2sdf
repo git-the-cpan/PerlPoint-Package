@@ -5,7 +5,8 @@
 # ---------------------------------------------------------------------------------------
 # version | date   | author | changes
 # ---------------------------------------------------------------------------------------
-# 0.05    |27.01.02| ste    | "}" characters outside verbatim blocks and embedded HTML
+# 0.06    |13.03.01| ste    | activated new backend process visualization;
+# 0.05    |27.01.01| ste    | "}" characters outside verbatim blocks and embedded HTML
 #         |        |        | are now replaced by SDF escape "{{CHAR::rbrace}}" to guard
 #         |        |        | translations of things like "\B<{key=>value}>";
 #         |01.02.01| ste    | inserting text paragraphs by a backslash now unless they
@@ -35,7 +36,7 @@ B<pp2sdf> - translates PerlPoint to SDF
 
 =head1 VERSION
 
-This manual describes version B<0.05>.
+This manual describes version B<0.06>.
 
 =head1 DESCRIPTION
 
@@ -415,7 +416,7 @@ distribution for more details.
 
 
 # declare version
-$VERSION=$VERSION=0.05;
+$VERSION=$VERSION=0.06;
 
 # pragmata
 use strict;
@@ -536,6 +537,7 @@ my $backend=new PerlPoint::Backend(
                                               + (exists $options{nowarn} ? DISPLAY_NOWARN : 0),
                                    trace   =>   TRACE_NOTHING
                                               + ((exists $options{trace} and $options{trace} & 32) ? TRACE_BACKEND : 0),
+                                   vispro  => 1,
                                   );
 
 # register backend handlers
