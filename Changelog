@@ -1,5 +1,44 @@
 
 
+=0.32
+
+==Bugfixes
+
+* README adapted to new pp2sdf installation performed since 0.31;
+
+* Lorenz recognized that macro results sometimes differed from
+  plain usage of the replacements, investigation showed that
+  this was the case if a macro was used without body, for reasons
+  of parsing. The result was that the token after the bodyless
+  macro was parsed before the macro replacement, resulting in
+  sometimes confusing output. (As a workaround, one could use
+  a meaningless body like in \C<\\MACRO\<_\>>.)
+  To make a long story short, the error is fixed with 0.32, so the
+  stream should be correct now even when bodyless macros were used
+  as in \C<\\MACRO\\MACRO\\MACRO\\MACRO\\MACRO\\MACRO\\MACRO>.
+
+* made Changelog pasing the parser again;
+
+
+==Features
+
+* Jeffrey S. Haemer suggested to extend \C<\\INCLUDE> so that external
+  scripts can be placed into PerlPoint without the need to copy their
+  contents and paste it into the presentation source. To relieve
+  presentation authors this way, \C<\\INCLUDE> now supports a special
+  file type of \B<example>.
+
+  \\INCLUDE{\B<type=example> file=script}
+
+* The example is included as a verbatim block. Its lines can be
+  indented by the new special option \B<indent>:
+
+  \\INCLUDE{type=example file=script \B<indent=2>}
+
+* slightly rearranged \C<doc/parser-tags.pp> when adding the
+  example extension;
+
+
 =0.31
 
 ==Bugfixes
@@ -32,19 +71,19 @@
 
 * added a tiny editing hint to the docs (FAQ);
 
-* added Emacs lisp code in the utilities directory as an example
-  how the hilit19 module could be extended for PerlPoint;
+* added \B<Emacs> lisp code in the \C<utilities> directory as an example
+  how the \C<hilit19> module could be extended for PerlPoint;
 
 * improved \C<Changelog> structure;
 
-* adapted parser-paragraphs.pp documentation slightly;
+* adapted \C<parser-paragraphs.pp> documentation slightly;
 
 * New option \B<\C<smart>> makes the \C<\\INCLUDE> tag
   working like Perl's \C<require> or \C<use> for nested
   PerlPoint sources: the file is only read unless it was
-  already read before.
+  already seen before.
 
-   \INCLUDE{file="macros.pp" smart=1}
+   \\INCLUDE{type=pp file="macros.pp" \B<smart=1>}
 
 * This feature is \I<not> intended for translated paragraphs but
   especially useful to make macros available by separate source
@@ -60,7 +99,7 @@
 
      Remember: think twice.
 
-  The only exceptions of this rule are made if the first word
+* The only exceptions of this rule are made if the first word
   is "Note" or "Sign" because the special SDF formattings seem
   to make sense then.
 
@@ -112,17 +151,17 @@
   The restriction makes it easier to use backslashed strings when
   \I<all> tags are accepted. Formerly, one had to write
 
+    This is \\\\no_tag, be sure!
+
+* Now this can be written
+
     This is \\no_tag, be sure!
 
-  Now this can be written
+* and only capitalized backslashed strings are still to be guarded:
 
-    This is \no_tag, be sure!
+    This is \\\\NO_TAG, be sure!
 
-  and only capitalized backslashed strings are still to be guarded:
-
-    This is \\NO_TAG, be sure!
-
-  As before, this has only to be taken into account if
+* As before, this has only to be taken into account if
   users prefer to accept everything looking like a tag as a tag
   (see \C<\\ACCEPT_ALL> for details).
 
@@ -140,8 +179,8 @@
 ==pp2sdf
 
 * "}" characters outside verbatim blocks and embedded HTML
-  are now replaced by SDF escape "{{CHAR::rbrace}}" to guard
-  translations of things like \C<\\B<{key=\>value}\>>
+  are now replaced by SDF escape \C<{{CHAR::rbrace}}> to guard
+  translations of things like \C<\\B\<{key=\>value}\>>
 
 
 
@@ -154,15 +193,15 @@
 
 * New common way to pass basic data to active contents:
   translator authors can pass a hash of settings which is
-  mirrored in the active contents namespace as %$PerlPoint.
+  mirrored in the active contents namespace as \C<\B<%$PerlPoint>>.
   This makes it easy to pass things like the current target
   language or call specific user settings.
 
-  Two conventions are already introduced: \I<targetLanguage>
+* Two conventions are already introduced: \I<targetLanguage>
   and \I<userSettings> (allowing users to control the translation
   process more detailled by passing simple translator options).
 
-  See \B<pp2sdf> for an example of usage.
+* See \B<pp2sdf> for an example of usage.
 
 * Simplified backslash handling in macros. Before 0.29, each
   macro level (and each tag level in the macro replacement,
@@ -171,14 +210,14 @@
   making it difficult to nest a number of macros (especially
   if they were declared by others).
 
-  So, until now, one had to write
+* So, until now, one had to write
 
 <<EOE
     \I<$var-\>{key}>
     \I<\B<$var-\>{key}>>
 EOE
 
-  but
+* but
 
 <<EOE
     \I<$var-\>{key}>
@@ -186,10 +225,10 @@ EOE
     \MACRO<\MACRO<\I<$var-\\\\\\\>{key}>>>
 EOE
 
-  - not really handable. And inconsistently (nested \I<tags> never
+* - not really handable. And inconsistent (nested \I<tags> never
   required aditional backslashes, but macros did).
 
-  From now on, only \I<one> backslash is necessary \I<ever>:
+* From now on, only \I<one> backslash is necessary \I<ever>:
 
 <<EOE
     \I<$var-\>{key}>
@@ -199,7 +238,7 @@ EOE
     \MACRO<\MACRO<\I<$var-\>{key}>>>
 EOE
 
-  \B<Note: existing PerlPoint sources might have to be updated.>
+* \B<Note: existing PerlPoint sources might have to be updated.>
 
 * Accelerated macro handling - earlier versions used to \I<reparse>
   a macro body which delayed parsing in case of deep macro nesting.
@@ -246,7 +285,7 @@ EOE
   Before 0.26 it might happen that the headline level offset was
   modified but an \I<old> offset was restored from cache.
 
-  \B<The cache format was modified. You \I<can> still use existing
+* \B<The cache format was modified. You \I<can> still use existing
   cache files but old data therein will never be referenced. To
   clean up old caches just remove them or use the parsers cleanup
   facility.>
@@ -268,17 +307,17 @@ EOE
   becomes easier. \B<Existing sources including files from
   other directories may have to be adapted!>
 
-  Example: if a source located in \C<subdir> is processed
+* Example: if a source located in \C<subdir> is processed
   and includes
 
       \\INCLUDE{type=pp file="\B<subdir/>subdoc.pp"}
 
-  to nest a file in its own directory, \C<subdir> had to
+* to nest a file in its own directory, \C<subdir> had to
   be specified because all pathes were relative to the parsers
   startup directory. This was not very logical and made it
   hard to combine nested sources.
 
-  Now the parser changes into the source directory, which
+* Now the parser changes into the source directory, which
   means that nested source pathes are relative to the path
   \I<of the including PerlPoint file>, in our example:
 

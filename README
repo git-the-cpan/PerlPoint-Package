@@ -37,10 +37,10 @@ backend framework class.
 INSTALLATION
 
 As usual: unpack and run "make test" and
-"make install distclean".
-
-To install pp2sdf, just copy it from the demo directory
-and add an appropriate shebang line.
+"make install distclean". This will install
+both the module set (PerlPoint::Backend,
+PerlPoint::Constants, PerlPoint::Parser) and
+the translator pp2sdf.
 
 
 DOCUMENTATION

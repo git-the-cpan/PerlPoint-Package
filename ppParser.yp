@@ -14,6 +14,10 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.32    |07.02.2001| JSTENZEL | bugfix: bodyless macros can now be used without moving
+#         |          |          | subsequent tokens before the macro replacement;
+#         |10.02.2001| JSTENZEL | added new special type "example" to \INCLUDE to relieve
+#         |          |          | people who want to include files just as examples;
 # 0.31    |30.01.2001| JSTENZEL | ordered lists now provide the entry level number
 #         |          |          | (additionally to the first list point which already
 #         |          |          | did this if the list was continued);
@@ -186,7 +190,7 @@ B<PerlPoint::Parser> - a PerlPoint Parser
 
 =head1 VERSION
 
-This manual describes version B<0.31>.
+This manual describes version B<0.32>.
 
 =head1 SYNOPSIS
 
@@ -640,9 +644,30 @@ The second special case is a file type of "Perl". If active contents is enabled,
 included Perl code is read into memory and evaluated like I<embedded> Perl. The
 results are made part of the input stream to be parsed.
 
+  // execute a perl script and include the results
+  \INCLUDE{type=perl file="disk-usage.pl"}
+
+As another option files may be declared to be of type "example". This makes the
+file placed into the source as a verbatim block, without need to copy its contents
+into the source.
+
+  // include an external script as an example
+  \INCLUDE{type=example file="script.csh"}
+
+All lines of the example file are included as they are but can be indented on request.
+To do so, just set the special option "indent" to a positive numerical value equal to
+the number of spaces to be inserted before each line.
+
+  // external example source, indented by 3 spaces
+  \INCLUDE{type=example file="script.csh" indent=3}
+
+Including external scripts this way can accelerate PerlPoint authoring significantly,
+especially if the included files are still subject to changes.
+
 It is possible to filter the file types you wish to include (with exception
-of "PP"), see below for details. I<In any case>, the mentioned file has to
-exist.
+of "pp" and "example"), see below for details. I<In any case>, the mentioned file
+has to exist.
+
 
 
 =item \EMBED and \END_EMBED
@@ -836,7 +861,7 @@ B<Example:>
  require 5.00503;
 
  # declare module version
- $PerlPoint::Parser::VERSION=0.31;
+ $PerlPoint::Parser::VERSION=0.32;
  $PerlPoint::Parser::VERSION=$PerlPoint::Parser::VERSION; # to suppress a warning of exclusive usage only;
 
  # pragmata
@@ -1928,8 +1953,28 @@ tag : Tag_name
               $macro=~s/__${par}__/$value/g;
              }
 
+           # Bodyless macros need special care - the parser already got the subsequent token to
+           # recognize that the macro was complete. Now, the macro replacement is reinserted into the stream
+           # where it will be read by the next lexer operation which is enforced when the parser needs a token
+           # again - and this will happen after processing the already receicved token which stood behind the
+           # bodyless macro. Letting the parser process the read token this way, this token would be streamed
+           # (in most cases) *before* the macro replacement, while it was intented to come after it. So, if we
+           # detect this case, we move this token *behind* the macro replacement. As for the parser, we replace
+           # this token by something streamed to "nothing", currently an empty string declared as "Word" token.
+           my $delayedToken;
+           unless (@{$_[5][0]})
+             {
+              # insert the current token behind the imaginary body
+              $delayedToken=new PerlPoint::Parser::DelayedToken($_[0]->YYCurtok, $_[0]->YYCurval);
+
+              # set new dummy values to let the parser work on
+              # (something without effect and valid everywhere a tag is)
+              $_[0]->YYCurtok('Word');
+              $_[0]->YYCurval(['', $_[0]->YYCurval->[1]]);
+             }
+
            # finally, pass the constructed text back to the input stream (by stack)
-           stackInput($_[0], map {$_ eq '__body__' ? dclone($_[5][0]) : split(/(\n)/, $_)} split(/(__body__)/, $macro));
+           stackInput($_[0], (map {$_ eq '__body__' ? dclone($_[5][0]) : split(/(\n)/, $_)} split(/(__body__)/, $macro)), $delayedToken ? $delayedToken : ());
 
            # reset the "end of input reached" flag if necessary
            $readCompletely=0 if $readCompletely;
@@ -2363,7 +2408,7 @@ included : Include
                       # we have to supply something, but it should be nothing
                       [[()], $_[3][1]];
                      }
-                   elsif ($flags{filter} and $tagpars{type}!~/^$flags{filter}$/i)
+                   elsif ($flags{filter} and $tagpars{type}!~/^(($flags{filter})|example)$/i)
                      {
                       # this file does not need to be included, nevertheless
                       # we have to supply something - but it should be nothing
@@ -2411,17 +2456,50 @@ included : Include
                       my @included=<$included>;
                       close($included);
 
-                      [
-                       [
-                        # opener directive
-                        [DIRECTIVE_TAG, DIRECTIVE_START, 'EMBED', {lang=>$tagpars{type}}],
-                        # the list of enclosed "literals", if any
-                        @included,
-                        # final directive
-                        [DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'EMBED', {lang=>$tagpars{type}}]
-                       ],
-                       $_[3][1]
-                      ];
+                      # in case the file was declared an example, embed its contents as a verbatim block,
+                      # otherwise, include it as really embedded part (to be processed by a backend)
+                      if ($tagpars{type}=~/^example$/i)
+                        {
+                         # indent lines, if requested
+                         if (exists $tagpars{indent})
+                           {
+                            # check parameter
+                            unless ($tagpars{indent}=~/^\d+$/)
+                              {$errors++, warn "[Error ", ++$semErr, "] $sourceFile, line $_[3][1]: Invalid indentation value of \"$tagpars{indent}\", please set up a number.\n";}
+                            else
+                              {
+                               # all right, indent
+                               my $indentation=' ' x $tagpars{indent}; 
+                               @included=map {"$indentation$_"} @included;
+                              }
+                           }
+
+                         [
+                          [
+                           # opener directive
+                           [DIRECTIVE_VERBATIM, DIRECTIVE_START],
+                           # the list of enclosed literals
+                           @included,
+                           # final directive
+                           [DIRECTIVE_VERBATIM, DIRECTIVE_COMPLETE]
+                          ],
+                          $_[3][1]
+                         ];
+                        }
+                      else
+                        {
+                         [
+                          [
+                           # opener directive
+                           [DIRECTIVE_TAG, DIRECTIVE_START, 'EMBED', {lang=>$tagpars{type}}],
+                           # the list of enclosed "literals", if any
+                           @included,
+                           # final directive
+                           [DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'EMBED', {lang=>$tagpars{type}}]
+                          ],
+                          $_[3][1]
+                         ];
+                        }
                      }
                   }
                 else
@@ -2536,7 +2614,7 @@ sub stackInput
   push(@lines, (defined $parser->YYData->{INPUT} and $parser->YYData->{INPUT}) ? $parser->YYData->{INPUT} : ());
 
   # combine line parts to lines completed by a trailing newline
-  # (additionally, take that there might be mixed references which have to be stored unchanged)
+  # (additionally, take into account that there might be mixed references which have to be stored unchanged)
   {
    my $lineBuffer='';
    foreach my $line (@lines)
@@ -2638,12 +2716,21 @@ sub lexer
             }
          }
 
-       # if this line was get from stack and is a reference, we got an already prepared stream part
+       # if this line was got from stack and is a reference, we got an already prepared stream part
        if ($lineFromStack and ref($parser->YYData->{INPUT}))
          {
-          my $streamedPart=$parser->YYData->{INPUT};
-          $parser->YYData->{INPUT}='';
-          return('StreamedPart', [$streamedPart, $lineNrs{$inHandle}]);
+          if (ref($parser->YYData->{INPUT}) eq 'PerlPoint::Parser::DelayedToken')
+            {
+             my $delayedToken=$parser->YYData->{INPUT};
+             $parser->YYData->{INPUT}='';
+             return($delayedToken->token, $delayedToken->value);
+            }
+          else
+            {
+             my $streamedPart=$parser->YYData->{INPUT};
+             $parser->YYData->{INPUT}='';
+             return('StreamedPart', [$streamedPart, $lineNrs{$inHandle}]);
+            }
          }
      
        # update line counter
@@ -3799,6 +3886,36 @@ sub updateChecksums
     }
  }
 
+1;
+
+# declare a helper package used for token "delay" after bodyless macros
+# (implemented the oo way to determine the data)
+package PerlPoint::Parser::DelayedToken;
+
+# even this tiny package needs modules!
+use Carp;
+
+# make an object holding the token name and its value
+sub new
+ {
+  # get parameter
+  my ($class, $token, $value)=@_;
+
+  # check parameters
+  confess "[BUG] Missing class name.\n" unless $class;
+  confess "[BUG] Missing token parameter.\n" unless $token;
+  confess "[BUG] Missing token value parameter.\n" unless defined $value;
+
+  # build and reply object
+  my $me=[$token, $value];
+  bless($me, $class);
+ }
+
+# reply token
+sub token {$_[0]->[0];}
+
+# reply value
+sub value {$_[0]->[1];}
 
 1;
 
