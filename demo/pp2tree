@@ -1,0 +1,191 @@
+
+
+# = HISTORY SECTION =====================================================================
+
+# ---------------------------------------------------------------------------------------
+# version | date   | author | changes
+# ---------------------------------------------------------------------------------------
+# 0.04    |07.12.00| ste    | new module namespace "PerlPoint";
+# 0.03    |07.10.00| ste    | renamed to pp2tree;
+# 0.02    |12.10.99| ste    | added a simple backend;
+# 0.01    |09.10.99| ste    | derived from the PerlPoint::Parser draft.
+# ---------------------------------------------------------------------------------------
+
+# = POD SECTION =========================================================================
+
+=head1 NAME
+
+B<pp2tree> - a Perl Point demo application visualizing a documents structure
+
+=head1 VERSION
+
+This manual describes version B<0.04>.
+
+This is a demonstration application of the PP package. It
+visualizes a Perl Point document as a tree.
+
+=head1 SYNOPSIS
+
+=head1 FILES
+
+=head1 ENVIRONMENT
+
+=head1 NOTES
+
+This is a demonstration only. A real life pp2tree visualizer surely
+should be more robust etc., the intention of this code is simply
+to I<show the usage of PerlPoint::Package>, not a perfect translator.
+
+=head1 SEE ALSO
+
+PerlPoint::Parser
+
+PerlPoint::Backend
+
+=head1 AUTHOR
+
+Copyright (c) Jochen Stenzel (perl@jochen-stenzel.de), 1999-2000. All rights reserved.
+
+=cut
+
+
+# declare version
+$VERSION=$VERSION=0.04;
+
+# pragmata
+use strict;
+
+# load modules
+use Carp;
+use PerlPoint::Backend;
+use PerlPoint::Parser 0.12;
+use PerlPoint::Constants;
+# use Getopt::Long;
+# use Getopt::ArgvFile qw(argvFile);
+
+
+# declare variables
+my ($depth, $patt, @streamData, %tagHash)=(0, "   |");
+
+# declare list of accepted tag openers
+@tagHash{qw(B C I IMG E)}=();
+
+# build parser
+my ($parser)=new PerlPoint::Parser;
+
+# and call it
+$parser->run(
+             stream  => \@streamData,
+             tags    => \%tagHash,
+             files   => \@ARGV,
+             trace   => TRACE_NOTHING,
+             display => DISPLAY_ALL,
+            );
+
+# build a backend
+my $backend=new PerlPoint::Backend(name=>'pp2tree', trace=>TRACE_NOTHING);
+
+# register backend handlers
+$backend->register(DIRECTIVE_BLOCK, \&handleBlock);
+$backend->register(DIRECTIVE_COMMENT, \&handleComment);
+$backend->register(DIRECTIVE_DOCUMENT, \&handleDocument);
+$backend->register(DIRECTIVE_HEADLINE, \&handleHeadline);
+$backend->register($_, \&handleList) foreach (DIRECTIVE_ULIST, DIRECTIVE_OLIST, DIRECTIVE_DLIST);
+$backend->register($_, \&handleListPoint) foreach (DIRECTIVE_UPOINT, DIRECTIVE_OPOINT, DIRECTIVE_DPOINT);
+$backend->register(DIRECTIVE_LIST_LSHIFT, \&handleListShift);
+$backend->register(DIRECTIVE_LIST_RSHIFT, \&handleListShift);
+$backend->register(DIRECTIVE_SIMPLE, \&handleSimple);
+$backend->register(DIRECTIVE_TAG, \&handleTag);
+$backend->register(DIRECTIVE_TEXT, \&handleText);
+$backend->register(DIRECTIVE_VERBATIM, \&handleVerbatim);
+
+# and run it
+$backend->run(\@streamData);
+
+
+# SUBROUTINES ###############################################################################
+
+# helper function
+sub visualize
+ {
+  # get and check parameters
+  my ($state, $msg)=@_;
+  confess "[BUG] Missing state parameter.\n" unless defined $state;
+  confess "[BUG] Missing message parameter.\n" unless defined $msg;
+
+  if ($state==DIRECTIVE_START)
+    {
+     # update graphics
+     warn(($patt x $depth), "\n");
+     warn(($patt x $depth), "- $msg.\n");
+     warn(($patt x ($depth+1)), "\n");
+
+     # update data
+     $depth++;
+    }
+  else
+    {
+     # update data
+     $depth-- if $depth>0;
+
+     # update graphics
+     warn(($patt x ($depth+1)), "\n");
+     warn(($patt x $depth), "- $msg.\n");
+     warn(($patt x $depth), "\n");
+    }
+ }
+
+# simple directive handlers
+sub handleSimple
+ {
+  # update the token counter
+  ;
+ }
+sub handleHeadline
+ {visualize($_[1], "Headline $_[2]");}
+
+sub handleList
+ {visualize($_[1], join(' ', $_[0]==DIRECTIVE_OLIST ? 'Ordered' : $_[0]==DIRECTIVE_ULIST ? 'Unordered' : 'Definition', 'list'));}
+
+sub handleListPoint
+ {visualize($_[1], $_[0]==DIRECTIVE_DPOINT ? 'Definition' : 'Item');}
+
+sub handleListShift
+ {visualize($_[1], "List Shift");}
+
+sub handleBlock
+ {visualize($_[1], "Block");}
+
+sub handleText
+ {visualize($_[1], "Text");}
+
+sub handleVerbatim
+ {visualize($_[1], "Verbatim block");}
+
+sub handleComment
+ {visualize($_[1], "Comment");}
+
+sub handleTag
+ {visualize($_[1], "Tag $_[2]");}
+
+sub handleDocument
+ {
+  if ($_[1]==DIRECTIVE_START)
+    {
+     # update graphics
+     warn "Document (base $_[2]).\n";
+     warn "$patt\n";
+
+     # update data
+     $depth++;
+    }
+  else
+    {
+     # update data
+     $depth-- if $depth>0;
+
+     # update graphics
+     warn "$patt\n";
+     warn "Document (base $_[2]).\n";
+    }
+ }

@@ -1,0 +1,632 @@
+
+
+# = HISTORY SECTION =====================================================================
+
+# ---------------------------------------------------------------------------------------
+# version | date   | author | changes
+# ---------------------------------------------------------------------------------------
+# 0.03    |07.12.00| ste    | new module namespace "PerlPoint";
+# 0.02    |28.11.00| ste    | "<" characters outside verbatim blocks are now replaced by
+#         |        |        | SDF escapes ({{CHAR:lt}}) to avoid SDF confusion assuming
+#         |        |        | phrases;
+# 0.01    |24.11.00| ste    | derived from my pp2pod demo script.
+# ---------------------------------------------------------------------------------------
+
+# = POD SECTION =========================================================================
+
+=head1 NAME
+
+B<pp2sdf> - translates PerlPoint to SDF
+
+=head1 VERSION
+
+This manual describes version B<0.03>.
+
+=head1 DESCRIPTION
+
+This is a demonstration application of the PerlPoint package. It
+translates PerlPoint into SDF.
+
+SDF as a target format is useful because sdf itself can produce
+various other formats.
+
+=head1 SYNOPSIS
+
+pp2sdf [<options>] <PerlPoint sources>
+
+=head2 Options
+
+All options can be abbreviated uniqly.
+
+=over 4
+
+=item -activeContents
+
+PerlPoint sources can embed Perl code which is evaluated while the source is parsed. For
+reasons of security this feature is deactivated by default. Set this option to active
+it. You can use I<-safeOpcode> to fine tune which operations shall be permitted.
+
+=item -allTags
+
+B<pp2sdf> implements the PerlPoint tags I<B>, I<C>, I<E>, I<I> and I<IMAGE>. Because every
+PerlPoint translator can define its own tags it may happen that a source file containes
+more than these. If they do not pass translation try this option which makes I<all> tags
+accepted. I<This is still an experimental feature.>
+
+=item -cache
+
+parsing of one and the same document several times can be accelerated by activating the
+PerlPoint parser cache by this option. The performance boost depends on your document
+structure.
+
+Cache files are written besides the source and named ".<source file>.ppcache".
+
+It can be useful to (temporarily) deactivate the cache to get correct line numbers in
+parser error messages (currently numbers cannot always reported correctly with activated
+cache because of a special perl behaviour).
+
+=item -cacheCleanup
+
+PerlPoint parser cache files grow (with every modified version of a source parsed)
+because they store expressions for every parsed variant of a paragraph. This is usually
+uncritical but you may wish to clean up the cache occasionally. Use this option to
+perform the task (or remove the cache file manually).
+
+=item -help
+
+displays an online help and terminates the script.
+
+=item -nocopyright
+
+suppresses the copyright message;
+
+=item -noinfo
+
+supresses runtime informations;
+
+=item -nowarn
+
+supresses warnings;
+
+=item -quiet
+
+a shortcut for "-nocopyright -noinfo -nowarn": all non critical runtime messages are suppressed;
+
+=item -safeOpcode <opcode>
+
+If active contents is enabled (I<-activeContents>), Perl code embedded into the translated PerlPoint sources will be
+evaluated. To keep security this is done via an object of class B<Safe> which restricts code
+to permitted operations. By this option you can declare which opcode (or opcode tag) is
+permitted. Please see the B<Safe> and B<Opcode> manual pages for further details. (These modules
+come with perl.)
+
+This option can be used multiply.
+
+You may want to store these options in default option files, see below for details.
+
+=item -trace [<level>]
+
+activates traces of the specified level. You may use the environment variable SCRIPTDEBUG
+alternatively (but an option overwrites environment settings). The following levels are
+defined  (use the I<numeric> values) - if a description sounds cryptic to you, just ignore
+the setting:
+
+=over 4
+
+=item zero (0)
+
+same as omitting the option: all traces are suppressed.
+
+=item one (1)
+
+paragraph detection,
+
+=item two (2)
+
+lexer traces,
+
+=item four (4)
+
+parsing,
+
+=item eight (8)
+
+semantic actions embedded into parsing,
+
+=item sixteen (16)
+
+active contents,
+
+=item thirtytwo (32)
+
+backend traces.
+
+=back
+
+Using different levels may cause unexpected results.
+
+Several levels are combined by addition.
+
+ # activate lexer and parser traces
+ -trace 6
+
+=back
+
+=head2 Option files
+
+Options may be loaded from files where they are stored exactly as you write them in the
+command line, but may be spread to several lines and extended by comment lines which start
+with a "#" character. To mark an option file in the commandline, simply enter its (path and)
+name prededed by a "@" character, for example
+
+  pp2sdf @myOptions ppfile
+
+  where the file myOptions could look like
+
+  # suppress infos
+  -noinfo
+
+Option files may be nested. To avoid endless recursion, every option file is resolved only
+the first time it is detected.
+
+  # this is an option file which
+  # refers to another option file
+  -noinfo @moreOptions
+
+The script also takes care of I<default option files> which means that usual options can
+be stored in files named C<.pp2sdf>. If such a file is placed in the directory where the script itself
+resides, options in the file are read in automatically by all pp2sdf calls. These are global
+settings. If you place such a file in your home directory, it is read automatically as well
+but only if pp2sdf is called under your account, so this is for personal preferences.
+
+A personal default option file overwrites global settings, and all default options are
+overwritten by options passed to the script call.
+
+=head1 FILES
+
+=head1 ENVIRONMENT
+
+=over 4
+
+=item SCRIPTDEBUG
+
+may be set to a numeric value to activate certain trace levels. You can use option I<-trace>
+alternatively (note that a used option overwrites an environment setting). The several levels
+are described with this option.
+
+=back
+
+=head1 NOTES
+
+This is a first attempt of a working PerlPoint to SDF translator. It handles
+all of the PerlPoint elements but is still alpha software because
+
+=over 4
+
+=item SDF phrases are not disabled
+
+SDF recognizes POD tags like I, B and C. If a string looks like such a tag, sdf
+tries to evaluate it the tag way. This should be suppressed.
+
+=back
+
+=head1 FILES
+
+B<pp2sdf> activates the PerlPoint parser cache to accelerate repeated translations.
+Because of this the usual PerlPoint parser cache files will be written next the
+parsed sources (as ".<source file name>.ppcache" in the source directory).
+
+=head1 SEE ALSO
+
+PerlPoint::Parser
+
+PerlPoint::Backend
+
+=head1 AUTHOR
+
+Copyright (c) Jochen Stenzel (perl@jochen-stenzel.de), 2000. All rights reserved.
+
+This script is free software, you can redistribute it and/or modify it
+under the terms of the Artistic License distributed with Perl version
+5.003 or (at your option) any later version. Please refer to the
+Artistic License that came with your Perl distribution for more
+details.
+
+The Artistic License should have been included in your distribution of
+Perl. It resides in the file named "Artistic" at the top-level of the
+Perl source tree (where Perl was downloaded/unpacked - ask your
+system administrator if you dont know where this is).  Alternatively,
+the current version of the Artistic License distributed with Perl can
+be viewed on-line on the World-Wide Web (WWW) from the following URL:
+http://www.perl.com/perl/misc/Artistic.html
+
+
+=head1 DISCLAIMER
+
+This software is distributed in the hope that it will be useful, but
+is provided "AS IS" WITHOUT WARRANTY OF ANY KIND, either expressed or
+implied, INCLUDING, without limitation, the implied warranties of
+MERCHANTABILITY and FITNESS FOR A PARTICULAR PURPOSE.
+
+The ENTIRE RISK as to the quality and performance of the software
+IS WITH YOU (the holder of the software).  Should the software prove
+defective, YOU ASSUME THE COST OF ALL NECESSARY SERVICING, REPAIR OR
+CORRECTION.
+
+IN NO EVENT WILL ANY COPYRIGHT HOLDER OR ANY OTHER PARTY WHO MAY CREATE,
+MODIFY, OR DISTRIBUTE THE SOFTWARE BE LIABLE OR RESPONSIBLE TO YOU OR TO
+ANY OTHER ENTITY FOR ANY KIND OF DAMAGES (no matter how awful - not even
+if they arise from known or unknown flaws in the software).
+
+Please refer to the Artistic License that came with your Perl
+distribution for more details.
+
+=cut
+
+
+# declare version
+$VERSION=$VERSION=0.03;
+
+# pragmata
+use strict;
+
+# load modules
+use Carp;
+use Safe;
+use PerlPoint::Backend;
+use Getopt::Long;
+use PerlPoint::Constants;
+use File::Basename;
+use PerlPoint::Parser 0.25;
+use Getopt::ArgvFile qw(argvFile);
+
+
+# declare variables
+my (
+    @streamData, 
+    @openLists,
+
+    %flags,
+    %options,                   # option hash;
+    %table,                     # a table buffer
+    %tagHash,
+   );
+
+
+# resolve option files
+argvFile(default=>1, home=>1);
+
+# get options
+GetOptions(\%options,
+                      "activeContents",    # evaluation of active contents;
+                      "allTags",           # accept anything as a tag what looks like a tag;
+                      "cache",             # control the cache;
+                      "cacheCleanup",      # cache cleanup;
+                      "help",              # online help, usage;
+                      "nocopyright",       # suppress copyright message;
+                      "noinfo",            # suppress runtime informations;
+                      "nowarn",            # suppress runtime warnings;
+                      "quiet",             # suppress all runtime messages except of error ones;
+                      "safeOpcode=s@",     # permitted opecodes in active contents;
+                      "trace:i",           # activate trace messages;
+          );
+
+# propagate options as necessary
+@options{qw(nocopyright noinfo nowarn)}=() x 3 if exists $options{quiet};
+$options{trace}=$ENV{SCRIPTDEBUG} if not exists $options{trace} and exists $ENV{SCRIPTDEBUG};
+
+# display copyright unless suppressed
+warn "\n", basename($0), " $main::VERSION, (c) J. Stenzel (perl\@jochen-stenzel.de) 2000. \n\n" unless exists $options{nocopyright};
+
+# check for a help request
+(exec("pod2text $0 | less") or die "[Fatal] exec() cannot be called: $!\n") if $options{help};
+
+# check usage
+die "[Fatal] Usage: $0 [<options>] <PerlPoint source(s)>\n" unless @ARGV>=1;
+
+# check passed sources
+-r or die "[Fatal] Source file $_ does not exist or is unreadable.\n" foreach @ARGV;
+
+# declare list of accepted tag openers
+@tagHash{qw(B C E I IMAGE)}=();
+$tagHash{'\ACCEPT_ALL'}=1 if exists $options{allTags};
+
+# build parser
+my ($parser)=new PerlPoint::Parser;
+
+# build and configure a Safe object
+my $safe=new Safe;
+$safe->permit(@{$options{safeOpcode}}) if exists $options{safeOpcode};
+
+# and call it
+$parser->run(
+             stream  => \@streamData,
+             tags    => \%tagHash,
+             files   => \@ARGV,
+             safe    => exists $options{activeContents} ? $safe : undef,
+             vispro  => 1,
+             cache   =>   (exists $options{cache} ? CACHE_ON : CACHE_OFF)
+                        + (exists $options{cacheCleanup} ? CACHE_CLEANUP : 0),
+             display =>   DISPLAY_ALL
+                        + (exists $options{noinfo} ? DISPLAY_NOINFO : 0)
+                        + (exists $options{nowarn} ? DISPLAY_NOWARN : 0),
+             trace   => TRACE_NOTHING
+                        + ((exists $options{trace} and $options{trace} &  1) ? TRACE_PARAGRAPHS : 0)
+                        + ((exists $options{trace} and $options{trace} &  2) ? TRACE_LEXER      : 0)
+                        + ((exists $options{trace} and $options{trace} &  4) ? TRACE_PARSER     : 0)
+                        + ((exists $options{trace} and $options{trace} &  8) ? TRACE_SEMANTIC   : 0)
+                        + ((exists $options{trace} and $options{trace} & 16) ? TRACE_ACTIVE     : 0),
+            ) or exit(1);
+
+# build a backend
+my $backend=new PerlPoint::Backend(
+                                   name    => 'pp2sdf',
+                                   display =>   DISPLAY_ALL
+                                              + (exists $options{noinfo} ? DISPLAY_NOINFO : 0)
+                                              + (exists $options{nowarn} ? DISPLAY_NOWARN : 0),
+                                   trace   =>   TRACE_NOTHING
+                                              + ((exists $options{trace} and $options{trace} & 32) ? TRACE_BACKEND : 0),
+                                  );
+
+# register backend handlers
+$backend->register(DIRECTIVE_DOCUMENT, sub {print "\n\n";});
+
+$backend->register(DIRECTIVE_SIMPLE, \&handleSimple);
+$backend->register(DIRECTIVE_TAG, \&handleTag);
+$backend->register(DIRECTIVE_HEADLINE, \&handleHeadline);
+
+$backend->register(DIRECTIVE_TEXT, sub {print "\n\n" if $_[1]==DIRECTIVE_COMPLETE;});
+
+$backend->register($_, \&handleList) foreach (DIRECTIVE_ULIST, DIRECTIVE_OLIST, DIRECTIVE_DLIST);
+$backend->register($_, \&handleListPoint) foreach (DIRECTIVE_UPOINT, DIRECTIVE_OPOINT, DIRECTIVE_DPOINT);
+$backend->register(DIRECTIVE_DPOINT_ITEM, \&handleDListPointItem);
+
+$backend->register(DIRECTIVE_LIST_LSHIFT, \&handleListShift);
+$backend->register(DIRECTIVE_LIST_RSHIFT, \&handleListShift);
+
+$backend->register(DIRECTIVE_BLOCK, \&handleBlock);
+$backend->register(DIRECTIVE_VERBATIM, \&handleBlock);
+
+$backend->register(DIRECTIVE_COMMENT, \&handleComment);
+
+
+# init several variables
+$flags{listlevel}=1;
+
+# and run it
+$backend->run(\@streamData);
+
+
+# SUBROUTINES ###############################################################################
+
+# simple directive handlers
+sub handleSimple
+ {
+  # get parameters
+  my ($opcode, $mode, @contents)=@_;
+
+  @contents=map {s/\n/\n$flags{block}/ if $flags{block}; $_} @contents;
+
+  # simply print the token (preface new lines by a mark within blocks, and buffer them in tables)
+  present(@contents);
+ }
+
+# headlines
+sub handleHeadline
+ {
+  # get parameters
+  my ($opcode, $mode, $level, @contents)=@_;
+
+  # act mode dependend
+  print "H$level: " if $mode==DIRECTIVE_START;
+  print "\n\n"       if $mode==DIRECTIVE_COMPLETE;
+
+  # new lists start at level 1
+  $flags{listlevel}=1;
+ }
+
+# tags
+sub handleTag
+ {
+  # get parameters
+  my ($opcode, $mode, $tag, $settings)=@_;
+
+  # handle image tags a special way
+  if (uc($tag) eq 'IMAGE')
+    {
+     # compose an SDF image macro
+     my @image=fileparse($settings->{src});
+     present(qq(\n\n!import "$image[0]"; ), $image[1] ? qq(base="$image[1]"; ) : '', join('; ', map {join('=', $_, map {/\s/ ? "\"$_\"" : $_} ucfirst(lc($settings->{$_})))} grep(lc($_) ne 'src', keys %$settings)), "\n\n") if $mode==DIRECTIVE_START;
+
+     # ok, well done
+     return(1);
+    }
+
+  # handle *tables*
+  if (uc($tag) eq 'TABLE')
+    {
+     # act mode dependend
+     if ($mode==DIRECTIVE_START)
+       {
+        # start a new table (in memory)
+        %table=();
+       }
+     else
+       {
+        # get the greatest number of columns
+        my $rowNr=0;
+        $rowNr>=@$_ or $rowNr=@$_ for (@{$table{rows}});
+
+        # open table
+        print "\n\n!block table; noheadings\n";
+        print join(';', map {"c$_";} (1..$rowNr)), "\n";
+
+        foreach my $row (@{$table{rows}})
+          {
+           print join(';', map {
+                                # remove laeding and trailing whitespaces
+                                s/^\s+//;
+                                s/\s+$//;
+                                s/^(\{\{\w:)\s+/$1/;
+                                s/\s+(\}\})$/$1/;
+                                s/\}{3}$/\} \}\}/;
+
+                                # supply cell contents
+                                $_;
+                               } @$row
+                     ), "\n";
+          }
+
+        # close table
+        print "\n!endblock\n\n";
+
+        # clean up
+        %table=();
+       }
+
+     # ok, well done
+     return(1);
+    }
+  elsif (uc($tag) eq 'TABLE_ROW')
+    {
+     # act mode dependend
+     push(@{$table{rows}}, []) if $mode==DIRECTIVE_START;
+
+     # ok, well done
+     return(1);
+    }
+  elsif (uc($tag) eq 'TABLE_COL')
+    {
+     # act mode dependend
+     push(@{$table{rows}[$#{$table{rows}}]}, '') if $mode==DIRECTIVE_START;
+
+     # ok, well done
+     return(1);
+    }
+  elsif (uc($tag) eq 'TABLE_HL')
+    {
+     # act mode dependend
+     push(@{$table{rows}[$#{$table{rows}}]}, '{{B:') if $mode==DIRECTIVE_START;
+     $table{rows}[$#{$table{rows}}][$#{$table{rows}[$#{$table{rows}}]}].='}}' if $mode==DIRECTIVE_COMPLETE;
+
+     # ok, well done
+     return(1);
+    }
+
+  # declare tag translations
+  my %tags=(
+            B => 'B',
+            C => 'EX',
+            E => 'E',
+            I => 'I',
+           );
+
+  # act mode dependend
+  present("{{$tags{uc($tag)}:") if $mode==DIRECTIVE_START and exists $tags{uc($tag)};
+  present('}}')                 if $mode==DIRECTIVE_COMPLETE and exists $tags{uc($tag)};
+ }
+
+# blocks
+sub handleBlock
+ {
+  # get parameters
+  my ($opcode, $mode)=@_;
+
+  # update global flag
+  $flags{block}=$opcode==DIRECTIVE_VERBATIM ? '>' : 'E: ' if $mode==DIRECTIVE_START;
+  $flags{block}=0 if $mode==DIRECTIVE_COMPLETE;
+
+  # prepare or complete the SDF block
+  print "\n\n$flags{block}" if $mode==DIRECTIVE_START;
+  print "\n\n" if $mode==DIRECTIVE_COMPLETE;
+ }
+
+# list
+sub handleList
+ {
+  # get parameters
+  my ($opcode, $mode, $wishedStartNr)=@_;
+
+  # update list hints
+  $flags{listpoints}=defined $wishedStartNr ? $wishedStartNr-1 : 0 if $mode==DIRECTIVE_START;
+ }
+
+# list shift
+sub handleListShift
+ {
+  # get parameters
+  my ($opcode, $mode, $offset)=@_;
+
+  # anything to do?
+  return unless $mode==DIRECTIVE_START;
+
+  # handle operation dependend
+  $flags{listlevel}+=$offset if $opcode==DIRECTIVE_LIST_RSHIFT;
+  $flags{listlevel}-=$offset if $opcode==DIRECTIVE_LIST_LSHIFT;
+  $flags{listlevel}=1 if $flags{listlevel}<1;
+ }
+
+# list point
+sub handleListPoint
+ {
+  # get parameters
+  my ($opcode, $mode, @data)=@_;
+
+  # update list counter if the item begins
+  $openLists[0]++ if $mode==DIRECTIVE_START;
+
+  # update list point counter
+  $flags{listpoints}++;
+
+  # act list and mode dependend
+  if ($mode==DIRECTIVE_START)
+    {
+     print STDOUT '*' x $flags{listlevel}, ' ' if $opcode==DIRECTIVE_UPOINT or $opcode==DIRECTIVE_DPOINT;
+     print STDOUT scalar($flags{listpoints}==1 ? '^' : '+') x $flags{listlevel}, ' ' if $opcode==DIRECTIVE_OPOINT;
+    }
+  else
+    {
+     print "\n\n";
+    }
+ }
+
+# definition list point item
+sub handleDListPointItem
+ {
+  # get parameters
+  my ($opcode, $mode, @data)=@_;
+
+  # by default, we simply add a colon to separate it from following explanations
+  print ': ' if $mode==DIRECTIVE_COMPLETE;
+ }
+
+# comment
+sub handleComment
+ {
+  # get parameters
+  my ($opcode, $mode)=@_;
+
+  # act list and mode dependend
+  print "# " if $mode==DIRECTIVE_START;
+  print "\n" if $mode==DIRECTIVE_COMPLETE;
+ }
+
+
+# write output to STDOUT or buffer it
+sub present
+ {
+  # build a string
+  my $string=join('', @_);
+
+  # replace characters which may confuse sdf
+  $string=~s/</{{CHAR:lt}}/g unless $flags{block} and $flags{block} eq '>';
+
+  # present result
+  unless (%table)
+    {print $string;}
+  else
+    {
+     $table{rows}[$#{$table{rows}}][$#{$table{rows}[$#{$table{rows}}]}].=$string;
+    }
+ }
+  

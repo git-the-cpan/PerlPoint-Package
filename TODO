@@ -1,0 +1,44 @@
+
+=List shifting
+
+* current stream representation might not be optimal
+  (because it closes the first list, shifts and opens
+  a new one instead of holding the first list open
+  and opening a subordered list);
+
+
+=Tables
+
+* shortcut version as specified
+
+* Allow nested tables? (Syntax!)
+
+* allow truly embedded tables?!:
+
+   bla bla \\table{colsep=+ rowsep=|} c11 + c12 | c21 + c22 \\end_table blu bla
+
+
+=Aliases (macros)
+
+* specified but still unimplemented
+
+
+=Parser
+
+* add error recovery;
+
+
+=pp2pod
+
+* complete? (may be sufficient enough as a demonstration ...)
+
+
+=pp2pp
+
+* find out why a first transformation of this TODO file
+  differs from subsequent ones by a trailing whitespace;
+
+* complete target mode 3;
+
+* implement target modes 2 and 1;
+

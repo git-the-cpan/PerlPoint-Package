@@ -1,0 +1,209 @@
+
+
+# = HISTORY SECTION =====================================================================
+
+# ---------------------------------------------------------------------------------------
+# version | date   | author | changes
+# ---------------------------------------------------------------------------------------
+# 0.03    |07.12.00| ste    | new module namespace "PerlPoint";
+# 0.02    |01.06.00| ste    | added comment transformation;
+# 0.01    |27.05.00| ste    | new.
+# ---------------------------------------------------------------------------------------
+
+# = POD SECTION =========================================================================
+
+=head1 NAME
+
+B<pp2pod> - a Perl Point demo translator to POD
+
+=head1 VERSION
+
+This manual describes version B<0.03>.
+
+=head1 DESCRIPTION
+
+This is a demonstration application of the PP package. It
+translates PP into POD.
+
+=head1 SYNOPSIS
+
+=head1 FILES
+
+=head1 ENVIRONMENT
+
+=head1 NOTES
+
+This is a demonstration only. A real life pp2pod translator surely
+should be more robust etc., the intention of this code is simply
+to I<show the usage of PerlPoint::Package>, not a perfect translator.
+
+=head1 SEE ALSO
+
+PerlPoint::Parser
+
+PerlPoint::Backend
+
+=head1 AUTHOR
+
+Copyright (c) Jochen Stenzel (perl@jochen-stenzel.de), 2000. All rights reserved.
+
+=cut
+
+
+# declare version
+$VERSION=$VERSION=0.03;
+
+# pragmata
+use strict;
+
+# load modules
+use Carp;
+use PerlPoint::Backend;
+use PerlPoint::Parser 0.12;
+use PerlPoint::Constants;
+# use Getopt::Long;
+# use Getopt::ArgvFile qw(argvFile);
+
+
+# declare variables
+my (@streamData, @openLists, %tagHash);
+
+# declare list of accepted tag openers
+@tagHash{qw(B C I IMG E)}=();
+
+# build parser
+my ($parser)=new PerlPoint::Parser;
+
+# and call it
+$parser->run(
+             stream  => \@streamData,
+             tags    => \%tagHash,
+             files   => \@ARGV,
+             trace   => TRACE_NOTHING,
+             display => DISPLAY_NOINFO,
+            ) or exit 1;
+
+# build a backend
+my $backend=new PerlPoint::Backend(name=>'pp2pod', trace=>TRACE_NOTHING, display=>DISPLAY_NOINFO);
+
+# register backend handlers
+$backend->register(DIRECTIVE_DOCUMENT, sub {print "\n\n";});
+
+$backend->register(DIRECTIVE_SIMPLE, \&handleSimple);
+$backend->register(DIRECTIVE_TAG, \&handleTag);
+$backend->register(DIRECTIVE_HEADLINE, \&handleHeadline);
+
+$backend->register(DIRECTIVE_TEXT, sub {print "\n\n" if $_[1]==DIRECTIVE_COMPLETE;});
+
+$backend->register($_, \&handleList) foreach (DIRECTIVE_ULIST, DIRECTIVE_OLIST, DIRECTIVE_DLIST);
+$backend->register($_, \&handleListPoint) foreach (DIRECTIVE_UPOINT, DIRECTIVE_OPOINT, DIRECTIVE_DPOINT);
+
+$backend->register(DIRECTIVE_LIST_LSHIFT, \&handleListShift);
+$backend->register(DIRECTIVE_LIST_RSHIFT, \&handleListShift);
+
+$backend->register(DIRECTIVE_BLOCK, \&handleSimple);
+$backend->register(DIRECTIVE_VERBATIM, \&handleSimple);
+
+$backend->register(DIRECTIVE_COMMENT, \&handleComment);
+
+
+
+# and run it
+$backend->run(\@streamData);
+
+
+# SUBROUTINES ###############################################################################
+
+# simple directive handlers
+sub handleSimple
+ {
+  # get parameters
+  my ($opcode, $mode, @contents)=@_;
+
+  # simply print the token
+  print @contents;
+ }
+
+# headlines
+sub handleHeadline
+ {
+  # get parameters
+  my ($opcode, $mode, $level, @contents)=@_;
+
+  # act mode dependend
+  print "=head$level " if $mode==DIRECTIVE_START;
+  print "\n\n"         if $mode==DIRECTIVE_COMPLETE;
+ }
+
+# tags
+sub handleTag
+ {
+  # get parameters
+  my ($opcode, $mode, $tag, $settings)=@_;
+
+  # declare tag translations
+  my %tags=(
+            B => 'B',
+            C => 'C',
+            E => 'E',
+            I => 'I',
+           );
+
+  # act mode dependend
+  print $tags{uc($tag)}, '<' if $mode==DIRECTIVE_START;
+  print '>'                  if $mode==DIRECTIVE_COMPLETE;
+ }
+
+# list
+sub handleList
+ {
+  # get parameters
+  my ($opcode, $mode)=@_;
+
+  # act list and mode dependend
+  unshift(@openLists, 0), print "=over 4\n\n" if $mode==DIRECTIVE_START;
+  shift(@openLists), print "=back\n\n"        if $mode==DIRECTIVE_COMPLETE;
+ }
+
+# list shift
+sub handleListShift
+ {
+  # get parameters
+  my ($opcode, $mode)=@_;
+
+  # anything to do?
+  return unless $mode==DIRECTIVE_START;
+
+  # handle operation dependend
+  unshift(@openLists, 0), print "=over 4\n\n" if $opcode==DIRECTIVE_LIST_RSHIFT;
+  shift(@openLists), print "=back\n\n"        if $opcode==DIRECTIVE_LIST_LSHIFT;
+ }
+
+# unordered list point
+sub handleListPoint
+ {
+  # get parameters
+  my ($opcode, $mode, @data)=@_;
+
+  # update list counter if the item begins
+  $openLists[0]++ if $mode==DIRECTIVE_START;
+
+  # act list and mode dependend
+  print "=item\n\n"                if $mode==DIRECTIVE_START and $opcode==DIRECTIVE_UPOINT;
+  print "=item $openLists[0].\n\n" if $mode==DIRECTIVE_START and $opcode==DIRECTIVE_OPOINT;
+  print "=item $data[0].\n\n"      if $mode==DIRECTIVE_START and $opcode==DIRECTIVE_DPOINT;
+  print "\n\n"                     if $mode==DIRECTIVE_COMPLETE;
+ }
+
+# comment (there is no comment feature built into POD (which is
+# intended for comments completely), so make it a foreign language)
+sub handleComment
+ {
+  # get parameters
+  my ($opcode, $mode)=@_;
+
+  # act list and mode dependend
+  print "=for comment\n\n" if $mode==DIRECTIVE_START;
+  print "\n\n"             if $mode==DIRECTIVE_COMPLETE;
+ }
+

@@ -1,0 +1,287 @@
+
+=0.27
+
+* module namespace changed from "PP" into "PerlPoint";
+
+* first CPAN release;
+
+
+=0.26
+
+* pp2sdf: avoid unintended SDF phrases (\C<P\<something\>>)
+  now by generating "<" as "{{CHAR:lt}}" (outside verbatim
+  blocks);
+
+* new utilities directory, providing a NoteTab clipbook file
+  initially;
+
+* bugfix in active contents handling: it might happen that
+  lines were ignored;
+
+* new dynamic FAQ document;
+
+* new headline level offset keyword "CURRENT_LEVEL" in
+  PP file imports;
+
+* The parser now changes into the directory of a sourcefile
+  when it is processed. This way nested sources can always
+  use relative pathes, so assembling a patchwork document
+  becomes easier. \B<Existing sources including files from
+  other directories may have to be adapted!>
+
+  Example: if a source located in \C<subdir> is processed
+  and includes
+
+      \\INCLUDE{type=pp file="\B<subdir/>subdoc.pp"}
+
+  to nest a file in its own directory, \C<subdir> had to
+  be specified because all pathes were relative to the parsers
+  startup directory. This was not very logical and made it
+  hard to combine nested sources.
+
+  Now the parser changes into the source directory, which
+  means that nested source pathes are relative to the path
+  \I<of the including PerlPoint file>, in our example:
+
+      \\INCLUDE{type=pp file="subdoc.pp"}
+
+* bugfix in dynamic contents handling: nested dynamic contents
+  (resolved macros, embedded parts, included parts) might not
+  be handled in the correct order;
+
+* The cache now considers headline level offsets of nested sources.
+  Before 0.26 it might happen that the headline level offset was
+  modified but an \I<old> offset was restored from cache.
+
+  \B<The cache format was modified. You \I<can> still use existing
+  cache files but old data therein will never be referenced. To
+  clean up old caches just remove them or use the parsers cleanup
+  facility.>
+
+* the package now explicitly requires perl 5.6;
+
+
+=0.25
+
+* completed prerequisites list in Makefile.PL;
+
+* added notes about Storable updates to parser documentation;
+
+* cache bugfix;
+
+* trace code bugfix;
+
+* added a new demo application pp2sdf which is a complete
+  translator;
+
+* process visualization: bugfix and improvements;
+
+* new experimental tag setting "\ACCEPT_ALL" switches to a
+  "anything that looks like a tag is processed as a tag" mode
+  to simplify source translation by tools implementing different
+  tag sets;
+
+
+=0.24
+
+* new checksum based incremental parsing accelerates updates
+  (depending on the document structure);
+
+* ordered list can be continued now: simply use \C<##> instead
+  of \C<#> to continue a previously opened list \I<in the same chapter>
+  (needs translator updates to take visible effect);
+
+* new \C<run()> option \C<"vispro"> to activate process visualization;
+
+
+=0.23
+
+* several fixes in embedded code handling, tables can now
+  be inserted dynamically;
+
+* providing a new basic PerlPoint documentation about
+  active contents;
+
+* new trace mode TRACE_ACTIVE (active contents evaluation);
+
+* improved README file;
+
+
+=0.22
+
+* the include directive has a new optional headline level
+  offset parameter;
+
+* several slight bugfixes in trace modes;
+
+* when reading included files, the main file handle is now
+  closed instead of duplicated and reused - perl5.6 run
+  into difficulties in some cases (if several files were
+  included, the file pointer seemed not to reset correctly
+  while switching back to the original handle);
+
+* now providing basic PerlPoint documentation in new "doc"
+  directory, may be included into translator docs;
+
+* added a first README version;
+
+
+=0.21
+
+* completed table paragraph implementation according to the
+  design paper: first row is now automatically streamed as
+  "table headline" (it is up to the backend to format such
+  table cells as it wishes);
+
+* added macro (or alias) feature, call it still experimental
+  because there might still be untested cases;
+
+
+=0.20
+
+* table \I<paragraphs> are implemented now;
+
+
+=0.19
+
+* new condition paragraphs which allow to maintain presentation
+  versions in several languages by one source file, for example;
+
+* bugfix in table handling: table stream structure was wrong
+  (the bug was discovered by \I<L. Domke>);
+
+
+=0.18
+
+* fixed an error in Makefile.PL comment;
+
+* embedded Perl code is evaluated now (in a safe, user
+  configurable environment);
+
+* Perl code can now be included as well as embedded;
+
+* PerlPoint can now be embedded as well as included;
+
+* variables are made accessible by included or embedded Perl code;
+
+* added a simple visualizer to the demo directory (pp2tree);
+
+* new optional source line hints in the stream;
+
+* bugfix: backslashes in embedded parts shall not be special
+  (as they were);
+
+* new multi level list shifts (e.g. "<2"), level is optional and
+  defaults to 1;
+
+
+=0.17
+
+* Bugfix release: if a paragraph started with a tag, paragraph
+  openers (like "*", "#", "-" and so on), they were handled as
+  special characters until the tag was closed, which made them
+  invalid inside the tag. Thanks to \I<L. Domke> for the bug
+  report.
+
+* There was also a bug in tag handling which could be fixed by
+  the way.
+
+
+=0.16
+
+* added a tag test which demonstrates the usage (and function)
+  of string parameters ;
+
+* the grammar file became part of the distribution;
+
+* updated parser documentation;
+
+* definition list items were plain strings before, now they are
+  streamed input which means that they can contain tags, for example
+  (thanks to \I<A. Sigel> for the suggestion);
+
+* Added a filter feature to run(). The parser can now suppress
+  included or embedded code of a language different from the
+  target one. Embedded HTML code, for example, makes no sense
+  in a stream passed to a backend which generates LaTeX or PostScript.
+
+
+=0.15
+
+* this is just another attempt to make the package 5.005 clean ...
+  thanks to \I<L. Domke> for his tests;
+
+* added the Changelog part of 0.14 which was prepared but not
+  delivered with 0.14;
+
+
+=0.14
+
+* improved handling of special characters, as a consequence,
+  only backslashes should have to be guarded by a backslash
+  now if they should stay for itself (except of in the
+  beginning of a new paragraph where a number of special
+  characters have to be recognized);
+
+* added new demo script pp2pp in a first version which
+  successfully processes Changelog and TODO file;
+
+* bugfixes: stream contained trailing whitespaces for
+  list points and headlines;
+
+* bugfix: empty lines in verbatim blocks were not streamed;
+
+* bugfix: stream contained leading newline for verbatim blocks;
+
+
+=0.13
+
+* made it backwards compatible with perl 5.00503 again
+  (until more people will have 5.6.1);
+
+
+=0.12
+
+* added demo translator pp2pod;
+
+* leading spaces in list points are ignored now;
+
+* various bugfixes in parser behaviour (success flags);
+
+* made the Changelog file passing the parser ;-)
+
+
+=0.11
+
+* added embedding (enclosed blocks of foreign code);
+
+* added including (embedded files);
+
+* added a first version of tables;
+
+
+=0.10
+
+* fixed various block bugs detected by \I<Lorenz Domke>:
+  verbatim block opener was supplied in stream in 0.09,
+  first indentation in blocks was not supplied;
+
+
+=0.09
+
+* started Changelog;
+
+* verbatim blocks now start with a "here document" hint immediately;
+
+* new "definition list point" paragraphs;
+
+* safer tests;
+
+* streamed lists are embedded into list directives now;
+
+* modified syntax of verbatim blocks;
+
+* added variables;
+
+* modified tag syntax: TAG<body> => \\TAG[{parlist}][<body>];
+
