@@ -5,6 +5,8 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.06    |20.01.2001| JSTENZEL | renamed to variables2.t: testing disabled variable
+#         |          |          | propagation now;
 # 0.05    |09.12.2000| JSTENZEL | new namespace: "PP" => "PerlPoint";
 # 0.04    |07.10.2000| JSTENZEL | variables are accessible by (embedded) Perl now;
 # 0.03    |05.10.2000| JSTENZEL | parser takes a Safe object now;

@@ -5,6 +5,9 @@
 # ---------------------------------------------------------------------------------------
 # version | date   | author | changes
 # ---------------------------------------------------------------------------------------
+# 0.05    |27.01.02| ste    | "}" characters outside verbatim blocks and embedded HTML
+#         |        |        | are now replaced by SDF escape "{{CHAR::rbrace}}" to guard
+#         |        |        | translations of things like "\B<{key=>value}>";
 # 0.04    |21.12.00| ste    | using new active contents base data feature;
 #         |22.12.00| ste    | added SDF and HTML filters;
 #         |        | ste    | supports embedded HTML now;
@@ -25,7 +28,7 @@ B<pp2sdf> - translates PerlPoint to SDF
 
 =head1 VERSION
 
-This manual describes version B<0.04>.
+This manual describes version B<0.05>.
 
 =head1 DESCRIPTION
 
@@ -341,7 +344,7 @@ PerlPoint::Backend
 
 =head1 AUTHOR
 
-Copyright (c) Jochen Stenzel (perl@jochen-stenzel.de), 2000. All rights reserved.
+Copyright (c) Jochen Stenzel (perl@jochen-stenzel.de), 2000, 2001. All rights reserved.
 
 This script is free software, you can redistribute it and/or modify it
 under the terms of the Artistic License distributed with Perl version
@@ -382,7 +385,7 @@ distribution for more details.
 
 
 # declare version
-$VERSION=$VERSION=0.04;
+$VERSION=$VERSION=0.05;
 
 # pragmata
 use strict;
@@ -436,7 +439,7 @@ GetOptions(\%options,
 $options{trace}=$ENV{SCRIPTDEBUG} if not exists $options{trace} and exists $ENV{SCRIPTDEBUG};
 
 # display copyright unless suppressed
-warn "\n", basename($0), " $main::VERSION, (c) J. Stenzel (perl\@jochen-stenzel.de) 2000. \n\n" unless exists $options{nocopyright};
+warn "\n", basename($0), " $main::VERSION, (c) J. Stenzel (perl\@jochen-stenzel.de) 2000, 2001. \n\n" unless exists $options{nocopyright};
 
 # check for a help request
 (exec("pod2text $0 | less") or die "[Fatal] exec() cannot be called: $!\n") if $options{help};
@@ -533,7 +536,12 @@ sub handleSimple
   # get parameters
   my ($opcode, $mode, @contents)=@_;
 
-  @contents=map {s/\n/\n$flags{block}/ if $flags{block}; $_} @contents;
+  @contents=map
+             {
+              s/\}/{{CHAR:rbrace}}/g;                   # guard translations of things like "\B<{key=>value}>";
+              s/\n/\n$flags{block}/ if $flags{block};   # preface block line as necessary;
+              $_;
+             } @contents;
 
   # simply print the token (preface new lines by a mark within blocks, and buffer them in tables)
   present(@contents);
@@ -777,8 +785,8 @@ sub present
   my $string=join('', @_);
 
   # replace characters which may confuse sdf
-  $string=~s/</{{CHAR:lt}}/g unless    ($flags{block} and $flags{block} eq '>')
-                                    or $flags{html};
+  unless (($flags{block} and $flags{block} eq '>') or $flags{html})
+    {$string=~s/</{{CHAR:lt}}/g;}
 
   # present result
   if ($flags{html}==1)

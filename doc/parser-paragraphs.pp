@@ -201,7 +201,7 @@ The first line of such a table is automatically formatted as \I<table headline>.
 
 start with a  \B<"?"> character. If \I<active contents> is enabled, the paragraph text
 is evaluated as \I<Perl code>. The (boolean) evaluation result then determines if
-subsequent Perl Point is read and parsed. If the result is false, all subsequent
+subsequent PerlPoint is read and parsed. If the result is false, all subsequent
 paragraphs until the next condition are \I<skipped>.
 
 This feature can be used to maintain various language versions of a presentation
@@ -222,7 +222,7 @@ disabled perl warnings (the language variable in the example above may not even 
 
 ==Variable assignments
 
-Variables can be used in the Perl Point text and will be automatically replaced by their string
+Variables can be used in the PerlPoint text and will be automatically replaced by their string
 values (if declared).
 
   The next paragraph sets a variable.
@@ -250,6 +250,9 @@ EOE
 
 causes I\<\$var> to be different on parser and code side - the parser will still use a
 value of 10, while embedded code works on with a value of 20.
+
+Translator software \I<can> make additional use of variables. Please see your
+translators documentation for details.
 
 
 ==Macro definitions

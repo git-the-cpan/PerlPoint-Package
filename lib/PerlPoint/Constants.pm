@@ -5,6 +5,7 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.11    |20.01.2001| JSTENZEL | added new constant DIRECTIVE_VARSET;
 # 0.10    |07.12.2000| JSTENZEL | new namespace PerlPoint;
 # 0.09    |18.11.2000| JSTENZEL | added new CACHE constants;
 # 0.08    |28.10.2000| JSTENZEL | added new constant TRACE_ACTIVE;
@@ -32,7 +33,7 @@ B<PerlPoint::Constants> - public PerlPoint::... module constants
 
 =head1 VERSION
 
-This manual describes version B<0.10>.
+This manual describes version B<0.11>.
 
 =head1 DESCRIPTION
 
@@ -52,7 +53,7 @@ of the using modules B<PerlPoint::Parser> and B<PerlPoint::Backend>.
 package PerlPoint::Constants;
 
 # declare version
-$VERSION=$VERSION=0.10;
+$VERSION=$VERSION=0.11;
 
 # startup actions
 BEGIN
@@ -114,6 +115,10 @@ flags a headline;
 
 control directive, shift a list left;
 
+=item DIRECTIVE_LIST_RSHIFT
+
+control directive, shift a list right;
+
 =item DIRECTIVE_NEW_LINE
 
 a backend hint to inform about a new source line;
@@ -125,18 +130,6 @@ flags an "ordered list";
 =item DIRECTIVE_OPOINT
 
 flags an "ordered point" paragraph;
-
-=item DIRECTIVE_LIST_RSHIFT
-
-control directive, shift a list right;
-
-=item DIRECTIVE_ULIST
-
-flags an "unordered list";
-
-=item DIRECTIVE_UPOINT
-
-flags an "unordered point" paragraph;
 
 =item DIRECTIVE_SIMLPE
 
@@ -153,6 +146,18 @@ flags a tag;
 =item DIRECTIVE_TEXT
 
 flags a text paragraph;
+
+=item DIRECTIVE_ULIST
+
+flags an "unordered list";
+
+=item DIRECTIVE_UPOINT
+
+flags an "unordered point" paragraph;
+
+=item DIRECTIVE_VARSET
+
+a backend hint propagating a variable setting;
 
 =item DIRECTIVE_VERBATIM
 
@@ -176,13 +181,14 @@ flags a verbatim block paragraph;
                            'DIRECTIVE_HEADLINE',     # headline;
                            'DIRECTIVE_LIST_LSHIFT',  # shift list left;
                            'DIRECTIVE_LIST_RSHIFT',  # shift list right;
-                           'DIRECTIVE_NEW_LINE',     # backend line hints;
+                           'DIRECTIVE_NEW_LINE',     # backend line hint;
                            'DIRECTIVE_OLIST',        # ordered list;
                            'DIRECTIVE_OPOINT',       # ordered list point;
                            'DIRECTIVE_TAG',          # tag;
                            'DIRECTIVE_TEXT',         # text;
                            'DIRECTIVE_ULIST',        # unordered list;
                            'DIRECTIVE_UPOINT',       # unordered list point;
+                           'DIRECTIVE_VARSET',       # backend hint: variable setting;
                            'DIRECTIVE_VERBATIM',     # verbatim;
 
                            'DIRECTIVE_SIMPLE',       # a pseudo directive (never used directly - MUST be the last here!);
@@ -335,6 +341,7 @@ use Exporter;
            DIRECTIVE_TEXT
            DIRECTIVE_ULIST
            DIRECTIVE_UPOINT
+           DIRECTIVE_VARSET
            DIRECTIVE_VERBATIM
 
            DIRECTIVE_SIMPLE

@@ -14,6 +14,26 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.30    |05.01.2001| JSTENZEL | slight lexer improvement (removed obsolete code);
+#         |          | JSTENZEL | modified the grammar a way that shift/reduce conflicts
+#         |          |          | were reduced (slightly) and, more important, the grammar
+#         |          |          | now passes yacc/bison (just a preparation);
+#         |20.01.2001| JSTENZEL | variable settings are now propagated into the stream;
+#         |          | JSTENZEL | improved syntactical error messages;
+#         |23.01.2001| JSTENZEL | bugfix: embedding into tags failed because not all
+#         |          |          | special settings were restored correctly, especially
+#         |          |          | for ">" which completes a tag body;
+#         |27.01.2001| JSTENZEL | fixed "unintialized value" warning (cache statistics);
+#         |          | JSTENZEL | tag implementation is now more restrictive: according
+#         |          |          | to the language definition tag and macro names now *have*
+#         |          |          | to be build from capitals and underscores, thus reducing
+#         |          |          | potential tag recognition confusion with ACCEPT_ALL;
+#         |          | JSTENZEL | lowercased alias names in alias definitions are now
+#         |          |          | automatically converted into capitals because of the
+#         |          |          | modfied tag/macro recognition just mentioned before;
+#         |          | JSTENZEL | POD: added a warning to the POD section that the cache
+#         |          |          | should be cleansed after introducing new macros which
+#         |          |          | could possibly be used as simple text before;
 # 0.29    |21.12.2000| JSTENZEL | direct setting of $VERSION variable to enable CPAN to
 #         |          |          | detect and display the parser module version;
 #         |          | JSTENZEL | introduced base settings for active contents provided
@@ -146,7 +166,7 @@ B<PerlPoint::Parser> - a PerlPoint Parser
 
 =head1 VERSION
 
-This manual describes version B<0.29>.
+This manual describes version B<0.30>.
 
 =head1 SYNOPSIS
 
@@ -790,7 +810,7 @@ B<Example:>
  require 5.00503;
 
  # declare module version
- $PerlPoint::Parser::VERSION=0.29;
+ $PerlPoint::Parser::VERSION=0.30;
  $PerlPoint::Parser::VERSION=$PerlPoint::Parser::VERSION; # to suppress a warning of exclusive usage only;
 
  # pragmata
@@ -802,7 +822,7 @@ B<Example:>
  use Carp;
  use IO::File;
  use File::Basename;
- use PerlPoint::Constants 0.09;
+ use PerlPoint::Constants 0.11;
  use Digest::SHA1 qw(sha1_base64);
  use Storable qw(:DEFAULT dclone);
 
@@ -855,6 +875,27 @@ B<Example:>
                      DIRECTIVE_OPOINT,
                     }=();
 
+ # declare token descriptions (to be used in error messages)
+ my %tokenDescriptions=(
+                        EOL                => 'a carriage return',
+                        Embed              => 'embedded code',
+                        Embedded           => 'an \END_EMBED tag',
+                        Empty_line         => 'an empty line',
+                        Heredoc_close      => 'a string closing the "here document"',
+                        Heredoc_open       => 'a "here document" opener',
+                        Ils                => 'a indentation',
+                        Include            => 'an included part',
+                        Named_variable     => 'a named variable',
+                        Space              => 'a whitespace',
+                        StreamedPart       => undef,
+                        Symbolic_variable  => 'a symbolic variable',
+                        Table              => 'a table',
+                        Table_separator    => 'a table column separator',
+                        Tabled             => 'an \END_TABLE tag',
+                        Tag_name           => 'a tag name',
+                        Word               => 'a word',
+                       );
+
 %}
 
 # declare tokens (not necessary for Parse::Yapp, but helpful for the reader)
@@ -873,8 +914,10 @@ B<Example:>
 %token Heredoc_open
 %token Heredoc_close
 %token StreamedPart
+%token Named_variable
+%token Symbolic_variable
 
-%expect 18
+%expect 17
 
 %%
 
@@ -1500,6 +1543,9 @@ variable_assignment : Named_variable '=' text
                         # make the text contents a string and store it
                         $variables{$_[1][0]}=join('', @{$_[3][0]});
 
+                        # propagate the setting to the stream, if necessary
+                        push(@$resultStreamRef, [DIRECTIVE_VARSET, DIRECTIVE_START, {var=>$_[1][0], value=>$variables{$_[1][0]}}]) if $flags{var2stream};
+
                         # make the new variable setting available to embedded Perl code, if necessary
                         if ($safeObject)
                          {
@@ -2007,7 +2053,7 @@ table_paragraph : '@'
                     # trace, if necessary
                     warn "[Trace] $sourceFile, line $_[1][1]: Table paragraph starts.\n" if $flags{trace} & TRACE_PARAGRAPHS;
                    }
-                  words
+                  words EOL
                    {
                     # store specified column separator
                     unshift(@tableSeparatorStack, quotemeta(join('', @{$_[3][0]})));
@@ -2018,7 +2064,7 @@ table_paragraph : '@'
                     stateManager(STATE_DEFAULT);
 
                     # trace, if necessary
-                    warn "[Trace] $sourceFile, line $_[6][1]: Table paragraph completed.\n" if $flags{trace} & TRACE_PARAGRAPHS;
+                    warn "[Trace] $sourceFile, line $_[7][1]: Table paragraph completed.\n" if $flags{trace} & TRACE_PARAGRAPHS;
 
                     # reset column separator memory
                     shift(@tableSeparatorStack);
@@ -2030,27 +2076,22 @@ table_paragraph : '@'
                     # closed and a new one opened at the end of the last table line.
                     # Because the table is completed now, the final opener tags can
                     # be removed. This is done *here* and by pop() for acceleration.
-                    # Additionally, note that in a table *paragraph* the first end
-                    # of line is supplied. This is different to a table tag.
-                    if (@{$_[5][0]}>4)
+                    if (@{$_[6][0]}>4)
                       {
-                       # remove initial carriage return in the startup line
-                       shift(@{$_[5][0]});
-
                        # delete final opener directives made by the final carriage return
-                       splice(@{$_[5][0]}, -2, 2);
+                       splice(@{$_[6][0]}, -2, 2);
 
                        # well, the first row shall be formatted as a headline by example,
                        # find the first row and make a modified version
                        {
                         my ($index, @headlinePart)=(0);
-                        foreach (@{$_[5][0]})
+                        foreach (@{$_[6][0]})
                           {
                            $index++;
                            push(@headlinePart, (ref($_) eq 'ARRAY' and $_->[0]==DIRECTIVE_TAG and $_->[2] eq 'TABLE_COL') ? [@{$_}[0, 1], 'TABLE_HL'] : $_);
                            last if ref($_) eq 'ARRAY' and $_->[0]==DIRECTIVE_TAG and $_->[1]==DIRECTIVE_COMPLETE and $_->[2] eq 'TABLE_ROW'
                           }
-                        splice(@{$_[5][0]}, 0, $index, @headlinePart);
+                        splice(@{$_[6][0]}, 0, $index, @headlinePart);
                        }
 
                        # reply data in a "tag envelope" (for backends)
@@ -2061,17 +2102,17 @@ table_paragraph : '@'
                          [DIRECTIVE_TAG, DIRECTIVE_START, 'TABLE_ROW'],
                          [DIRECTIVE_TAG, DIRECTIVE_START, 'TABLE_HL'],
                          # the list of enclosed literals reduced by the final two, if any
-                         @{$_[5][0]} ? @{$_[5][0]} : (),
+                         @{$_[6][0]} ? @{$_[6][0]} : (),
                          # final directive
                          [DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TABLE', \%pars]
                         ],
-                        $_[6][1]
+                        $_[7][1]
                        ];
                       }
                     else
                       {
                        # empty table - reply nothing real
-                       [[()], $_[6][1]];
+                       [[()], $_[7][1]];
                       }
                    }
                 ;
@@ -2079,8 +2120,9 @@ table_paragraph : '@'
 
 embedded : Embed
             {
-             # switch to embedding mode saving the former state
+             # switch to embedding mode saving the former state (including *all* special settings)
              push(@stateStack, $parserState);
+             push(@specialStack, [%specials]);
              stateManager(STATE_EMBEDDING);
 
              # trace, if necessary
@@ -2105,8 +2147,9 @@ embedded : Embed
             }
            optional_literals_and_empty_lines Embedded
             {
-             # restore parser state
+             # restore former parser state (including *all* special settings)
              stateManager(pop(@stateStack));
+             %specials=@{pop(@specialStack)};
 
              # build parameter hash, if necessary
              my %pars;
@@ -2352,6 +2395,13 @@ alias_definition : '+'
 
                      # trace, if necessary
                      warn "[Trace] $sourceFile, line $_[4][1]: Macro definition completed.\n" if $flags{trace} & TRACE_PARAGRAPHS;
+
+                     # check spelling (only accept capitals and underscores in alias names, just like in tags)
+                     if ($_[3][0]=~/[a-z]/)
+                       {
+                        warn "[Warn] $sourceFile, line $_[3][1]: Macro \"\\$_[3][0]\" is stored as ", uc("\\$_[3][0]"), ".\n" unless $flags{display} & DISPLAY_NOWARN;
+                        $_[3][0]=uc($_[3][0]);
+                       }
 
                      # build macro text
                      shift(@{$_[6][0]}); splice(@{$_[6][0]}, -2, 2);
@@ -2782,32 +2832,32 @@ sub lexer
      # reply next token: scan for SPECIAL tagnames: \TABLE
      $found=$1, s/^\\$1//,
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Table starts in line $lineNrs{$inHandle}.\n")),
-     return('Table', [$found, $lineNrs{$inHandle}]) if $specials{tag} and /^(?<!\\)\\(TABLE)/i;
+     return('Table', [$found, $lineNrs{$inHandle}]) if $specials{tag} and /^(?<!\\)\\(TABLE)/;
      
      # reply next token: scan for SPECIAL tagnames: \END_TABLE
      $found=$1, s/^\\$1//,
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Table completed in line $lineNrs{$inHandle}.\n")),
-     return('Tabled', [$found, $lineNrs{$inHandle}])  if $specials{tag} and /^(?<!\\)\\(END_TABLE)/i;
+     return('Tabled', [$found, $lineNrs{$inHandle}])  if $specials{tag} and /^(?<!\\)\\(END_TABLE)/;
      
      # reply next token: scan for SPECIAL tagnames: \EMBED
      $found=$1, s/^\\$1//,
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Embedding starts in line $lineNrs{$inHandle}.\n")),
-     return('Embed', [$found, $lineNrs{$inHandle}]) if $specials{tag} and /^(?<!\\)\\(EMBED)/i;
+     return('Embed', [$found, $lineNrs{$inHandle}]) if $specials{tag} and /^(?<!\\)\\(EMBED)/;
      
      # reply next token: scan for SPECIAL tagnames: \END_EMBED
      $found=$1, s/^\\$1//,
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Embedding completed in line $lineNrs{$inHandle}.\n")),
-     return('Embedded', [$found, $lineNrs{$inHandle}]) if $specials{embedded} and /^(?<!\\)\\(END_EMBED)/i;
+     return('Embedded', [$found, $lineNrs{$inHandle}]) if $specials{embedded} and /^(?<!\\)\\(END_EMBED)/;
      
      # reply next token: scan for SPECIAL tagnames: \INCLUDE
      $found=$1, s/^\\$1//,
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Including starts in line $lineNrs{$inHandle}.\n")),
-     return('Include', [$found, $lineNrs{$inHandle}]) if $specials{tag} and /^(?<!\\)\\(INCLUDE)/i;
+     return('Include', [$found, $lineNrs{$inHandle}]) if $specials{tag} and /^(?<!\\)\\(INCLUDE)/;
      
      # reply next token: scan for tagnames
      $found=$1, s/^\\$1//,
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Tag opener $found in line $lineNrs{$inHandle}.\n")),
-     return('Tag_name', [$found, $lineNrs{$inHandle}]) if $specials{tag} and /^(?<!\\)\\(\w+)/ and (exists $tagsRef->{'\ACCEPT_ALL'} or exists $tagsRef->{$1} or exists $macros{$1});
+     return('Tag_name', [$found, $lineNrs{$inHandle}]) if $specials{tag} and /^(?<!\\)\\([A-Z_]+)/ and (exists $tagsRef->{'\ACCEPT_ALL'} or exists $tagsRef->{$1} or exists $macros{$1});
      
      # reply next token: scan for special characters
      $found=$1, s/^\Q$1//,
@@ -2837,15 +2887,10 @@ sub lexer
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Number $found in line $lineNrs{$inHandle}.\n")),
      return('Number', [$found, $lineNrs{$inHandle}]) if $specials{number} and /^(\d+)/;
 
-     # reply next token: scan for words
+     # reply next token: scan for words or single character (declared as "Word" as well)
      $found=$1, s/^\Q$1//,
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Word \"$found\" in line $lineNrs{$inHandle}.\n")),
-     return('Word', [$found, $lineNrs{$inHandle}]) if /^(\w+)/;
-
-     # reply next token: single character (declared as "word" as well)
-     $found=$1, s/^\Q$1//,
-     (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Word \"$found\" in line $lineNrs{$inHandle}.\n")),
-     return('Word', [$found, $lineNrs{$inHandle}]) if /^(\S)/;
+     return('Word', [$found, $lineNrs{$inHandle}]) if /^(\w+)/ or /^(\S)/;
 
      # everything should be handled - this code should never be executed!
      die "[BUG] $sourceFile, line $lineNrs{$inHandle}: No symbol found in \"$_\"!\n";
@@ -2857,7 +2902,11 @@ sub lexer
 # ----------------------------------------------------------------------------------------------
 sub _Error
  {
-  warn "[Error] $sourceFile, line ${$_[0]->YYCurval}[1]", (exists $statistics{cache} and $statistics{cache}[1]) ? ' (or below because of cache hits)' : (), ": symbol \"", $_[0]->YYCurtok, '" is "', ${$_[0]->YYCurval}[0], "\", expected:\n", join("\nor ", sort $_[0]->YYExpect), ".\n";
+  # declare base indention
+  my $baseIndention=' ' x length('[Error] ');
+
+  # use $_[0]->YYCurtok to display the recognized *token* if necessary - for users convenience, it is suppressed in the message
+  warn "\n\n[Error] $sourceFile, line ${$_[0]->YYCurval}[1]", (exists $statistics{cache} and $statistics{cache}[1]) ? ' (or below because of cache hits)' : (), qq(: found "), ${$_[0]->YYCurval}[0], qq(", expected:\n$baseIndention), ' ' x length('or '), join("\n${baseIndention}or ", map {exists $tokenDescriptions{$_} ? defined $tokenDescriptions{$_} ? $tokenDescriptions{$_} : () : $_} sort $_[0]->YYExpect), ".\n\n";
  }
 
 # ----------------------------------------------------------------------------------------------
@@ -3211,6 +3260,26 @@ New cache entries are always I<added> which means that old entries are never
 replaced and a cache file tends to grow. If you ever wish to clean up a
 cache file completely pass B<CACHE_CLEANUP> to this option.
 
+To avoid trouble B<CACHE_CLEANUP> is I<strongly> recommended after adding
+new alias definitions (that means, alias names which were unknown before),
+unless the special control tag C<\ACCEPT_ALL> is declared (see I<tags> for
+details). Otherwise, unchanged paragraphs containing the backslashed string
+which is an alias now would be restored I<from cache> so that the new alias
+would take no effect.
+
+  // Text before: \NEW has no meaning and is evaluated
+  // as a simple word "NEW" - the backslash is removed silently.
+  // This paragraph will be cached because it does not contain an
+  // alias/macro.
+  There could be \NEW aliases someday.
+
+  // Now consider this is the next turn and \NEW was declared
+  // an alias now. But the paragraph using new remained unchanged,
+  // so I<it is restored from cache>.
+
+This seems to be a rather seldom case but users should be informed about this
+behaviour if you provide the cache feature to them.
+
 To deactivate caching explicitly pass B<CACHE_OFF>.
 I<An existing cache will not be destroyed.>
 
@@ -3383,6 +3452,19 @@ combined by addition as in the following example:
 
 If you omit this parameter or pass TRACE_NOTHING, no traces will be displayed.
 
+=item var2stream
+
+If set to a true value, the parser will propagate variable settings into the stream
+by adding additional C<DIRECTIVE_VARSET> directives.
+
+A variable propagation has the form
+
+  [DIRECTIVE_VARSET, DIRECTIVE_START, {var=>varname, value=>value}]
+
+and is suggested to be handled by a backend callback.
+
+The default value is 0.
+
 =item vispro
 
 activates "process visualization" which simply means that a user will see
@@ -3455,11 +3537,12 @@ sub run
    $flags{display},          #  5
    $flags{filter},           #  6
    $flags{linehints},        #  7
-   $flags{cache},            #  8
-   $flags{cached},           #  9
-   $flags{vis},              # 10
-   $flags{activeBaseData},   # 11
-   $flags{activeDataInit},   # 12
+   $flags{var2stream},       #  8
+   $flags{cache},            #  9
+   $flags{cached},           # 10
+   $flags{vis},              # 11
+   $flags{activeBaseData},   # 12
+   $flags{activeDataInit},   # 13
   )=(
      $pars{tags},                                                                #  1
      $pars{stream},                                                              #  2
@@ -3468,15 +3551,17 @@ sub run
      exists $pars{display} ? $pars{display} : DISPLAY_ALL,                       #  5
      exists $pars{filter} ? $pars{filter} : '',                                  #  6
      (exists $pars{linehints} and $pars{linehints}),                             #  7
-     exists $pars{cache} ? $pars{cache} : CACHE_OFF,                             #  8
-     0,                                                                          #  9
-     exists $pars{vispro} ? $pars{vispro} : 0,                                   # 10
-     exists $pars{activeBaseData} ? fields::phash(%{$pars{activeBaseData}}) : 0, # 11
-     exists $pars{activeDataInit} ? $pars{activeDataInit} : 0,                   # 12
+     (exists $pars{var2stream} and $pars{var2stream}),                           #  8
+     exists $pars{cache} ? $pars{cache} : CACHE_OFF,                             #  9
+     0,                                                                          # 10
+     exists $pars{vispro} ? $pars{vispro} : 0,                                   # 11
+     exists $pars{activeBaseData} ? fields::phash(%{$pars{activeBaseData}}) : 0, # 12
+     exists $pars{activeDataInit} ? $pars{activeDataInit} : 0,                   # 13
     );
 
   # init more
   @flags{qw(skipInput headlineLevelOffset headlineLevel)}=(0) x 3;
+  $statistics{cache}[1]=0 if $flags{cache} & CACHE_ON;
 
   # welcome user
   unless ($flags{display} & DISPLAY_NOINFO)
@@ -3593,7 +3678,7 @@ EOM
     }
 
   # inform user
-  warn "[Info] Parsing completed.\n" unless $flags{display} & DISPLAY_NOINFO;
+  warn "[Info] Parsing completed.\n\n" unless $flags{display} & DISPLAY_NOINFO;
 
   # reply success state
   $rc and not $semErr;
@@ -3728,7 +3813,7 @@ by I<Lorenz Domke> using B<PerlPoint::Package>.
 
 =head1 AUTHOR
 
-Copyright (c) Jochen Stenzel (perl@jochen-stenzel.de), 1999-2000. All rights reserved.
+Copyright (c) Jochen Stenzel (perl@jochen-stenzel.de), 1999-2001. All rights reserved.
 
 This module is free software, you can redistribute it and/or modify it
 under the terms of the Artistic License distributed with Perl version
@@ -3742,7 +3827,19 @@ Perl source tree (where Perl was downloaded/unpacked - ask your
 system administrator if you dont know where this is).  Alternatively,
 the current version of the Artistic License distributed with Perl can
 be viewed on-line on the World-Wide Web (WWW) from the following URL:
-http://www.perl.com/perl/misc/Artistic.html
+http://www.perl.com/perl/misc/Artistic.html.
+
+B<PerlPoint::Parser> is built using B<Parse::Yapp> a way that users
+have I<not> to explicitly install B<Parse::Yapp> themselves. According
+to the copyright note of B<Parse::Yapp> I have to mention the following:
+
+"The Parse::Yapp module and its related modules and shell
+scripts are copyright (c) 1998-1999 Francois Desarmenien,
+France. All rights reserved.
+
+You may use and distribute them under the terms of either
+the GNU General Public License or the Artistic License, as
+specified in the Perl README file."
 
 
 =head1 DISCLAIMER

@@ -88,4 +88,4 @@ $nested1=$word $value
 $nested2=$number $nested1 $number
 
 
-\embed{lang=perl}$main::nested2;\end_embed
+\EMBED{lang=perl}$main::nested2;\END_EMBED

@@ -79,7 +79,8 @@ t/tags.pp
 t/text.t
 t/text.pp
 
-t/variables.t
+t/variables1.t
+t/variables2.t
 t/variables.pp
 
 t/verbatim.t

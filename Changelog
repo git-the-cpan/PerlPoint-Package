@@ -1,4 +1,70 @@
 
+=0.30
+
+* internal code cosmetics;
+
+* variable settings can be propagated into the stream now;
+
+* improved syntactical error messages;
+
+* fixed a bug detected by \I<Lorenz Domke> (lorenz.domke@gmx.de):
+  embedded code can now be included into tags;
+
+* According to the PerlPoint language definition tag
+  recognition is now strictly limited to capitals and underscores
+  (previous versions accepted lowercase letters in tag names as well).
+  The restriction makes it easier to use backslashed strings when
+  \I<all> tags are accepted. Formerly, one had to write
+
+    This is \\no_tag, be sure!
+
+  Now this can be written
+
+    This is \no_tag, be sure!
+
+  and only capitalized backslashed strings are still to be guarded:
+
+    This is \\NO_TAG, be sure!
+
+  As before, this has only to be taken into account if
+  users prefer to accept everything looking like a tag as a tag
+  (see \C<\\ACCEPT_ALL> for details).
+
+* Consequently, lowercased letters in alias/macro definitions
+  are no longer valid. They are accepted but automatically converted
+  into capitals, while the parser displays a warning.
+
+* \I<Lorenz Domke> (lorenz.domke@gmx.de) detected unhandled macro
+  modifications when caching was active. I figured out that this
+  really can happen under the following rare circumstances:
+
+>
+
+* You use a string looking like a tag name not currently known
+  as tag or alias and precede it by a backslash, like \C<\\NOALIAS>.
+  The paragraph does not contain any dynamically changing contents.
+
+* Now you proceed the text with active cache. Because the paragraph looks
+  perfectly static it is cached.
+
+* You declare a new alias \C<\\NOALIAS>. The paragraph remains unchanged.
+
+* Now the next time this text is processed with active cache its
+  checksum matches the paragraph stored before. The stream is restored
+  and the new alias is ignored until eiher the paragraph changes or the
+  cache is cleaned up.
+
+<
+
+* Well, this is not perfect. Users should know this at least, so I added
+  a suggestion to clean up the cache after introducing new alias definitions.
+
+* pp2sdf: "}" characters outside verbatim blocks and embedded HTML
+  are now replaced by SDF escape "{{CHAR::rbrace}}" to guard
+  translations of things like \C<\\B<{key=\>value}\>>
+
+
+
 =0.29
 
 * modified the parser module a way that its version can be

@@ -486,6 +486,26 @@ sub _Parse {
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.30    |05.01.2001| JSTENZEL | slight lexer improvement (removed obsolete code);
+#         |          | JSTENZEL | modified the grammar a way that shift/reduce conflicts
+#         |          |          | were reduced (slightly) and, more important, the grammar
+#         |          |          | now passes yacc/bison (just a preparation);
+#         |20.01.2001| JSTENZEL | variable settings are now propagated into the stream;
+#         |          | JSTENZEL | improved syntactical error messages;
+#         |23.01.2001| JSTENZEL | bugfix: embedding into tags failed because not all
+#         |          |          | special settings were restored correctly, especially
+#         |          |          | for ">" which completes a tag body;
+#         |27.01.2001| JSTENZEL | fixed "unintialized value" warning (cache statistics);
+#         |          | JSTENZEL | tag implementation is now more restrictive: according
+#         |          |          | to the language definition tag and macro names now *have*
+#         |          |          | to be build from capitals and underscores, thus reducing
+#         |          |          | potential tag recognition confusion with ACCEPT_ALL;
+#         |          | JSTENZEL | lowercased alias names in alias definitions are now
+#         |          |          | automatically converted into capitals because of the
+#         |          |          | modfied tag/macro recognition just mentioned before;
+#         |          | JSTENZEL | POD: added a warning to the POD section that the cache
+#         |          |          | should be cleansed after introducing new macros which
+#         |          |          | could possibly be used as simple text before;
 # 0.29    |21.12.2000| JSTENZEL | direct setting of $VERSION variable to enable CPAN to
 #         |          |          | detect and display the parser module version;
 #         |          | JSTENZEL | introduced base settings for active contents provided
@@ -618,7 +638,7 @@ B<PerlPoint::Parser> - a PerlPoint Parser
 
 =head1 VERSION
 
-This manual describes version B<0.29>.
+This manual describes version B<0.30>.
 
 =head1 SYNOPSIS
 
@@ -1262,7 +1282,7 @@ B<Example:>
  require 5.00503;
 
  # declare module version
- $PerlPoint::Parser::VERSION=0.29;
+ $PerlPoint::Parser::VERSION=0.30;
  $PerlPoint::Parser::VERSION=$PerlPoint::Parser::VERSION; # to suppress a warning of exclusive usage only;
 
  # pragmata
@@ -1274,7 +1294,7 @@ B<Example:>
  use Carp;
  use IO::File;
  use File::Basename;
- use PerlPoint::Constants 0.09;
+ use PerlPoint::Constants 0.11;
  use Digest::SHA1 qw(sha1_base64);
  use Storable qw(:DEFAULT dclone);
 
@@ -1326,6 +1346,27 @@ B<Example:>
                      DIRECTIVE_UPOINT,
                      DIRECTIVE_OPOINT,
                     }=();
+
+ # declare token descriptions (to be used in error messages)
+ my %tokenDescriptions=(
+                        EOL                => 'a carriage return',
+                        Embed              => 'embedded code',
+                        Embedded           => 'an \END_EMBED tag',
+                        Empty_line         => 'an empty line',
+                        Heredoc_close      => 'a string closing the "here document"',
+                        Heredoc_open       => 'a "here document" opener',
+                        Ils                => 'a indentation',
+                        Include            => 'an included part',
+                        Named_variable     => 'a named variable',
+                        Space              => 'a whitespace',
+                        StreamedPart       => undef,
+                        Symbolic_variable  => 'a symbolic variable',
+                        Table              => 'a table',
+                        Table_separator    => 'a table column separator',
+                        Tabled             => 'an \END_TABLE tag',
+                        Tag_name           => 'a tag name',
+                        Word               => 'a word',
+                       );
 
 
 
@@ -2139,11 +2180,8 @@ sub new {
 	},
 	{#State 93
 		ACTIONS => {
-			'Word' => 124
-		},
-		DEFAULT => -120,
-		GOTOS => {
-			'@21-3' => 125
+			'EOL' => 124,
+			'Word' => 125
 		}
 	},
 	{#State 94
@@ -2399,35 +2437,13 @@ sub new {
 		DEFAULT => -43
 	},
 	{#State 124
-		DEFAULT => -99
+		DEFAULT => -120,
+		GOTOS => {
+			'@21-4' => 145
+		}
 	},
 	{#State 125
-		ACTIONS => {
-			'EOL' => 3,
-			'Table_separator' => 24,
-			'Include' => 23,
-			'Named_variable' => 94,
-			'StreamedPart' => 50,
-			'Table' => 27,
-			'Symbolic_variable' => 42,
-			'Space' => 56,
-			'Word' => 30,
-			'Tag_name' => 58,
-			'Embed' => 14
-		},
-		DEFAULT => -67,
-		GOTOS => {
-			'included' => 2,
-			'literals' => 109,
-			'table' => 53,
-			'embedded' => 41,
-			'basic' => 12,
-			'table_separator' => 48,
-			'literal' => 111,
-			'optional_literals' => 145,
-			'tag' => 43,
-			'element' => 13
-		}
+		DEFAULT => -99
 	},
 	{#State 126
 		DEFAULT => -46
@@ -2583,7 +2599,30 @@ sub new {
 	},
 	{#State 145
 		ACTIONS => {
-			'Empty_line' => 157
+			'EOL' => 3,
+			'Table_separator' => 24,
+			'Include' => 23,
+			'Named_variable' => 94,
+			'StreamedPart' => 50,
+			'Table' => 27,
+			'Symbolic_variable' => 42,
+			'Space' => 56,
+			'Word' => 30,
+			'Tag_name' => 58,
+			'Embed' => 14
+		},
+		DEFAULT => -67,
+		GOTOS => {
+			'included' => 2,
+			'literals' => 109,
+			'table' => 53,
+			'embedded' => 41,
+			'basic' => 12,
+			'table_separator' => 48,
+			'literal' => 111,
+			'optional_literals' => 157,
+			'tag' => 43,
+			'element' => 13
 		}
 	},
 	{#State 146
@@ -2703,7 +2742,9 @@ sub new {
 		}
 	},
 	{#State 157
-		DEFAULT => -121
+		ACTIONS => {
+			'Empty_line' => 166
+		}
 	},
 	{#State 158
 		DEFAULT => -106
@@ -2713,12 +2754,12 @@ sub new {
 			'Word' => 147
 		},
 		GOTOS => {
-			'tagpar' => 166
+			'tagpar' => 167
 		}
 	},
 	{#State 160
 		ACTIONS => {
-			"=" => 167
+			"=" => 168
 		}
 	},
 	{#State 161
@@ -2742,7 +2783,7 @@ sub new {
 			'StreamedPart' => 50,
 			'Table' => 27,
 			'Symbolic_variable' => 42,
-			">" => 168,
+			">" => 169,
 			'Space' => 56,
 			'Word' => 30,
 			'Tag_name' => 58,
@@ -2760,21 +2801,24 @@ sub new {
 		}
 	},
 	{#State 166
-		DEFAULT => -108
+		DEFAULT => -121
 	},
 	{#State 167
-		ACTIONS => {
-			"\"" => 169,
-			'Word' => 171
-		},
-		GOTOS => {
-			'tagvalue' => 170
-		}
+		DEFAULT => -108
 	},
 	{#State 168
-		DEFAULT => -114
+		ACTIONS => {
+			"\"" => 170,
+			'Word' => 172
+		},
+		GOTOS => {
+			'tagvalue' => 171
+		}
 	},
 	{#State 169
+		DEFAULT => -114
+	},
+	{#State 170
 		ACTIONS => {
 			'Table' => 27,
 			'Symbolic_variable' => 42,
@@ -2792,23 +2836,23 @@ sub new {
 			'table' => 53,
 			'embedded' => 41,
 			'basic' => 107,
-			'basics' => 172,
+			'basics' => 173,
 			'table_separator' => 48,
 			'tag' => 43,
 			'element' => 13
 		}
 	},
-	{#State 170
+	{#State 171
 		DEFAULT => -110
 	},
-	{#State 171
+	{#State 172
 		DEFAULT => -111
 	},
-	{#State 172
+	{#State 173
 		ACTIONS => {
 			'Table' => 27,
 			'Symbolic_variable' => 42,
-			"\"" => 173,
+			"\"" => 174,
 			'Space' => 56,
 			'Table_separator' => 24,
 			'Include' => 23,
@@ -2828,7 +2872,7 @@ sub new {
 			'element' => 13
 		}
 	},
-	{#State 173
+	{#State 174
 		DEFAULT => -112
 	}
 ],
@@ -2840,7 +2884,7 @@ sub new {
 	[#Rule 1
 		 'document', 1,
 sub
-#line 883 "ppParser.yp"
+#line 926 "ppParser.yp"
 {
              # skip empty line "paragraphs"
              unless ($_[1][0] eq '')
@@ -2874,7 +2918,7 @@ sub
 	[#Rule 2
 		 'document', 2,
 sub
-#line 913 "ppParser.yp"
+#line 956 "ppParser.yp"
 {
              # skip empty line "paragraphs"
              unless ($_[2][0] eq '')
@@ -2944,7 +2988,7 @@ sub
 	[#Rule 15
 		 '@1-1', 0,
 sub
-#line 961 "ppParser.yp"
+#line 1004 "ppParser.yp"
 {
              # switch to headline intro mode
              stateManager(STATE_HEADLINE);
@@ -2959,7 +3003,7 @@ sub
 	[#Rule 16
 		 'headline', 4,
 sub
-#line 972 "ppParser.yp"
+#line 1015 "ppParser.yp"
 {
              # back to default mode
              stateManager(STATE_DEFAULT);
@@ -2993,7 +3037,7 @@ sub
 	[#Rule 18
 		 'headline_level', 1,
 sub
-#line 1003 "ppParser.yp"
+#line 1046 "ppParser.yp"
 {
                    # start new counter and reply it
                    [$flags{headlineLevelOffset}+1, $_[1][1]];
@@ -3002,7 +3046,7 @@ sub
 	[#Rule 19
 		 'headline_level', 2,
 sub
-#line 1008 "ppParser.yp"
+#line 1051 "ppParser.yp"
 {
                    # update counter and reply it
                    [$_[1][0]+1, $_[1][1]];
@@ -3011,7 +3055,7 @@ sub
 	[#Rule 20
 		 '@2-1', 0,
 sub
-#line 1016 "ppParser.yp"
+#line 1059 "ppParser.yp"
 {
                # switch to condition mode
                stateManager(STATE_HEADLINE);
@@ -3023,7 +3067,7 @@ sub
 	[#Rule 21
 		 'condition', 4,
 sub
-#line 1024 "ppParser.yp"
+#line 1067 "ppParser.yp"
 {
                # back to default mode
                stateManager(STATE_DEFAULT);
@@ -3080,7 +3124,7 @@ sub
 	[#Rule 23
 		 'list', 2,
 sub
-#line 1078 "ppParser.yp"
+#line 1121 "ppParser.yp"
 {
          # update token list and reply it
          push(@{$_[1][0]}, @{$_[2][0]});
@@ -3090,7 +3134,7 @@ sub
 	[#Rule 24
 		 'list', 3,
 sub
-#line 1084 "ppParser.yp"
+#line 1127 "ppParser.yp"
 {
          # update statistics, if necessary (shifters are not passed as standalone paragraphs, so ...)
          $statistics{$_[2][0][0][0]}++;
@@ -3103,7 +3147,7 @@ sub
 	[#Rule 25
 		 'list_part', 1,
 sub
-#line 1096 "ppParser.yp"
+#line 1139 "ppParser.yp"
 {
               # embed the points into list directives
               [
@@ -3122,7 +3166,7 @@ sub
 	[#Rule 26
 		 'list_part', 1,
 sub
-#line 1111 "ppParser.yp"
+#line 1154 "ppParser.yp"
 {
               # embed the points into list directives
               [
@@ -3141,7 +3185,7 @@ sub
 	[#Rule 27
 		 'list_part', 1,
 sub
-#line 1126 "ppParser.yp"
+#line 1169 "ppParser.yp"
 {
               # embed the points into list directives
               [
@@ -3163,7 +3207,7 @@ sub
 	[#Rule 29
 		 'olist', 2,
 sub
-#line 1145 "ppParser.yp"
+#line 1188 "ppParser.yp"
 {
           # update token list and reply it
           push(@{$_[1][0]}, @{$_[2][0]});
@@ -3176,7 +3220,7 @@ sub
 	[#Rule 31
 		 'ulist', 2,
 sub
-#line 1155 "ppParser.yp"
+#line 1198 "ppParser.yp"
 {
           # update token list and reply it
           push(@{$_[1][0]}, @{$_[2][0]});
@@ -3189,7 +3233,7 @@ sub
 	[#Rule 33
 		 'dlist', 2,
 sub
-#line 1165 "ppParser.yp"
+#line 1208 "ppParser.yp"
 {
           # update token list and reply it
           push(@{$_[1][0]}, @{$_[2][0]});
@@ -3199,7 +3243,7 @@ sub
 	[#Rule 34
 		 '@3-1', 0,
 sub
-#line 1174 "ppParser.yp"
+#line 1217 "ppParser.yp"
 {
            # switch to opoint mode
            stateManager(STATE_OPOINT);
@@ -3211,7 +3255,7 @@ sub
 	[#Rule 35
 		 'opoint', 3,
 sub
-#line 1182 "ppParser.yp"
+#line 1225 "ppParser.yp"
 {
            # update statistics (list points are not passed as standalone paragraphs, so ...)
            $statistics{&DIRECTIVE_OPOINT}++;
@@ -3248,19 +3292,19 @@ sub
 	[#Rule 37
 		 'opoint_opener', 1,
 sub
-#line 1217 "ppParser.yp"
+#line 1260 "ppParser.yp"
 {[0, $_[1][1]];}
 	],
 	[#Rule 38
 		 'opoint_opener', 2,
 sub
-#line 1219 "ppParser.yp"
+#line 1262 "ppParser.yp"
 {[1, $_[1][1]];}
 	],
 	[#Rule 39
 		 '@4-1', 0,
 sub
-#line 1224 "ppParser.yp"
+#line 1267 "ppParser.yp"
 {
            # switch to upoint mode
            stateManager(STATE_UPOINT);
@@ -3272,7 +3316,7 @@ sub
 	[#Rule 40
 		 'upoint', 3,
 sub
-#line 1232 "ppParser.yp"
+#line 1275 "ppParser.yp"
 {
            # update statistics (list points are not passed as standalone paragraphs, so ...)
            $statistics{&DIRECTIVE_UPOINT}++;
@@ -3302,14 +3346,14 @@ sub
 	[#Rule 42
 		 '@5-1', 0,
 sub
-#line 1260 "ppParser.yp"
+#line 1303 "ppParser.yp"
 {
           }
 	],
 	[#Rule 43
 		 'dpoint', 3,
 sub
-#line 1263 "ppParser.yp"
+#line 1306 "ppParser.yp"
 {
            # update statistics (list points are not passed as standalone paragraphs, so ...)
            $statistics{&DIRECTIVE_DPOINT}++;
@@ -3344,7 +3388,7 @@ sub
 	[#Rule 45
 		 '@6-1', 0,
 sub
-#line 1296 "ppParser.yp"
+#line 1339 "ppParser.yp"
 {
                  # switch to dlist item mode
                  stateManager(STATE_DPOINT_ITEM);
@@ -3356,7 +3400,7 @@ sub
 	[#Rule 46
 		 'dlist_opener', 4,
 sub
-#line 1304 "ppParser.yp"
+#line 1347 "ppParser.yp"
 {
                  # switch to dlist body mode
                  stateManager(STATE_DPOINT);
@@ -3371,7 +3415,7 @@ sub
 	[#Rule 48
 		 'compound_block', 2,
 sub
-#line 1317 "ppParser.yp"
+#line 1360 "ppParser.yp"
 {
                    # this is tricky - to combine both blocks, we have to remove the already
                    # embedded stop/start directives and to supply the 
@@ -3391,7 +3435,7 @@ sub
 	[#Rule 49
 		 'compound_block', 3,
 sub
-#line 1333 "ppParser.yp"
+#line 1376 "ppParser.yp"
 {
                    # update statistics (for the first part which is completed by the intermediate flag paragraph)
                    $statistics{&DIRECTIVE_BLOCK}++;
@@ -3411,7 +3455,7 @@ sub
 	[#Rule 50
 		 '@7-1', 0,
 sub
-#line 1352 "ppParser.yp"
+#line 1395 "ppParser.yp"
 {
                   # switch to control mode
                   stateManager(STATE_CONTROL);
@@ -3423,7 +3467,7 @@ sub
 	[#Rule 51
 		 'block_flagnew', 3,
 sub
-#line 1360 "ppParser.yp"
+#line 1403 "ppParser.yp"
 {
                   # back to default mode
                   stateManager(STATE_DEFAULT);
@@ -3438,7 +3482,7 @@ sub
 	[#Rule 52
 		 '@8-1', 0,
 sub
-#line 1374 "ppParser.yp"
+#line 1417 "ppParser.yp"
 {
           # switch to block mode
           stateManager(STATE_BLOCK);
@@ -3450,7 +3494,7 @@ sub
 	[#Rule 53
 		 'block', 3,
 sub
-#line 1382 "ppParser.yp"
+#line 1425 "ppParser.yp"
 {
           # trace, if necessary
           warn "[Trace] $sourceFile, line $_[3][1]: Block completed.\n" if $flags{trace} & TRACE_PARAGRAPHS;
@@ -3473,7 +3517,7 @@ sub
 	[#Rule 55
 		 '@9-1', 0,
 sub
-#line 1402 "ppParser.yp"
+#line 1445 "ppParser.yp"
 {
          # enter text mode - unless we are in a block (or point (which already set this mode itself))
          unless (   $parserState==STATE_BLOCK
@@ -3495,7 +3539,7 @@ sub
 	[#Rule 56
 		 'text', 4,
 sub
-#line 1421 "ppParser.yp"
+#line 1464 "ppParser.yp"
 {
          # trace, if necessary
          warn "[Trace] $sourceFile, line $_[4][1]: Text completed.\n" unless    not $flags{trace} & TRACE_PARAGRAPHS
@@ -3528,7 +3572,7 @@ sub
 	[#Rule 57
 		 '@10-1', 0,
 sub
-#line 1453 "ppParser.yp"
+#line 1496 "ppParser.yp"
 {
              # switch to verbatim mode
              stateManager(STATE_VERBATIM);
@@ -3546,7 +3590,7 @@ sub
 	[#Rule 58
 		 'verbatim', 4,
 sub
-#line 1468 "ppParser.yp"
+#line 1511 "ppParser.yp"
 {
              # trace, if necessary
              warn "[Trace] $sourceFile, line $_[4][1]: Verbatim block completed.\n" if $flags{trace} & TRACE_PARAGRAPHS;
@@ -3574,7 +3618,7 @@ sub
 	[#Rule 59
 		 'variable_assignment', 3,
 sub
-#line 1495 "ppParser.yp"
+#line 1538 "ppParser.yp"
 {
                         # remove text directives and the final space (made from the final EOL)
                         shift(@{$_[3][0]});
@@ -3582,6 +3626,9 @@ sub
 
                         # make the text contents a string and store it
                         $variables{$_[1][0]}=join('', @{$_[3][0]});
+
+                        # propagate the setting to the stream, if necessary
+                        push(@$resultStreamRef, [DIRECTIVE_VARSET, DIRECTIVE_START, {var=>$_[1][0], value=>$variables{$_[1][0]}}]) if $flags{var2stream};
 
                         # make the new variable setting available to embedded Perl code, if necessary
                         if ($safeObject)
@@ -3600,7 +3647,7 @@ sub
 	[#Rule 60
 		 '@11-2', 0,
 sub
-#line 1520 "ppParser.yp"
+#line 1566 "ppParser.yp"
 {
             # switch to comment mode
             stateManager(STATE_COMMENT);
@@ -3612,7 +3659,7 @@ sub
 	[#Rule 61
 		 'comment', 5,
 sub
-#line 1528 "ppParser.yp"
+#line 1574 "ppParser.yp"
 {
             # back to default mode
             stateManager(STATE_DEFAULT);
@@ -3637,7 +3684,7 @@ sub
 	[#Rule 62
 		 '@12-1', 0,
 sub
-#line 1552 "ppParser.yp"
+#line 1598 "ppParser.yp"
 {
                 # temporarily activate number detection
                 push(@specialStack, $specials{number});
@@ -3647,7 +3694,7 @@ sub
 	[#Rule 63
 		 '@13-3', 0,
 sub
-#line 1558 "ppParser.yp"
+#line 1604 "ppParser.yp"
 {
                 # restore previous number detection mode
                 $specials{number}=pop(@specialStack);
@@ -3662,7 +3709,7 @@ sub
 	[#Rule 64
 		 'list_shift', 5,
 sub
-#line 1569 "ppParser.yp"
+#line 1615 "ppParser.yp"
 {
                 # back to default mode
                 stateManager(STATE_DEFAULT);
@@ -3691,7 +3738,7 @@ sub
 	[#Rule 65
 		 'list_shifter', 1,
 sub
-#line 1597 "ppParser.yp"
+#line 1643 "ppParser.yp"
 {
                  # reply a flag
                  [LIST_SHIFT_RIGHT, $_[1][1]];
@@ -3700,7 +3747,7 @@ sub
 	[#Rule 66
 		 'list_shifter', 1,
 sub
-#line 1602 "ppParser.yp"
+#line 1648 "ppParser.yp"
 {
                  # reply a flag
                  [LIST_SHIFT_LEFT, $_[1][1]];
@@ -3709,7 +3756,7 @@ sub
 	[#Rule 67
 		 'optional_literals', 0,
 sub
-#line 1610 "ppParser.yp"
+#line 1656 "ppParser.yp"
 {
                       # start a new, empty list and reply it
                       [[], $lineNrs{$inHandle}];
@@ -3724,7 +3771,7 @@ sub
 	[#Rule 70
 		 'literals', 2,
 sub
-#line 1620 "ppParser.yp"
+#line 1666 "ppParser.yp"
 {
              # update token list and reply it
              push(@{$_[1][0]}, @{$_[2][0]});
@@ -3734,7 +3781,7 @@ sub
 	[#Rule 71
 		 'optional_literals_and_empty_lines', 0,
 sub
-#line 1629 "ppParser.yp"
+#line 1675 "ppParser.yp"
 {
                                       # start a new, empty list and reply it
                                       [[], $lineNrs{$inHandle}];
@@ -3749,7 +3796,7 @@ sub
 	[#Rule 74
 		 'literals_and_empty_lines', 2,
 sub
-#line 1639 "ppParser.yp"
+#line 1685 "ppParser.yp"
 {
                              # update token list and reply it
                              push(@{$_[1][0]}, @{$_[2][0]});
@@ -3762,7 +3809,7 @@ sub
 	[#Rule 76
 		 'literal_or_empty_line', 1,
 sub
-#line 1649 "ppParser.yp"
+#line 1695 "ppParser.yp"
 {
                           # start a new token list and reply it
                           [[$_[1][0]], $_[1][1]];
@@ -3774,7 +3821,7 @@ sub
 	[#Rule 78
 		 'literal', 1,
 sub
-#line 1658 "ppParser.yp"
+#line 1704 "ppParser.yp"
 {
             # start a new token list and reply it
             [[$_[1][0]], $_[1][1]];
@@ -3783,7 +3830,7 @@ sub
 	[#Rule 79
 		 'optional_basics', 0,
 sub
-#line 1666 "ppParser.yp"
+#line 1712 "ppParser.yp"
 {
                    # start a new, empty list and reply it
                    [[], $lineNrs{$inHandle}];
@@ -3798,7 +3845,7 @@ sub
 	[#Rule 82
 		 'basics', 2,
 sub
-#line 1676 "ppParser.yp"
+#line 1722 "ppParser.yp"
 {
            # update token list and reply it
            push(@{$_[1][0]}, @{$_[2][0]});
@@ -3820,7 +3867,7 @@ sub
 	[#Rule 87
 		 'elements', 2,
 sub
-#line 1694 "ppParser.yp"
+#line 1740 "ppParser.yp"
 {
              # update token list and reply it
              push(@{$_[1][0]}, @{$_[2][0]});
@@ -3830,7 +3877,7 @@ sub
 	[#Rule 88
 		 'element', 1,
 sub
-#line 1704 "ppParser.yp"
+#line 1750 "ppParser.yp"
 {
             # start a new token list and reply it
             [[$_[1][0]], $_[1][1]];
@@ -3839,7 +3886,7 @@ sub
 	[#Rule 89
 		 'element', 1,
 sub
-#line 1709 "ppParser.yp"
+#line 1755 "ppParser.yp"
 {
             # start a new token list and reply it
             [[$_[1][0]], $_[1][1]];
@@ -3848,7 +3895,7 @@ sub
 	[#Rule 90
 		 'element', 1,
 sub
-#line 1714 "ppParser.yp"
+#line 1760 "ppParser.yp"
 {
 	    # disable storage of a checksum (variable definitions may change or have changed)
 	    $flags{checksummed}=0;
@@ -3860,7 +3907,7 @@ sub
 	[#Rule 91
 		 'element', 1,
 sub
-#line 1722 "ppParser.yp"
+#line 1768 "ppParser.yp"
 {
 	    # disable storage of a checksum (variable definitions may change or have changed)
 	    $flags{checksummed}=0;
@@ -3872,7 +3919,7 @@ sub
 	[#Rule 92
 		 'element', 1,
 sub
-#line 1730 "ppParser.yp"
+#line 1776 "ppParser.yp"
 {
             # start a new token list and reply it
             # (the passed stream is already a reference)
@@ -3891,7 +3938,7 @@ sub
 	[#Rule 96
 		 'optional_number', 0,
 sub
-#line 1743 "ppParser.yp"
+#line 1789 "ppParser.yp"
 {[undef, $lineNrs{$inHandle}];}
 	],
 	[#Rule 97
@@ -3900,7 +3947,7 @@ sub
 	[#Rule 98
 		 'words', 1,
 sub
-#line 1750 "ppParser.yp"
+#line 1796 "ppParser.yp"
 {
           # start a new token list and reply it
           [[$_[1][0]], $_[1][1]];
@@ -3909,7 +3956,7 @@ sub
 	[#Rule 99
 		 'words', 2,
 sub
-#line 1755 "ppParser.yp"
+#line 1801 "ppParser.yp"
 {
           # update token list and reply it
           push(@{$_[1][0]}, $_[2][0]);
@@ -3919,7 +3966,7 @@ sub
 	[#Rule 100
 		 '@14-1', 0,
 sub
-#line 1765 "ppParser.yp"
+#line 1811 "ppParser.yp"
 {
         # trace, if necessary
         warn "[Trace] $sourceFile, line $_[1][1]: Tag $_[1][0] starts.\n" if $flags{trace} & TRACE_PARAGRAPHS;
@@ -3932,7 +3979,7 @@ sub
 	[#Rule 101
 		 '@15-3', 0,
 sub
-#line 1774 "ppParser.yp"
+#line 1820 "ppParser.yp"
 {
         # restore special states of "{" and "}"
         @specials{('{', '}')}=splice(@specialStack, -2, 2);
@@ -3941,7 +3988,7 @@ sub
 	[#Rule 102
 		 'tag', 5,
 sub
-#line 1779 "ppParser.yp"
+#line 1825 "ppParser.yp"
 {
         # trace, if necessary
         warn "[Trace] $sourceFile, line $_[5][1]: Tag $_[1][0] completed.\n" if $flags{trace} & TRACE_PARAGRAPHS;
@@ -4005,7 +4052,7 @@ sub
 	[#Rule 103
 		 'optional_tagpars', 0,
 sub
-#line 1842 "ppParser.yp"
+#line 1888 "ppParser.yp"
 {[[], $lineNrs{$inHandle}];}
 	],
 	[#Rule 104
@@ -4014,7 +4061,7 @@ sub
 	[#Rule 105
 		 '@16-1', 0,
 sub
-#line 1848 "ppParser.yp"
+#line 1894 "ppParser.yp"
 {
                  # temporarily activate special "="
                  push(@specialStack, $specials{'='});
@@ -4024,7 +4071,7 @@ sub
 	[#Rule 106
 		 'used_tagpars', 4,
 sub
-#line 1854 "ppParser.yp"
+#line 1900 "ppParser.yp"
 {
                  #restore special state of "="
                  $specials{'='}=pop(@specialStack);
@@ -4039,7 +4086,7 @@ sub
 	[#Rule 108
 		 'tagpars', 3,
 sub
-#line 1866 "ppParser.yp"
+#line 1912 "ppParser.yp"
 {
             # update parameter list
             push(@{$_[1][0]}, @{$_[3][0]});
@@ -4051,7 +4098,7 @@ sub
 	[#Rule 109
 		 '@17-1', 0,
 sub
-#line 1877 "ppParser.yp"
+#line 1923 "ppParser.yp"
 {
            # temporarily make "=" and quotes the only specials,
            # but take care to reset the remaining settings defined
@@ -4063,7 +4110,7 @@ sub
 	[#Rule 110
 		 'tagpar', 4,
 sub
-#line 1885 "ppParser.yp"
+#line 1931 "ppParser.yp"
 {
            # restore special settings
            %specials=@{pop(@specialStack)};
@@ -4078,7 +4125,7 @@ sub
 	[#Rule 112
 		 'tagvalue', 3,
 sub
-#line 1896 "ppParser.yp"
+#line 1942 "ppParser.yp"
 {
              # build a string and supply it
              [join('', @{$_[2][0]}), $_[3][1]];
@@ -4087,13 +4134,13 @@ sub
 	[#Rule 113
 		 'optional_tagbody', 0,
 sub
-#line 1904 "ppParser.yp"
+#line 1950 "ppParser.yp"
 {[[], $lineNrs{$inHandle}];}
 	],
 	[#Rule 114
 		 'optional_tagbody', 3,
 sub
-#line 1906 "ppParser.yp"
+#line 1952 "ppParser.yp"
 {
                      # reply the literals
                      [$_[2][0], $_[3][1]];
@@ -4102,7 +4149,7 @@ sub
 	[#Rule 115
 		 '@18-1', 0,
 sub
-#line 1914 "ppParser.yp"
+#line 1960 "ppParser.yp"
 {
           # trace, if necessary
           warn "[Trace] $sourceFile, line $_[1][1]: Table starts.\n" if $flags{trace} & TRACE_PARAGRAPHS;
@@ -4122,7 +4169,7 @@ sub
 	[#Rule 116
 		 '@19-3', 0,
 sub
-#line 1930 "ppParser.yp"
+#line 1976 "ppParser.yp"
 {
           # restore previous handling of empty lines
           $lexerFlags{el}=pop(@specialStack);
@@ -4140,7 +4187,7 @@ sub
 	[#Rule 117
 		 'table', 6,
 sub
-#line 1944 "ppParser.yp"
+#line 1990 "ppParser.yp"
 {
           # reset column separator memory
           shift(@tableSeparatorStack);
@@ -4178,7 +4225,7 @@ sub
 	[#Rule 118
 		 'table_separator', 1,
 sub
-#line 1981 "ppParser.yp"
+#line 2027 "ppParser.yp"
 {
                     # update counter of completed table columns
                     $tableColumns++;
@@ -4201,7 +4248,7 @@ sub
 	[#Rule 119
 		 '@20-1', 0,
 sub
-#line 2003 "ppParser.yp"
+#line 2049 "ppParser.yp"
 {
                     # switch to condition mode
                     stateManager(STATE_TABLE);
@@ -4211,24 +4258,24 @@ sub
                    }
 	],
 	[#Rule 120
-		 '@21-3', 0,
+		 '@21-4', 0,
 sub
-#line 2011 "ppParser.yp"
+#line 2057 "ppParser.yp"
 {
                     # store specified column separator
                     unshift(@tableSeparatorStack, quotemeta(join('', @{$_[3][0]})));
                    }
 	],
 	[#Rule 121
-		 'table_paragraph', 6,
+		 'table_paragraph', 7,
 sub
-#line 2016 "ppParser.yp"
+#line 2062 "ppParser.yp"
 {
                     # back to default mode
                     stateManager(STATE_DEFAULT);
 
                     # trace, if necessary
-                    warn "[Trace] $sourceFile, line $_[6][1]: Table paragraph completed.\n" if $flags{trace} & TRACE_PARAGRAPHS;
+                    warn "[Trace] $sourceFile, line $_[7][1]: Table paragraph completed.\n" if $flags{trace} & TRACE_PARAGRAPHS;
 
                     # reset column separator memory
                     shift(@tableSeparatorStack);
@@ -4240,27 +4287,22 @@ sub
                     # closed and a new one opened at the end of the last table line.
                     # Because the table is completed now, the final opener tags can
                     # be removed. This is done *here* and by pop() for acceleration.
-                    # Additionally, note that in a table *paragraph* the first end
-                    # of line is supplied. This is different to a table tag.
-                    if (@{$_[5][0]}>4)
+                    if (@{$_[6][0]}>4)
                       {
-                       # remove initial carriage return in the startup line
-                       shift(@{$_[5][0]});
-
                        # delete final opener directives made by the final carriage return
-                       splice(@{$_[5][0]}, -2, 2);
+                       splice(@{$_[6][0]}, -2, 2);
 
                        # well, the first row shall be formatted as a headline by example,
                        # find the first row and make a modified version
                        {
                         my ($index, @headlinePart)=(0);
-                        foreach (@{$_[5][0]})
+                        foreach (@{$_[6][0]})
                           {
                            $index++;
                            push(@headlinePart, (ref($_) eq 'ARRAY' and $_->[0]==DIRECTIVE_TAG and $_->[2] eq 'TABLE_COL') ? [@{$_}[0, 1], 'TABLE_HL'] : $_);
                            last if ref($_) eq 'ARRAY' and $_->[0]==DIRECTIVE_TAG and $_->[1]==DIRECTIVE_COMPLETE and $_->[2] eq 'TABLE_ROW'
                           }
-                        splice(@{$_[5][0]}, 0, $index, @headlinePart);
+                        splice(@{$_[6][0]}, 0, $index, @headlinePart);
                        }
 
                        # reply data in a "tag envelope" (for backends)
@@ -4271,27 +4313,28 @@ sub
                          [DIRECTIVE_TAG, DIRECTIVE_START, 'TABLE_ROW'],
                          [DIRECTIVE_TAG, DIRECTIVE_START, 'TABLE_HL'],
                          # the list of enclosed literals reduced by the final two, if any
-                         @{$_[5][0]} ? @{$_[5][0]} : (),
+                         @{$_[6][0]} ? @{$_[6][0]} : (),
                          # final directive
                          [DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TABLE', \%pars]
                         ],
-                        $_[6][1]
+                        $_[7][1]
                        ];
                       }
                     else
                       {
                        # empty table - reply nothing real
-                       [[()], $_[6][1]];
+                       [[()], $_[7][1]];
                       }
                    }
 	],
 	[#Rule 122
 		 '@22-1', 0,
 sub
-#line 2081 "ppParser.yp"
+#line 2122 "ppParser.yp"
 {
-             # switch to embedding mode saving the former state
+             # switch to embedding mode saving the former state (including *all* special settings)
              push(@stateStack, $parserState);
+             push(@specialStack, [%specials]);
              stateManager(STATE_EMBEDDING);
 
              # trace, if necessary
@@ -4309,7 +4352,7 @@ sub
 	[#Rule 123
 		 '@23-3', 0,
 sub
-#line 2098 "ppParser.yp"
+#line 2140 "ppParser.yp"
 {
              # restore special state of "{" and "}"
              @specials{('{', '}')}=splice(@specialStack, -2, 2);
@@ -4322,10 +4365,11 @@ sub
 	[#Rule 124
 		 'embedded', 6,
 sub
-#line 2107 "ppParser.yp"
+#line 2149 "ppParser.yp"
 {
-             # restore parser state
+             # restore former parser state (including *all* special settings)
              stateManager(pop(@stateStack));
+             %specials=@{pop(@specialStack)};
 
              # build parameter hash, if necessary
              my %pars;
@@ -4406,7 +4450,7 @@ sub
 	[#Rule 125
 		 '@24-1', 0,
 sub
-#line 2190 "ppParser.yp"
+#line 2233 "ppParser.yp"
 {
              # trace, if necessary
              warn "[Trace] $sourceFile, line $_[1][1]: Inclusion starts.\n" if $flags{trace} & TRACE_PARAGRAPHS;
@@ -4425,7 +4469,7 @@ sub
 	[#Rule 126
 		 'included', 3,
 sub
-#line 2205 "ppParser.yp"
+#line 2248 "ppParser.yp"
 {
              # restore special state of "{" and "}"
              @specials{('{', '}')}=splice(@specialStack, -2, 2);
@@ -4557,7 +4601,7 @@ sub
 	[#Rule 127
 		 '@25-1', 0,
 sub
-#line 2337 "ppParser.yp"
+#line 2380 "ppParser.yp"
 {
                      # switch to definition mode
                      stateManager(STATE_DEFINITION);
@@ -4569,7 +4613,7 @@ sub
 	[#Rule 128
 		 '@26-4', 0,
 sub
-#line 2345 "ppParser.yp"
+#line 2388 "ppParser.yp"
 {
                      # disable all specials to get the body as a plain text
                      @specials{keys %specials}=(0) x scalar(keys %specials);
@@ -4578,12 +4622,19 @@ sub
 	[#Rule 129
 		 'alias_definition', 6,
 sub
-#line 2350 "ppParser.yp"
+#line 2393 "ppParser.yp"
 {
                      # "text" already switched back to default mode (and disabled specials [{}:])
 
                      # trace, if necessary
                      warn "[Trace] $sourceFile, line $_[4][1]: Macro definition completed.\n" if $flags{trace} & TRACE_PARAGRAPHS;
+
+                     # check spelling (only accept capitals and underscores in alias names, just like in tags)
+                     if ($_[3][0]=~/[a-z]/)
+                       {
+                        warn "[Warn] $sourceFile, line $_[3][1]: Macro \"\\$_[3][0]\" is stored as ", uc("\\$_[3][0]"), ".\n" unless $flags{display} & DISPLAY_NOWARN;
+                        $_[3][0]=uc($_[3][0]);
+                       }
 
                      # build macro text
                      shift(@{$_[6][0]}); splice(@{$_[6][0]}, -2, 2);
@@ -4633,7 +4684,7 @@ sub
     bless($self,$class);
 }
 
-#line 2402 "ppParser.yp"
+#line 2452 "ppParser.yp"
 
 
 
@@ -5017,32 +5068,32 @@ sub lexer
      # reply next token: scan for SPECIAL tagnames: \TABLE
      $found=$1, s/^\\$1//,
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Table starts in line $lineNrs{$inHandle}.\n")),
-     return('Table', [$found, $lineNrs{$inHandle}]) if $specials{tag} and /^(?<!\\)\\(TABLE)/i;
+     return('Table', [$found, $lineNrs{$inHandle}]) if $specials{tag} and /^(?<!\\)\\(TABLE)/;
      
      # reply next token: scan for SPECIAL tagnames: \END_TABLE
      $found=$1, s/^\\$1//,
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Table completed in line $lineNrs{$inHandle}.\n")),
-     return('Tabled', [$found, $lineNrs{$inHandle}])  if $specials{tag} and /^(?<!\\)\\(END_TABLE)/i;
+     return('Tabled', [$found, $lineNrs{$inHandle}])  if $specials{tag} and /^(?<!\\)\\(END_TABLE)/;
      
      # reply next token: scan for SPECIAL tagnames: \EMBED
      $found=$1, s/^\\$1//,
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Embedding starts in line $lineNrs{$inHandle}.\n")),
-     return('Embed', [$found, $lineNrs{$inHandle}]) if $specials{tag} and /^(?<!\\)\\(EMBED)/i;
+     return('Embed', [$found, $lineNrs{$inHandle}]) if $specials{tag} and /^(?<!\\)\\(EMBED)/;
      
      # reply next token: scan for SPECIAL tagnames: \END_EMBED
      $found=$1, s/^\\$1//,
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Embedding completed in line $lineNrs{$inHandle}.\n")),
-     return('Embedded', [$found, $lineNrs{$inHandle}]) if $specials{embedded} and /^(?<!\\)\\(END_EMBED)/i;
+     return('Embedded', [$found, $lineNrs{$inHandle}]) if $specials{embedded} and /^(?<!\\)\\(END_EMBED)/;
      
      # reply next token: scan for SPECIAL tagnames: \INCLUDE
      $found=$1, s/^\\$1//,
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Including starts in line $lineNrs{$inHandle}.\n")),
-     return('Include', [$found, $lineNrs{$inHandle}]) if $specials{tag} and /^(?<!\\)\\(INCLUDE)/i;
+     return('Include', [$found, $lineNrs{$inHandle}]) if $specials{tag} and /^(?<!\\)\\(INCLUDE)/;
      
      # reply next token: scan for tagnames
      $found=$1, s/^\\$1//,
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Tag opener $found in line $lineNrs{$inHandle}.\n")),
-     return('Tag_name', [$found, $lineNrs{$inHandle}]) if $specials{tag} and /^(?<!\\)\\(\w+)/ and (exists $tagsRef->{'\ACCEPT_ALL'} or exists $tagsRef->{$1} or exists $macros{$1});
+     return('Tag_name', [$found, $lineNrs{$inHandle}]) if $specials{tag} and /^(?<!\\)\\([A-Z_]+)/ and (exists $tagsRef->{'\ACCEPT_ALL'} or exists $tagsRef->{$1} or exists $macros{$1});
      
      # reply next token: scan for special characters
      $found=$1, s/^\Q$1//,
@@ -5072,15 +5123,10 @@ sub lexer
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Number $found in line $lineNrs{$inHandle}.\n")),
      return('Number', [$found, $lineNrs{$inHandle}]) if $specials{number} and /^(\d+)/;
 
-     # reply next token: scan for words
+     # reply next token: scan for words or single character (declared as "Word" as well)
      $found=$1, s/^\Q$1//,
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Word \"$found\" in line $lineNrs{$inHandle}.\n")),
-     return('Word', [$found, $lineNrs{$inHandle}]) if /^(\w+)/;
-
-     # reply next token: single character (declared as "word" as well)
-     $found=$1, s/^\Q$1//,
-     (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Word \"$found\" in line $lineNrs{$inHandle}.\n")),
-     return('Word', [$found, $lineNrs{$inHandle}]) if /^(\S)/;
+     return('Word', [$found, $lineNrs{$inHandle}]) if /^(\w+)/ or /^(\S)/;
 
      # everything should be handled - this code should never be executed!
      die "[BUG] $sourceFile, line $lineNrs{$inHandle}: No symbol found in \"$_\"!\n";
@@ -5092,7 +5138,11 @@ sub lexer
 # ----------------------------------------------------------------------------------------------
 sub _Error
  {
-  warn "[Error] $sourceFile, line ${$_[0]->YYCurval}[1]", (exists $statistics{cache} and $statistics{cache}[1]) ? ' (or below because of cache hits)' : (), ": symbol \"", $_[0]->YYCurtok, '" is "', ${$_[0]->YYCurval}[0], "\", expected:\n", join("\nor ", sort $_[0]->YYExpect), ".\n";
+  # declare base indention
+  my $baseIndention=' ' x length('[Error] ');
+
+  # use $_[0]->YYCurtok to display the recognized *token* if necessary - for users convenience, it is suppressed in the message
+  warn "\n\n[Error] $sourceFile, line ${$_[0]->YYCurval}[1]", (exists $statistics{cache} and $statistics{cache}[1]) ? ' (or below because of cache hits)' : (), qq(: found "), ${$_[0]->YYCurval}[0], qq(", expected:\n$baseIndention), ' ' x length('or '), join("\n${baseIndention}or ", map {exists $tokenDescriptions{$_} ? defined $tokenDescriptions{$_} ? $tokenDescriptions{$_} : () : $_} sort $_[0]->YYExpect), ".\n\n";
  }
 
 # ----------------------------------------------------------------------------------------------
@@ -5446,6 +5496,26 @@ New cache entries are always I<added> which means that old entries are never
 replaced and a cache file tends to grow. If you ever wish to clean up a
 cache file completely pass B<CACHE_CLEANUP> to this option.
 
+To avoid trouble B<CACHE_CLEANUP> is I<strongly> recommended after adding
+new alias definitions (that means, alias names which were unknown before),
+unless the special control tag C<\ACCEPT_ALL> is declared (see I<tags> for
+details). Otherwise, unchanged paragraphs containing the backslashed string
+which is an alias now would be restored I<from cache> so that the new alias
+would take no effect.
+
+  // Text before: \NEW has no meaning and is evaluated
+  // as a simple word "NEW" - the backslash is removed silently.
+  // This paragraph will be cached because it does not contain an
+  // alias/macro.
+  There could be \NEW aliases someday.
+
+  // Now consider this is the next turn and \NEW was declared
+  // an alias now. But the paragraph using new remained unchanged,
+  // so I<it is restored from cache>.
+
+This seems to be a rather seldom case but users should be informed about this
+behaviour if you provide the cache feature to them.
+
 To deactivate caching explicitly pass B<CACHE_OFF>.
 I<An existing cache will not be destroyed.>
 
@@ -5618,6 +5688,19 @@ combined by addition as in the following example:
 
 If you omit this parameter or pass TRACE_NOTHING, no traces will be displayed.
 
+=item var2stream
+
+If set to a true value, the parser will propagate variable settings into the stream
+by adding additional C<DIRECTIVE_VARSET> directives.
+
+A variable propagation has the form
+
+  [DIRECTIVE_VARSET, DIRECTIVE_START, {var=>varname, value=>value}]
+
+and is suggested to be handled by a backend callback.
+
+The default value is 0.
+
 =item vispro
 
 activates "process visualization" which simply means that a user will see
@@ -5690,11 +5773,12 @@ sub run
    $flags{display},          #  5
    $flags{filter},           #  6
    $flags{linehints},        #  7
-   $flags{cache},            #  8
-   $flags{cached},           #  9
-   $flags{vis},              # 10
-   $flags{activeBaseData},   # 11
-   $flags{activeDataInit},   # 12
+   $flags{var2stream},       #  8
+   $flags{cache},            #  9
+   $flags{cached},           # 10
+   $flags{vis},              # 11
+   $flags{activeBaseData},   # 12
+   $flags{activeDataInit},   # 13
   )=(
      $pars{tags},                                                                #  1
      $pars{stream},                                                              #  2
@@ -5703,15 +5787,17 @@ sub run
      exists $pars{display} ? $pars{display} : DISPLAY_ALL,                       #  5
      exists $pars{filter} ? $pars{filter} : '',                                  #  6
      (exists $pars{linehints} and $pars{linehints}),                             #  7
-     exists $pars{cache} ? $pars{cache} : CACHE_OFF,                             #  8
-     0,                                                                          #  9
-     exists $pars{vispro} ? $pars{vispro} : 0,                                   # 10
-     exists $pars{activeBaseData} ? fields::phash(%{$pars{activeBaseData}}) : 0, # 11
-     exists $pars{activeDataInit} ? $pars{activeDataInit} : 0,                   # 12
+     (exists $pars{var2stream} and $pars{var2stream}),                           #  8
+     exists $pars{cache} ? $pars{cache} : CACHE_OFF,                             #  9
+     0,                                                                          # 10
+     exists $pars{vispro} ? $pars{vispro} : 0,                                   # 11
+     exists $pars{activeBaseData} ? fields::phash(%{$pars{activeBaseData}}) : 0, # 12
+     exists $pars{activeDataInit} ? $pars{activeDataInit} : 0,                   # 13
     );
 
   # init more
   @flags{qw(skipInput headlineLevelOffset headlineLevel)}=(0) x 3;
+  $statistics{cache}[1]=0 if $flags{cache} & CACHE_ON;
 
   # welcome user
   unless ($flags{display} & DISPLAY_NOINFO)
@@ -5828,7 +5914,7 @@ EOM
     }
 
   # inform user
-  warn "[Info] Parsing completed.\n" unless $flags{display} & DISPLAY_NOINFO;
+  warn "[Info] Parsing completed.\n\n" unless $flags{display} & DISPLAY_NOINFO;
 
   # reply success state
   $rc and not $semErr;
@@ -5963,7 +6049,7 @@ by I<Lorenz Domke> using B<PerlPoint::Package>.
 
 =head1 AUTHOR
 
-Copyright (c) Jochen Stenzel (perl@jochen-stenzel.de), 1999-2000. All rights reserved.
+Copyright (c) Jochen Stenzel (perl@jochen-stenzel.de), 1999-2001. All rights reserved.
 
 This module is free software, you can redistribute it and/or modify it
 under the terms of the Artistic License distributed with Perl version
@@ -5977,7 +6063,19 @@ Perl source tree (where Perl was downloaded/unpacked - ask your
 system administrator if you dont know where this is).  Alternatively,
 the current version of the Artistic License distributed with Perl can
 be viewed on-line on the World-Wide Web (WWW) from the following URL:
-http://www.perl.com/perl/misc/Artistic.html
+http://www.perl.com/perl/misc/Artistic.html.
+
+B<PerlPoint::Parser> is built using B<Parse::Yapp> a way that users
+have I<not> to explicitly install B<Parse::Yapp> themselves. According
+to the copyright note of B<Parse::Yapp> I have to mention the following:
+
+"The Parse::Yapp module and its related modules and shell
+scripts are copyright (c) 1998-1999 Francois Desarmenien,
+France. All rights reserved.
+
+You may use and distribute them under the terms of either
+the GNU General Public License or the Artistic License, as
+specified in the Perl README file."
 
 
 =head1 DISCLAIMER
