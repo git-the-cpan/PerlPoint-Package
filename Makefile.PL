@@ -9,12 +9,12 @@
 use ExtUtils::MakeMaker;
 
 # the package requires modern perl
-require 5.006;
+require 5.00503;
 
 # write makefile
 $ok=WriteMakefile(
                   NAME         => 'PerlPoint',
-                  VERSION      => '0.27',
+                  VERSION      => '0.28',
                   PREREQ_PM    => {
 		                   Digest::SHA1 => 1,
                                    IO::File     => 1,

@@ -14,6 +14,7 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.28    |14.12.2000| JSTENZEL | made it finally backward compatible to perl 5.005 again;
 # 0.27    |07.12.2000| JSTENZEL | moved package namespace from "PP" to "PerlPoint";
 # 0.26    |30.11.2000| JSTENZEL | "Perl Point" => "PerlPoint";
 #         |02.12.2000| JSTENZEL | bugfix in stackInput() which could remove input lines;
@@ -131,7 +132,7 @@ B<PerlPoint::Parser> - a PerlPoint Parser
 
 =head1 VERSION
 
-This manual describes version B<0.27>.
+This manual describes version B<0.28>.
 
 =head1 SYNOPSIS
 
@@ -764,12 +765,12 @@ B<Example:>
   }
 
  # requires modern perl
- require 5.006;
+ require 5.00503;
 
  # declare module version
  {
   no strict 'refs';
-  ${join('::', __PACKAGE__, 'VERSION')}=0.27;
+  ${join('::', __PACKAGE__, 'VERSION')}=0.28;
   ${join('::', __PACKAGE__, 'VERSION')}=${join('::', __PACKAGE__, 'VERSION')}; # to suppress a warning of exclusive usage only;
  }
 
@@ -2607,7 +2608,8 @@ sub lexer
 
 		   # The next steps depend - follow the provided hint. We may have to reinvoke
 		   # the parser to restore a state.                   
-                   unless (exists $checksums->{$sourceFile}{$checksum}[2])
+# perl 5.6 #       unless (exists $checksums->{$sourceFile}{$checksum}[2])
+                   unless (defined $checksums->{$sourceFile}{$checksum}[2])
 		     {
 		      # direct case - add the already known part directly to the stream
 		      push(@$resultStreamRef, @{$checksums->{$sourceFile}{$checksum}[0]});
@@ -3474,7 +3476,7 @@ sub run
 
      # close the input file
      close($inHandle);
-     $inHandle=undef;
+     $inHandle=new IO::File;
 
      # back to startup directory
      chdir($startupDirectory);

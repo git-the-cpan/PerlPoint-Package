@@ -1,4 +1,12 @@
 
+=0.28
+
+* removed an old POD headline prefix in README which caused
+  CPAN to run pod2html (and to display the related section only)
+
+* made it backwards compatible to perl 5.00503 again;
+
+
 =0.27
 
 * module namespace changed from "PP" into "PerlPoint";

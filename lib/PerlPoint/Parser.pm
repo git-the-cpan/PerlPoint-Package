@@ -486,6 +486,7 @@ sub _Parse {
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.28    |14.12.2000| JSTENZEL | made it finally backward compatible to perl 5.005 again;
 # 0.27    |07.12.2000| JSTENZEL | moved package namespace from "PP" to "PerlPoint";
 # 0.26    |30.11.2000| JSTENZEL | "Perl Point" => "PerlPoint";
 #         |02.12.2000| JSTENZEL | bugfix in stackInput() which could remove input lines;
@@ -603,7 +604,7 @@ B<PerlPoint::Parser> - a PerlPoint Parser
 
 =head1 VERSION
 
-This manual describes version B<0.27>.
+This manual describes version B<0.28>.
 
 =head1 SYNOPSIS
 
@@ -1236,12 +1237,12 @@ B<Example:>
   }
 
  # requires modern perl
- require 5.006;
+ require 5.00503;
 
  # declare module version
  {
   no strict 'refs';
-  ${join('::', __PACKAGE__, 'VERSION')}=0.27;
+  ${join('::', __PACKAGE__, 'VERSION')}=0.28;
   ${join('::', __PACKAGE__, 'VERSION')}=${join('::', __PACKAGE__, 'VERSION')}; # to suppress a warning of exclusive usage only;
  }
 
@@ -2812,7 +2813,7 @@ sub new {
 	[#Rule 1
 		 'document', 1,
 sub
-#line 885 "ppParser.yp"
+#line 886 "ppParser.yp"
 {
              # skip empty line "paragraphs"
              unless ($_[1][0] eq '')
@@ -2846,7 +2847,7 @@ sub
 	[#Rule 2
 		 'document', 2,
 sub
-#line 915 "ppParser.yp"
+#line 916 "ppParser.yp"
 {
              # skip empty line "paragraphs"
              unless ($_[2][0] eq '')
@@ -2916,7 +2917,7 @@ sub
 	[#Rule 15
 		 '@1-1', 0,
 sub
-#line 963 "ppParser.yp"
+#line 964 "ppParser.yp"
 {
              # switch to headline intro mode
              stateManager(STATE_HEADLINE);
@@ -2931,7 +2932,7 @@ sub
 	[#Rule 16
 		 'headline', 4,
 sub
-#line 974 "ppParser.yp"
+#line 975 "ppParser.yp"
 {
              # back to default mode
              stateManager(STATE_DEFAULT);
@@ -2965,7 +2966,7 @@ sub
 	[#Rule 18
 		 'headline_level', 1,
 sub
-#line 1005 "ppParser.yp"
+#line 1006 "ppParser.yp"
 {
                    # start new counter and reply it
                    [$flags{headlineLevelOffset}+1, $_[1][1]];
@@ -2974,7 +2975,7 @@ sub
 	[#Rule 19
 		 'headline_level', 2,
 sub
-#line 1010 "ppParser.yp"
+#line 1011 "ppParser.yp"
 {
                    # update counter and reply it
                    [$_[1][0]+1, $_[1][1]];
@@ -2983,7 +2984,7 @@ sub
 	[#Rule 20
 		 '@2-1', 0,
 sub
-#line 1018 "ppParser.yp"
+#line 1019 "ppParser.yp"
 {
                # switch to condition mode
                stateManager(STATE_HEADLINE);
@@ -2995,7 +2996,7 @@ sub
 	[#Rule 21
 		 'condition', 4,
 sub
-#line 1026 "ppParser.yp"
+#line 1027 "ppParser.yp"
 {
                # back to default mode
                stateManager(STATE_DEFAULT);
@@ -3045,7 +3046,7 @@ sub
 	[#Rule 23
 		 'list', 2,
 sub
-#line 1073 "ppParser.yp"
+#line 1074 "ppParser.yp"
 {
          # update token list and reply it
          push(@{$_[1][0]}, @{$_[2][0]});
@@ -3055,7 +3056,7 @@ sub
 	[#Rule 24
 		 'list', 3,
 sub
-#line 1079 "ppParser.yp"
+#line 1080 "ppParser.yp"
 {
          # update statistics, if necessary (shifters are not passed as standalone paragraphs, so ...)
          $statistics{$_[2][0][0][0]}++;
@@ -3068,7 +3069,7 @@ sub
 	[#Rule 25
 		 'list_part', 1,
 sub
-#line 1091 "ppParser.yp"
+#line 1092 "ppParser.yp"
 {
               # embed the points into list directives
               [
@@ -3087,7 +3088,7 @@ sub
 	[#Rule 26
 		 'list_part', 1,
 sub
-#line 1106 "ppParser.yp"
+#line 1107 "ppParser.yp"
 {
               # embed the points into list directives
               [
@@ -3106,7 +3107,7 @@ sub
 	[#Rule 27
 		 'list_part', 1,
 sub
-#line 1121 "ppParser.yp"
+#line 1122 "ppParser.yp"
 {
               # embed the points into list directives
               [
@@ -3128,7 +3129,7 @@ sub
 	[#Rule 29
 		 'olist', 2,
 sub
-#line 1140 "ppParser.yp"
+#line 1141 "ppParser.yp"
 {
           # update token list and reply it
           push(@{$_[1][0]}, @{$_[2][0]});
@@ -3141,7 +3142,7 @@ sub
 	[#Rule 31
 		 'ulist', 2,
 sub
-#line 1150 "ppParser.yp"
+#line 1151 "ppParser.yp"
 {
           # update token list and reply it
           push(@{$_[1][0]}, @{$_[2][0]});
@@ -3154,7 +3155,7 @@ sub
 	[#Rule 33
 		 'dlist', 2,
 sub
-#line 1160 "ppParser.yp"
+#line 1161 "ppParser.yp"
 {
           # update token list and reply it
           push(@{$_[1][0]}, @{$_[2][0]});
@@ -3164,7 +3165,7 @@ sub
 	[#Rule 34
 		 '@3-1', 0,
 sub
-#line 1169 "ppParser.yp"
+#line 1170 "ppParser.yp"
 {
            # switch to opoint mode
            stateManager(STATE_OPOINT);
@@ -3176,7 +3177,7 @@ sub
 	[#Rule 35
 		 'opoint', 3,
 sub
-#line 1177 "ppParser.yp"
+#line 1178 "ppParser.yp"
 {
            # update statistics (list points are not passed as standalone paragraphs, so ...)
            $statistics{&DIRECTIVE_OPOINT}++;
@@ -3213,19 +3214,19 @@ sub
 	[#Rule 37
 		 'opoint_opener', 1,
 sub
-#line 1212 "ppParser.yp"
+#line 1213 "ppParser.yp"
 {[0, $_[1][1]];}
 	],
 	[#Rule 38
 		 'opoint_opener', 2,
 sub
-#line 1214 "ppParser.yp"
+#line 1215 "ppParser.yp"
 {[1, $_[1][1]];}
 	],
 	[#Rule 39
 		 '@4-1', 0,
 sub
-#line 1219 "ppParser.yp"
+#line 1220 "ppParser.yp"
 {
            # switch to upoint mode
            stateManager(STATE_UPOINT);
@@ -3237,7 +3238,7 @@ sub
 	[#Rule 40
 		 'upoint', 3,
 sub
-#line 1227 "ppParser.yp"
+#line 1228 "ppParser.yp"
 {
            # update statistics (list points are not passed as standalone paragraphs, so ...)
            $statistics{&DIRECTIVE_UPOINT}++;
@@ -3267,14 +3268,14 @@ sub
 	[#Rule 42
 		 '@5-1', 0,
 sub
-#line 1255 "ppParser.yp"
+#line 1256 "ppParser.yp"
 {
           }
 	],
 	[#Rule 43
 		 'dpoint', 3,
 sub
-#line 1258 "ppParser.yp"
+#line 1259 "ppParser.yp"
 {
            # update statistics (list points are not passed as standalone paragraphs, so ...)
            $statistics{&DIRECTIVE_DPOINT}++;
@@ -3309,7 +3310,7 @@ sub
 	[#Rule 45
 		 '@6-1', 0,
 sub
-#line 1291 "ppParser.yp"
+#line 1292 "ppParser.yp"
 {
                  # switch to dlist item mode
                  stateManager(STATE_DPOINT_ITEM);
@@ -3321,7 +3322,7 @@ sub
 	[#Rule 46
 		 'dlist_opener', 4,
 sub
-#line 1299 "ppParser.yp"
+#line 1300 "ppParser.yp"
 {
                  # switch to dlist body mode
                  stateManager(STATE_DPOINT);
@@ -3336,7 +3337,7 @@ sub
 	[#Rule 48
 		 'compound_block', 2,
 sub
-#line 1312 "ppParser.yp"
+#line 1313 "ppParser.yp"
 {
                    # this is tricky - to combine both blocks, we have to remove the already
                    # embedded stop/start directives and to supply the 
@@ -3356,7 +3357,7 @@ sub
 	[#Rule 49
 		 'compound_block', 3,
 sub
-#line 1328 "ppParser.yp"
+#line 1329 "ppParser.yp"
 {
                    # update statistics (for the first part which is completed by the intermediate flag paragraph)
                    $statistics{&DIRECTIVE_BLOCK}++;
@@ -3376,7 +3377,7 @@ sub
 	[#Rule 50
 		 '@7-1', 0,
 sub
-#line 1347 "ppParser.yp"
+#line 1348 "ppParser.yp"
 {
                   # switch to control mode
                   stateManager(STATE_CONTROL);
@@ -3388,7 +3389,7 @@ sub
 	[#Rule 51
 		 'block_flagnew', 3,
 sub
-#line 1355 "ppParser.yp"
+#line 1356 "ppParser.yp"
 {
                   # back to default mode
                   stateManager(STATE_DEFAULT);
@@ -3403,7 +3404,7 @@ sub
 	[#Rule 52
 		 '@8-1', 0,
 sub
-#line 1369 "ppParser.yp"
+#line 1370 "ppParser.yp"
 {
           # switch to block mode
           stateManager(STATE_BLOCK);
@@ -3415,7 +3416,7 @@ sub
 	[#Rule 53
 		 'block', 3,
 sub
-#line 1377 "ppParser.yp"
+#line 1378 "ppParser.yp"
 {
           # trace, if necessary
           warn "[Trace] $sourceFile, line $_[3][1]: Block completed.\n" if $flags{trace} & TRACE_PARAGRAPHS;
@@ -3438,7 +3439,7 @@ sub
 	[#Rule 55
 		 '@9-1', 0,
 sub
-#line 1397 "ppParser.yp"
+#line 1398 "ppParser.yp"
 {
          # enter text mode - unless we are in a block (or point (which already set this mode itself))
          unless (   $parserState==STATE_BLOCK
@@ -3460,7 +3461,7 @@ sub
 	[#Rule 56
 		 'text', 4,
 sub
-#line 1416 "ppParser.yp"
+#line 1417 "ppParser.yp"
 {
          # trace, if necessary
          warn "[Trace] $sourceFile, line $_[4][1]: Text completed.\n" unless    not $flags{trace} & TRACE_PARAGRAPHS
@@ -3493,7 +3494,7 @@ sub
 	[#Rule 57
 		 '@10-1', 0,
 sub
-#line 1448 "ppParser.yp"
+#line 1449 "ppParser.yp"
 {
              # switch to verbatim mode
              stateManager(STATE_VERBATIM);
@@ -3511,7 +3512,7 @@ sub
 	[#Rule 58
 		 'verbatim', 4,
 sub
-#line 1463 "ppParser.yp"
+#line 1464 "ppParser.yp"
 {
              # trace, if necessary
              warn "[Trace] $sourceFile, line $_[4][1]: Verbatim block completed.\n" if $flags{trace} & TRACE_PARAGRAPHS;
@@ -3539,7 +3540,7 @@ sub
 	[#Rule 59
 		 'variable_assignment', 3,
 sub
-#line 1490 "ppParser.yp"
+#line 1491 "ppParser.yp"
 {
                         # remove text directives and the final space (made from the final EOL)
                         shift(@{$_[3][0]});
@@ -3565,7 +3566,7 @@ sub
 	[#Rule 60
 		 '@11-2', 0,
 sub
-#line 1515 "ppParser.yp"
+#line 1516 "ppParser.yp"
 {
             # switch to comment mode
             stateManager(STATE_COMMENT);
@@ -3577,7 +3578,7 @@ sub
 	[#Rule 61
 		 'comment', 5,
 sub
-#line 1523 "ppParser.yp"
+#line 1524 "ppParser.yp"
 {
             # back to default mode
             stateManager(STATE_DEFAULT);
@@ -3602,7 +3603,7 @@ sub
 	[#Rule 62
 		 '@12-1', 0,
 sub
-#line 1547 "ppParser.yp"
+#line 1548 "ppParser.yp"
 {
                 # temporarily activate number detection
                 push(@specialStack, $specials{number});
@@ -3612,7 +3613,7 @@ sub
 	[#Rule 63
 		 '@13-3', 0,
 sub
-#line 1553 "ppParser.yp"
+#line 1554 "ppParser.yp"
 {
                 # restore previous number detection mode
                 $specials{number}=pop(@specialStack);
@@ -3627,7 +3628,7 @@ sub
 	[#Rule 64
 		 'list_shift', 5,
 sub
-#line 1564 "ppParser.yp"
+#line 1565 "ppParser.yp"
 {
                 # back to default mode
                 stateManager(STATE_DEFAULT);
@@ -3656,7 +3657,7 @@ sub
 	[#Rule 65
 		 'list_shifter', 1,
 sub
-#line 1592 "ppParser.yp"
+#line 1593 "ppParser.yp"
 {
                  # reply a flag
                  [LIST_SHIFT_RIGHT, $_[1][1]];
@@ -3665,7 +3666,7 @@ sub
 	[#Rule 66
 		 'list_shifter', 1,
 sub
-#line 1597 "ppParser.yp"
+#line 1598 "ppParser.yp"
 {
                  # reply a flag
                  [LIST_SHIFT_LEFT, $_[1][1]];
@@ -3674,7 +3675,7 @@ sub
 	[#Rule 67
 		 'optional_literals', 0,
 sub
-#line 1605 "ppParser.yp"
+#line 1606 "ppParser.yp"
 {
                       # start a new, empty list and reply it
                       [[], $lineNrs{$inHandle}];
@@ -3689,7 +3690,7 @@ sub
 	[#Rule 70
 		 'literals', 2,
 sub
-#line 1615 "ppParser.yp"
+#line 1616 "ppParser.yp"
 {
              # update token list and reply it
              push(@{$_[1][0]}, @{$_[2][0]});
@@ -3699,7 +3700,7 @@ sub
 	[#Rule 71
 		 'optional_literals_and_empty_lines', 0,
 sub
-#line 1624 "ppParser.yp"
+#line 1625 "ppParser.yp"
 {
                                       # start a new, empty list and reply it
                                       [[], $lineNrs{$inHandle}];
@@ -3714,7 +3715,7 @@ sub
 	[#Rule 74
 		 'literals_and_empty_lines', 2,
 sub
-#line 1634 "ppParser.yp"
+#line 1635 "ppParser.yp"
 {
                              # update token list and reply it
                              push(@{$_[1][0]}, @{$_[2][0]});
@@ -3727,7 +3728,7 @@ sub
 	[#Rule 76
 		 'literal_or_empty_line', 1,
 sub
-#line 1644 "ppParser.yp"
+#line 1645 "ppParser.yp"
 {
                           # start a new token list and reply it
                           [[$_[1][0]], $_[1][1]];
@@ -3739,7 +3740,7 @@ sub
 	[#Rule 78
 		 'literal', 1,
 sub
-#line 1653 "ppParser.yp"
+#line 1654 "ppParser.yp"
 {
             # start a new token list and reply it
             [[$_[1][0]], $_[1][1]];
@@ -3748,7 +3749,7 @@ sub
 	[#Rule 79
 		 'optional_basics', 0,
 sub
-#line 1661 "ppParser.yp"
+#line 1662 "ppParser.yp"
 {
                    # start a new, empty list and reply it
                    [[], $lineNrs{$inHandle}];
@@ -3763,7 +3764,7 @@ sub
 	[#Rule 82
 		 'basics', 2,
 sub
-#line 1671 "ppParser.yp"
+#line 1672 "ppParser.yp"
 {
            # update token list and reply it
            push(@{$_[1][0]}, @{$_[2][0]});
@@ -3785,7 +3786,7 @@ sub
 	[#Rule 87
 		 'elements', 2,
 sub
-#line 1689 "ppParser.yp"
+#line 1690 "ppParser.yp"
 {
              # update token list and reply it
              push(@{$_[1][0]}, @{$_[2][0]});
@@ -3795,7 +3796,7 @@ sub
 	[#Rule 88
 		 'element', 1,
 sub
-#line 1699 "ppParser.yp"
+#line 1700 "ppParser.yp"
 {
             # start a new token list and reply it
             [[$_[1][0]], $_[1][1]];
@@ -3804,7 +3805,7 @@ sub
 	[#Rule 89
 		 'element', 1,
 sub
-#line 1704 "ppParser.yp"
+#line 1705 "ppParser.yp"
 {
             # start a new token list and reply it
             [[$_[1][0]], $_[1][1]];
@@ -3813,7 +3814,7 @@ sub
 	[#Rule 90
 		 'element', 1,
 sub
-#line 1709 "ppParser.yp"
+#line 1710 "ppParser.yp"
 {
 	    # disable storage of a checksum (variable definitions may change or have changed)
 	    $flags{checksummed}=0;
@@ -3825,7 +3826,7 @@ sub
 	[#Rule 91
 		 'element', 1,
 sub
-#line 1717 "ppParser.yp"
+#line 1718 "ppParser.yp"
 {
 	    # disable storage of a checksum (variable definitions may change or have changed)
 	    $flags{checksummed}=0;
@@ -3846,7 +3847,7 @@ sub
 	[#Rule 95
 		 'optional_number', 0,
 sub
-#line 1732 "ppParser.yp"
+#line 1733 "ppParser.yp"
 {[undef, $lineNrs{$inHandle}];}
 	],
 	[#Rule 96
@@ -3855,7 +3856,7 @@ sub
 	[#Rule 97
 		 'words', 1,
 sub
-#line 1739 "ppParser.yp"
+#line 1740 "ppParser.yp"
 {
           # start a new token list and reply it
           [[$_[1][0]], $_[1][1]];
@@ -3864,7 +3865,7 @@ sub
 	[#Rule 98
 		 'words', 2,
 sub
-#line 1744 "ppParser.yp"
+#line 1745 "ppParser.yp"
 {
           # update token list and reply it
           push(@{$_[1][0]}, $_[2][0]);
@@ -3874,7 +3875,7 @@ sub
 	[#Rule 99
 		 '@14-1', 0,
 sub
-#line 1754 "ppParser.yp"
+#line 1755 "ppParser.yp"
 {
         # trace, if necessary
         warn "[Trace] $sourceFile, line $_[1][1]: Tag $_[1][0] starts.\n" if $flags{trace} & TRACE_PARAGRAPHS;
@@ -3887,7 +3888,7 @@ sub
 	[#Rule 100
 		 '@15-3', 0,
 sub
-#line 1763 "ppParser.yp"
+#line 1764 "ppParser.yp"
 {
         # restore special states of "{" and "}"
         @specials{('{', '}')}=splice(@specialStack, -2, 2);
@@ -3896,7 +3897,7 @@ sub
 	[#Rule 101
 		 'tag', 5,
 sub
-#line 1768 "ppParser.yp"
+#line 1769 "ppParser.yp"
 {
         # trace, if necessary
         warn "[Trace] $sourceFile, line $_[5][1]: Tag $_[1][0] completed.\n" if $flags{trace} & TRACE_PARAGRAPHS;
@@ -3977,7 +3978,7 @@ sub
 	[#Rule 102
 		 'optional_tagpars', 0,
 sub
-#line 1848 "ppParser.yp"
+#line 1849 "ppParser.yp"
 {[[], $lineNrs{$inHandle}];}
 	],
 	[#Rule 103
@@ -3986,7 +3987,7 @@ sub
 	[#Rule 104
 		 '@16-1', 0,
 sub
-#line 1854 "ppParser.yp"
+#line 1855 "ppParser.yp"
 {
                  # temporarily activate special "="
                  push(@specialStack, $specials{'='});
@@ -3996,7 +3997,7 @@ sub
 	[#Rule 105
 		 'used_tagpars', 4,
 sub
-#line 1860 "ppParser.yp"
+#line 1861 "ppParser.yp"
 {
                  #restore special state of "="
                  $specials{'='}=pop(@specialStack);
@@ -4011,7 +4012,7 @@ sub
 	[#Rule 107
 		 'tagpars', 3,
 sub
-#line 1872 "ppParser.yp"
+#line 1873 "ppParser.yp"
 {
             # update parameter list
             push(@{$_[1][0]}, @{$_[3][0]});
@@ -4023,7 +4024,7 @@ sub
 	[#Rule 108
 		 '@17-1', 0,
 sub
-#line 1883 "ppParser.yp"
+#line 1884 "ppParser.yp"
 {
            # temporarily make "=" and quotes the only specials,
            # but take care to reset the remaining settings defined
@@ -4035,7 +4036,7 @@ sub
 	[#Rule 109
 		 'tagpar', 4,
 sub
-#line 1891 "ppParser.yp"
+#line 1892 "ppParser.yp"
 {
            # restore special settings
            %specials=@{pop(@specialStack)};
@@ -4050,7 +4051,7 @@ sub
 	[#Rule 111
 		 'tagvalue', 3,
 sub
-#line 1902 "ppParser.yp"
+#line 1903 "ppParser.yp"
 {
              # build a string and supply it
              [join('', @{$_[2][0]}), $_[3][1]];
@@ -4059,13 +4060,13 @@ sub
 	[#Rule 112
 		 'optional_tagbody', 0,
 sub
-#line 1910 "ppParser.yp"
+#line 1911 "ppParser.yp"
 {[[], $lineNrs{$inHandle}];}
 	],
 	[#Rule 113
 		 'optional_tagbody', 3,
 sub
-#line 1912 "ppParser.yp"
+#line 1913 "ppParser.yp"
 {
                      # reply the literals
                      [$_[2][0], $_[3][1]];
@@ -4074,7 +4075,7 @@ sub
 	[#Rule 114
 		 '@18-1', 0,
 sub
-#line 1920 "ppParser.yp"
+#line 1921 "ppParser.yp"
 {
           # trace, if necessary
           warn "[Trace] $sourceFile, line $_[1][1]: Table starts.\n" if $flags{trace} & TRACE_PARAGRAPHS;
@@ -4094,7 +4095,7 @@ sub
 	[#Rule 115
 		 '@19-3', 0,
 sub
-#line 1936 "ppParser.yp"
+#line 1937 "ppParser.yp"
 {
           # restore previous handling of empty lines
           $lexerFlags{el}=pop(@specialStack);
@@ -4112,7 +4113,7 @@ sub
 	[#Rule 116
 		 'table', 6,
 sub
-#line 1950 "ppParser.yp"
+#line 1951 "ppParser.yp"
 {
           # reset column separator memory
           shift(@tableSeparatorStack);
@@ -4150,7 +4151,7 @@ sub
 	[#Rule 117
 		 'table_separator', 1,
 sub
-#line 1987 "ppParser.yp"
+#line 1988 "ppParser.yp"
 {
                     # update counter of completed table columns
                     $tableColumns++;
@@ -4173,7 +4174,7 @@ sub
 	[#Rule 118
 		 '@20-1', 0,
 sub
-#line 2009 "ppParser.yp"
+#line 2010 "ppParser.yp"
 {
                     # switch to condition mode
                     stateManager(STATE_TABLE);
@@ -4185,7 +4186,7 @@ sub
 	[#Rule 119
 		 '@21-3', 0,
 sub
-#line 2017 "ppParser.yp"
+#line 2018 "ppParser.yp"
 {
                     # store specified column separator
                     unshift(@tableSeparatorStack, quotemeta(join('', @{$_[3][0]})));
@@ -4194,7 +4195,7 @@ sub
 	[#Rule 120
 		 'table_paragraph', 6,
 sub
-#line 2022 "ppParser.yp"
+#line 2023 "ppParser.yp"
 {
                     # back to default mode
                     stateManager(STATE_DEFAULT);
@@ -4260,7 +4261,7 @@ sub
 	[#Rule 121
 		 '@22-1', 0,
 sub
-#line 2087 "ppParser.yp"
+#line 2088 "ppParser.yp"
 {
              # switch to embedding mode saving the former state
              push(@stateStack, $parserState);
@@ -4281,7 +4282,7 @@ sub
 	[#Rule 122
 		 '@23-3', 0,
 sub
-#line 2104 "ppParser.yp"
+#line 2105 "ppParser.yp"
 {
              # restore special state of "{" and "}"
              @specials{('{', '}')}=splice(@specialStack, -2, 2);
@@ -4294,7 +4295,7 @@ sub
 	[#Rule 123
 		 'embedded', 6,
 sub
-#line 2113 "ppParser.yp"
+#line 2114 "ppParser.yp"
 {
              # restore parser state
              stateManager(pop(@stateStack));
@@ -4371,7 +4372,7 @@ sub
 	[#Rule 124
 		 '@24-1', 0,
 sub
-#line 2189 "ppParser.yp"
+#line 2190 "ppParser.yp"
 {
              # trace, if necessary
              warn "[Trace] $sourceFile, line $_[1][1]: Inclusion starts.\n" if $flags{trace} & TRACE_PARAGRAPHS;
@@ -4390,7 +4391,7 @@ sub
 	[#Rule 125
 		 'included', 3,
 sub
-#line 2204 "ppParser.yp"
+#line 2205 "ppParser.yp"
 {
              # restore special state of "{" and "}"
              @specials{('{', '}')}=splice(@specialStack, -2, 2);
@@ -4515,7 +4516,7 @@ sub
 	[#Rule 126
 		 '@25-1', 0,
 sub
-#line 2329 "ppParser.yp"
+#line 2330 "ppParser.yp"
 {
                      # switch to definition mode
                      stateManager(STATE_DEFINITION);
@@ -4527,7 +4528,7 @@ sub
 	[#Rule 127
 		 '@26-4', 0,
 sub
-#line 2337 "ppParser.yp"
+#line 2338 "ppParser.yp"
 {
                      # disable all specials to get the body as a plain text
                      @specials{keys %specials}=(0) x scalar(keys %specials);
@@ -4536,7 +4537,7 @@ sub
 	[#Rule 128
 		 'alias_definition', 6,
 sub
-#line 2342 "ppParser.yp"
+#line 2343 "ppParser.yp"
 {
                      # "text" already switched back to default mode (and disabled specials [{}:])
 
@@ -4591,7 +4592,7 @@ sub
     bless($self,$class);
 }
 
-#line 2394 "ppParser.yp"
+#line 2395 "ppParser.yp"
 
 
 
@@ -4808,7 +4809,8 @@ sub lexer
 
 		   # The next steps depend - follow the provided hint. We may have to reinvoke
 		   # the parser to restore a state.                   
-                   unless (exists $checksums->{$sourceFile}{$checksum}[2])
+# perl 5.6 #       unless (exists $checksums->{$sourceFile}{$checksum}[2])
+                   unless (defined $checksums->{$sourceFile}{$checksum}[2])
 		     {
 		      # direct case - add the already known part directly to the stream
 		      push(@$resultStreamRef, @{$checksums->{$sourceFile}{$checksum}[0]});
@@ -5675,7 +5677,7 @@ sub run
 
      # close the input file
      close($inHandle);
-     $inHandle=undef;
+     $inHandle=new IO::File;
 
      # back to startup directory
      chdir($startupDirectory);
