@@ -5,6 +5,7 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.03    |< 14.04.02| JSTENZEL | added simple versions of \I, \B and \C;
 # 0.02    |13.10.2001| JSTENZEL | added copy of PerlPoint::Tags::Basic tag \REF;
 # 0.01    |20.03.2001| JSTENZEL | new.
 # ---------------------------------------------------------------------------------------
@@ -38,6 +39,9 @@ use PerlPoint::Constants qw(:parsing :tags);
                  options => TAGS_OPTIONAL,
                 },
 
+       B     => {body => TAGS_MANDATORY,},
+       C     => {body => TAGS_MANDATORY,},
+       I     => {body => TAGS_MANDATORY,},
 
        # resolve a reference (copied from PerlPoint::Tags::Basic 0.02)
        # (this is used to check hook invokation and anchor management)

@@ -2,7 +2,7 @@
 // declare helpful macros
 +BC:\B<\C<__body__>>
 
-// include macro definitions of basic tag docs (to gt an up to date list of basic macros)
+// include macro definitions of basic tag docs (to get an up to date list of basic macros)
 \INCLUDE{type=pp file="tags/basic-tag-macros.pp" smart=1}
 
 

@@ -5,6 +5,10 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.06    |27.09.2002| JSTENZEL | switched to Test::More;
+#         |          | JSTENZEL | tests were really basic, improved;
+#         |          | JSTENZEL | adapted to shortcuts;
+#         |15.04.2002| JSTENZEL | adapted to chapter docstream hints;
 # 0.05    |16.08.2001| JSTENZEL | no need to build a Safe object;
 # 0.04    |20.03.2001| JSTENZEL | adapted to tag templates;
 # 0.03    |09.12.2000| JSTENZEL | new namespace: "PP" => "PerlPoint";
@@ -20,13 +24,12 @@ use strict;
 
 # load modules
 use Carp;
-use Test;
+use Test::More qw(no_plan);
 use PerlPoint::Backend;
-use PerlPoint::Parser 0.08;
+use PerlPoint::Parser 0.37;
+use PerlPoint::Tags;                # perl 5.005 needs this
+use PerlPoint::Tags::Basic;
 use PerlPoint::Constants;
-
-# prepare tests
-BEGIN {plan tests=>72;}
 
 # declare variables
 my (@streamData, @results);
@@ -71,59 +74,174 @@ $backend->register($_, \&handler) foreach (
 $backend->run(\@streamData);
 
 # perform checks
-shift(@results) until $results[0] eq DIRECTIVE_HEADLINE or not @results;
+is(shift(@results), $_) foreach (DIRECTIVE_DOCUMENT, DIRECTIVE_START, 'headlines.pp');
 
 # level recognition
-ok(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 1);
-shift(@results) until $results[0] eq DIRECTIVE_HEADLINE or not @results;
-ok(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 1);
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 1, 'A simple headline, 1st level', '');
+{
+ my $docstreams=shift(@results);
+ is(ref($docstreams), 'ARRAY');
+ is(join(' ', @$docstreams), '');
+}
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'A simple headline, 1st level');
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 1);
 
-ok(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 2);
-shift(@results) until $results[0] eq DIRECTIVE_HEADLINE or not @results;
-ok(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 2);
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 2, '2nd level', '');
+{
+ my $docstreams=shift(@results);
+ is(ref($docstreams), 'ARRAY');
+ is(join(' ', @$docstreams), '');
+}
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '2nd level');
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 2);
 
-ok(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 3);
-shift(@results) until $results[0] eq DIRECTIVE_HEADLINE or not @results;
-ok(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 3);
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 3, '3rd level', '');
+{
+ my $docstreams=shift(@results);
+ is(ref($docstreams), 'ARRAY');
+ is(join(' ', @$docstreams), '');
+}
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '3rd level');
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 3);
 
-ok(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 30);
-shift(@results) until $results[0] eq DIRECTIVE_HEADLINE or not @results;
-ok(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 30);
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 30, '30th level', '');
+{
+ my $docstreams=shift(@results);
+ is(ref($docstreams), 'ARRAY');
+ is(join(' ', @$docstreams), '');
+}
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '30th level');
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 30);
 
 # line combination and paragraph termination
-ok(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 1);
-shift(@results) until $results[0] eq DIRECTIVE_HEADLINE or not @results;
-ok(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 1);
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 1, 'Single line', '');
+{
+ my $docstreams=shift(@results);
+ is(ref($docstreams), 'ARRAY');
+ is(join(' ', @$docstreams), '');
+}
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Single line');
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 1);
 
-ok(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 2);
-shift(@results) until $results[0] eq DIRECTIVE_HEADLINE or not @results;
-ok(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 2);
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 2, 'Multiple line', '');
+{
+ my $docstreams=shift(@results);
+ is(ref($docstreams), 'ARRAY');
+ is(join(' ', @$docstreams), '');
+}
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Multiple');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'line');
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 2);
 
-ok(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 3);
-shift(@results) until $results[0] eq DIRECTIVE_HEADLINE or not @results;
-ok(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 3);
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 3, 'Multiple ===line (should be detected as ONE paragraph)', '');
+{
+ my $docstreams=shift(@results);
+ is(ref($docstreams), 'ARRAY');
+ is(join(' ', @$docstreams), '');
+}
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Multiple');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '===line (should be detected as ONE paragraph)');
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 3);
 
-ok(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 4);
-shift(@results) until $results[0] eq DIRECTIVE_HEADLINE or not @results;
-ok(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 4);
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 4, 'Really heavy multiple headline (all lines complete the SAME paragraph)', '');
+{
+ my $docstreams=shift(@results);
+ is(ref($docstreams), 'ARRAY');
+ is(join(' ', @$docstreams), '');
+}
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Really');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'heavy');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'multiple');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'headline');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '(all lines complete the SAME paragraph)');
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 4);
 
 # trailing whitespace handling
-ok(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 1);
-shift(@results) until $results[0] eq DIRECTIVE_HEADLINE or not @results;
-ok(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 1);
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 1, 'No trailing whitespace', '');
+{
+ my $docstreams=shift(@results);
+ is(ref($docstreams), 'ARRAY');
+ is(join(' ', @$docstreams), '');
+}
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'No trailing whitespace');
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 1);
 
-ok(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 2);
-shift(@results) until $results[0] eq DIRECTIVE_HEADLINE or not @results;
-ok(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 2);
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 2, 'A trailing whitespace', '');
+{
+ my $docstreams=shift(@results);
+ is(ref($docstreams), 'ARRAY');
+ is(join(' ', @$docstreams), '');
+}
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'A trailing whitespace');
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 2);
 
-ok(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 3);
-shift(@results) until $results[0] eq DIRECTIVE_HEADLINE or not @results;
-ok(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 3);
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 3, 'Several trailing whitespaces', '');
+{
+ my $docstreams=shift(@results);
+ is(ref($docstreams), 'ARRAY');
+ is(join(' ', @$docstreams), '');
+}
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Several trailing whitespaces');
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 3);
 
-ok(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 4);
-shift(@results) until $results[0] eq DIRECTIVE_HEADLINE or not @results;
-ok(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 4);
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 1, 'A headline with a tag', '');
+{
+ my $docstreams=shift(@results);
+ is(ref($docstreams), 'ARRAY');
+ is(join(' ', @$docstreams), '');
+}
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'A headline with ');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'I');
+{
+ my $pars=shift(@results);
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), '');
+}
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'a tag');
+is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'I');
+{
+ my $pars=shift(@results);
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), '');
+}
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 1);
 
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 1, 'And another one which is so long that we need a shortcut', 'Abbreviated');
+{
+ my $docstreams=shift(@results);
+ is(ref($docstreams), 'ARRAY');
+ is(join(' ', @$docstreams), '');
+}
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'And another one which is so long that we need a shortcut');
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 1);
+
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 1, "This headlines looks like abbreviated, ~ but actually it's just a usual headline", '');
+{
+ my $docstreams=shift(@results);
+ is(ref($docstreams), 'ARRAY');
+ is(join(' ', @$docstreams), '');
+}
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "This headlines looks like abbreviated, ");
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "~ but actually it's just a usual headline");
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 1);
+
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 4, 'A final simple headline (without final carriage return ...)', '');
+{
+ my $docstreams=shift(@results);
+ is(ref($docstreams), 'ARRAY');
+ is(join(' ', @$docstreams), '');
+}
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'A final simple headline (without final carriage return ...)');
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 4);
+
+
+is(shift(@results), $_) foreach (DIRECTIVE_DOCUMENT, DIRECTIVE_COMPLETE, 'headlines.pp');
 
 
 # SUBROUTINES ###############################################################################

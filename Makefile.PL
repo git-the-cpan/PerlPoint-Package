@@ -11,7 +11,7 @@ use ExtUtils::MakeMaker;
 # the package requires modern perl
 require 5.00503;
 
-my $version='0.36';
+my $version='0.37';
 
 # write makefile
 $ok=WriteMakefile(
@@ -19,11 +19,12 @@ $ok=WriteMakefile(
                   ABSTRACT     => 'A framework to write PerlPoint converters.',
                   VERSION      => $version,
                   PREREQ_PM    => {
-		                   Digest::SHA1  => 1,
-                                   IO::File      => 1,
-                                   Storable      => 1,
-                                   Test::Harness => 1.25,
-                                   Test::More    => 0.11,
+		                   Digest::SHA1      => 1,
+                                   File::Spec        => 0.8,
+                                   IO::File          => 1,
+                                   Storable          => 1,
+                                   Test::Harness     => 1.25,
+                                   Test::More        => 0.11,
                                   },
                   dist         => {
                                    COMPRESS     => 'gzip -9',

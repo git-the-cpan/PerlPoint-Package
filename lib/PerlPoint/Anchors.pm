@@ -5,6 +5,9 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.02    |< 14.04.02| JSTENZEL | new methods checkpoint() and reportNew();
+#         |19.04.2002| JSTENZEL | adapted the construction of reportNew()'s return
+#         |          |          | value construction to certainly reply a hash ref.;
 # 0.01    |11.10.2001| JSTENZEL | new.
 # ---------------------------------------------------------------------------------------
 
@@ -16,7 +19,7 @@ B<PerlPoint::Anchors> - simple anchor collection class
 
 =head1 VERSION
 
-This manual describes version B<0.01>.
+This manual describes version B<0.02>.
 
 =head1 SYNOPSIS
 
@@ -62,7 +65,7 @@ require 5.00503;
 package PerlPoint::Anchors;
 
 # declare package version
-$VERSION=0.01;
+$VERSION=0.02;
 
 
 
@@ -72,7 +75,7 @@ $VERSION=0.01;
 use strict;
 
 # there is only one data field
-use fields qw(anchors);
+use fields qw(anchors logMode newAnchors);
 
 
 
@@ -123,6 +126,9 @@ sub new
    no strict 'refs';
    $me=bless([\%{"$class\::FIELDS"}], $class);
   }
+
+  # set logging up
+  $me->checkpoint(0);
 
   # supply new object
   $me;
@@ -175,6 +181,9 @@ sub add
 
   # add new anchor (should we check overwriting?)
   $me->{anchors}{$name}=defined $value ? $value : undef;
+
+  # update anchor log, if necessary
+  $me->{newAnchors}{$name}=$me->{anchors}{$name} if $me->{logMode};
 
   # supply modified object
   $me;
@@ -251,6 +260,99 @@ sub query
  }
 
 
+=pod
+
+=head2 checkpoint()
+
+Activates or deactivates logging of all anchors added after this call.
+By default, logging is switched off.
+
+The list of new anchors can be requested by a call of I<reportNew()>.
+
+Previous logs are I<reset> by a new call of C<checkpoint()>.
+
+B<Parameters:>
+
+=over 4
+
+=item object
+
+An object made by C<new>.
+
+=item logging mode
+
+Logging is activated by a true value, disabled otherwise.
+
+=back
+
+B<Returns:> the object.
+
+B<Example:>
+
+  $anchors->checkpoint;
+
+=cut
+sub checkpoint
+ {
+  # get and check parameters
+  my ($me, $mode)=@_;
+  confess "[BUG] Missing object parameter.\n" unless $me;
+  confess "[BUG] Object parameter is no ", __PACKAGE__, " object.\n" unless ref $me and ref $me eq __PACKAGE__;
+
+  # reset log, flag logging state
+  $me->{newAnchors}={};
+  $me->{logMode}=(defined $mode and $mode) ? 1 : 0;
+
+  # supply modified object
+  $me;
+ }
+
+
+=pod
+
+=head2 reportNew()
+
+Reports anchors added after the last recent call of C<checkpoint()>.
+If the C<checkpoint()> invokation disabled anchor logging, the result
+will by empty even if anchors I<were> added.
+
+Requesting the log does I<not> reset the logging data. To reset it,
+I<checkpoint()> needs to be called again.
+
+B<Parameters:>
+
+=over 4
+
+=item object
+
+An object made by C<new>.
+
+=back
+
+B<Returns:> A reference to a hash containing names and values of
+newly added anchors. The supplied hash can be modified without
+effect to the object.
+
+B<Example:>
+
+  my $newAnchorHash=$anchors->reportNew;
+
+=cut
+sub reportNew
+ {
+  # get and check parameters
+  my ($me)=@_;
+  confess "[BUG] Missing object parameter.\n" unless $me;
+  confess "[BUG] Object parameter is no ", __PACKAGE__, " object.\n" unless ref $me and ref $me eq __PACKAGE__;
+
+  # supply a reference to a hash of added anchors (use a helper variable
+  # to enforce perl to recognize the hash reference constructor)
+  my $rc={%{$me->{newAnchors}}};
+  $rc;
+ }
+
+
+
 
 # flag successful loading
 1;
@@ -285,7 +387,7 @@ as well.
 
 =head1 AUTHOR
 
-Copyright (c) Jochen Stenzel (perl@jochen-stenzel.de), 1999-2001.
+Copyright (c) Jochen Stenzel (perl@jochen-stenzel.de), 1999-2002.
 All rights reserved.
 
 This module is free software, you can redistribute it and/or modify it

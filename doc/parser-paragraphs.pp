@@ -34,6 +34,22 @@ The number of "=" characters represents the headline level.
   example
 
 
+It is possible to declare a "short version" of a headline
+title by appending a \B<\C<~>> and plain strings to the headline
+like in
+
+  =Very long headlines are expressive but may exceed the
+   available space for example in HTML navigation bars or
+   something like that \B<~ \I<Long headlines>>
+
+The \C<~> is often used for similarity, or represents the described
+object in encyclopedias or dictionaries. So one may think of this
+as \I<"long title is (sometimes) similar to short title">.
+
+It is up to a converter if and how a declared shortcut is used. Please
+refer to the converter documentations for details.
+
+
 ==Texts
 
 begin \I<immediately> without a special startup character:
@@ -439,4 +455,79 @@ interchangable that macros can be used to overwrite existing tags. The paragraph
   +B:\\I<__body__>
 
 transforms all occurences of \\B tags into \\I ones.
+
+
+
+==Document streams and docstream entry points ~ Document streams
+
+Someimes documents contain "parallel parts" which are closely related.
+Consider the following layout:
+
+  -------------------------------------
+  |         header navigation         |
+  -------------------------------------
+  |                                   |
+  |              Title                |
+  |                                   |
+  | Introduction text, points etc.    |
+  |                                   |
+  -------------------------------------
+  |                 |                 |
+  | Here we are     | Here we are     |
+  | talking about   | talking about   |
+  | subtheme 1.     | subtheme 2.     |
+  |                 |                 |
+  -------------------------------------
+  |               notes               |
+  -------------------------------------
+  |         trailer navigation        |
+  -------------------------------------
+
+The kernel parts can be easily generalized into a more abstract scheme:
+
+  -------------------------------------
+  |                                   |
+  |            main stream            |
+  |                                   |
+  -------------------------------------
+  |                 |                 |
+  |  item 1 stream  |  item 2 stream  |
+  |                 |                 |
+  -------------------------------------
+  |              stream 3             |
+  -------------------------------------
+
+This may be used in many ways - to compare software or hardware items,
+to place reader hints besides a main text, to write about the lifes of
+two or more individuals and present certain life parts in parallel, and
+so on.
+
+But how to distinguish document streams in a PerlPoint document? Well,
+here are the simple rules:
+
+* Every headline (re)enters the \I<main stream>.
+
+* \I<Stream entry points> enter certain streams. They begin with a
+  \BC<~> character and end together with the line (like comments do):
+
+  =Main stream
+
+  Bla bla
+
+  \B<~The first docstream>
+
+  Blu blu
+
+  \B<~The 2nd doc stream>
+
+  Bli bli
+
+  ==Back to main stream
+
+It is \I<up to a converter> how it supports and "translates" document
+streams - please have a look at the converter documentations. Usually,
+you can instruct a converter at least to transform stream entry points
+into headlines (one level below the current real level), to ignore
+\I<certain> document streams, or to ignore document streams \I<at all>
+(except of the main stream).
 

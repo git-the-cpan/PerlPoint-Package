@@ -1,20 +1,10 @@
 
-
 # = HISTORY SECTION =====================================================================
 
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
-# 0.04    |< 14.04.02| JSTENZEL | added SCI function tests;
-#         |13.10.2001| JSTENZEL | switched to Test::More;
-# 0.03    |20.03.2001| JSTENZEL | adapted to tag templates;
-#         |24.05.2001| JSTENZEL | adapted to paragraph reformatting: text paragraphs
-#         |          |          | no longer contain a final whitespace string;
-#         |01.06.2001| JSTENZEL | adapted to modified lexing algorithm which takes
-#         |          |          | "words" as long as possible;
-#         |05.06.2001| JSTENZEL | adapted to further optimized lexing;
-# 0.02    |09.12.2000| JSTENZEL | new namespace: "PP" => "PerlPoint";
-# 0.01    |08.10.2000| JSTENZEL | new.
+# 0.01    |22.02.2002| JSTENZEL | new.
 # ---------------------------------------------------------------------------------------
 
 # PerlPoint test script
@@ -25,7 +15,6 @@ use strict;
 
 # load modules
 use Carp;
-use Safe;
 use Test::More qw(no_plan);
 use PerlPoint::Backend;
 use PerlPoint::Parser 0.37;
@@ -34,24 +23,26 @@ use PerlPoint::Constants;
 # declare variables
 my (@streamData, @results);
 
+# init library path
+$ENV{PERLPOINTLIB}='includelib';
+
 # build parser
 my ($parser)=new PerlPoint::Parser;
 
 # and call it
 $parser->run(
-             stream          => \@streamData,
-             files           => ['t/conditions.pp'],
-             activeBaseData  => {
-                                 userSettings => {flag1=>1},
-                                },
-             safe            => new Safe,
-             trace           => TRACE_NOTHING,
-             display         => DISPLAY_NOINFO+DISPLAY_NOWARN,
+             stream  => \@streamData,
+             files   => ['t/include6.pp'],
+             filter  => 'pp|perl|anything',
+             safe    => 0,
+             libpath => [qw(includelib2)],
+             trace   => TRACE_NOTHING,
+             display => DISPLAY_NOINFO+DISPLAY_NOWARN,
             );
 
 # build a backend
 my $backend=new PerlPoint::Backend(
-                                   name    => 'installation test: condition paragraphs',
+                                   name    => 'installation test: path search of included files',
                                    trace   => TRACE_NOTHING,
                                    display => DISPLAY_NOINFO,
                                   );
@@ -77,29 +68,17 @@ $backend->register($_, \&handler) foreach (
 $backend->run(\@streamData);
 
 # perform checks
-is(shift(@results), $_) foreach (DIRECTIVE_DOCUMENT, DIRECTIVE_START, 'conditions.pp');
+is(shift(@results), $_) foreach (DIRECTIVE_DOCUMENT, DIRECTIVE_START, 'include6.pp');
 
 is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
-is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Conditions allow to maintain all versions of a presentation in one file.');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'This is a text from an included source found via PERLPOINTLIB.');
 is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 
 is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
-is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Back to main text.');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'This is a text from an included source found via libpath.');
 is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 
-is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
-is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'flag1 set.');
-is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
-
-is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
-is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'flag1 or flag2 set.');
-is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
-
-is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
-is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Variable is greater than 10.');
-is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
-
-is(shift(@results), $_) foreach (DIRECTIVE_DOCUMENT, DIRECTIVE_COMPLETE, 'conditions.pp');
+is(shift(@results), $_) foreach (DIRECTIVE_DOCUMENT, DIRECTIVE_COMPLETE, 'include6.pp');
 
 
 # SUBROUTINES ###############################################################################

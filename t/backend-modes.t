@@ -5,6 +5,8 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.02    |< 14.04.02| JSTENZEL | adapted to headline shortcuts;
+#         |15.04.2002| JSTENZEL | adapted to chapter docstream hints;
 # 0.01    |16.08.2001| JSTENZEL | new.
 # ---------------------------------------------------------------------------------------
 
@@ -70,7 +72,12 @@ $backend->run(\@streamData);
 # perform checks: 1st turn (token mode)
 is(shift(@results), $_) foreach (DIRECTIVE_DOCUMENT, DIRECTIVE_START, 'backend-modes.pp');
 
-is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 1, 'A new chapter');
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 1, 'A new chapter', '');
+{
+ my $docstreams=shift(@results);
+ is(ref($docstreams), 'ARRAY');
+ is(join(' ', @$docstreams), '');
+}
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'A new chapter');
 is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 1);
 
@@ -78,7 +85,12 @@ is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'It comes with text.');
 is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 
-is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 2, 'And a subchapter');
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 2, 'And a subchapter', '');
+{
+ my $docstreams=shift(@results);
+ is(ref($docstreams), 'ARRAY');
+ is(join(' ', @$docstreams), '');
+}
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'And a subchapter');
 is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 2);
 
@@ -86,7 +98,12 @@ is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'with more text.');
 is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 
-is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 1, 'OK for today');
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 1, 'OK for today', '');
+{
+ my $docstreams=shift(@results);
+ is(ref($docstreams), 'ARRAY');
+ is(join(' ', @$docstreams), '');
+}
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'OK for today');
 is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 1);
 
@@ -101,15 +118,30 @@ $backend->mode(STREAM_HEADLINES);
 $backend->run(\@streamData);
 
 # 2nd turn perform headline mode tests
-is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 1, 'A new chapter');
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 1, 'A new chapter', '');
+{
+ my $docstreams=shift(@results);
+ is(ref($docstreams), 'ARRAY');
+ is(join(' ', @$docstreams), '');
+}
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'A new chapter');
 is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 1);
 
-is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 2, 'And a subchapter');
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 2, 'And a subchapter', '');
+{
+ my $docstreams=shift(@results);
+ is(ref($docstreams), 'ARRAY');
+ is(join(' ', @$docstreams), '');
+}
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'And a subchapter');
 is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 2);
 
-is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 1, 'OK for today');
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 1, 'OK for today', '');
+{
+ my $docstreams=shift(@results);
+ is(ref($docstreams), 'ARRAY');
+ is(join(' ', @$docstreams), '');
+}
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'OK for today');
 is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 1);
 
@@ -122,11 +154,21 @@ $backend->run(\@streamData);
 # perform checks: 3rd turn (mixed mode)
 is(shift(@results), $_) foreach (DIRECTIVE_DOCUMENT, DIRECTIVE_START, 'backend-modes.pp');
 
-is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 1, 'A new chapter');
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 1, 'A new chapter', '');
+{
+ my $docstreams=shift(@results);
+ is(ref($docstreams), 'ARRAY');
+ is(join(' ', @$docstreams), '');
+}
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'A new chapter');
 is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 1);
 
-is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 2, 'And a subchapter');
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 2, 'And a subchapter', '');
+{
+ my $docstreams=shift(@results);
+ is(ref($docstreams), 'ARRAY');
+ is(join(' ', @$docstreams), '');
+}
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'And a subchapter');
 is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 2);
 
@@ -134,7 +176,12 @@ is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'with more text.');
 is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 
-is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 1, 'OK for today');
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 1, 'OK for today', '');
+{
+ my $docstreams=shift(@results);
+ is(ref($docstreams), 'ARRAY');
+ is(join(' ', @$docstreams), '');
+}
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'OK for today');
 is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 1);
 

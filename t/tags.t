@@ -5,6 +5,9 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.11    |< 14.04.02| JSTENZEL | blocks got rid of a trailing newline;
+#         |          | JSTENZEL | adapted to headline shortcuts;
+#         |15.04.2002| JSTENZEL | adapted to chapter docstream hints;
 # 0.10    |16.08.2001| JSTENZEL | no need to build a Safe object;
 #         |13.10.2001| JSTENZEL | switched to Test::More;
 #         |          | JSTENZEL | added tests to check finish hook interface
@@ -356,7 +359,12 @@ is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
 is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 
 
-is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 1, 'Tag in a headline');
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 1, 'Tag in a headline', '');
+{
+ my $docstreams=shift(@results);
+ is(ref($docstreams), 'ARRAY');
+ is(join(' ', @$docstreams), '');
+}
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Tag in a ');
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
 {
@@ -478,7 +486,6 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
  is(join(' ', sort keys %$pars), '');
 }
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
-is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "\n");
 is(shift(@results), $_) foreach (DIRECTIVE_BLOCK, DIRECTIVE_COMPLETE);
 is(shift(@results), $_) foreach (DIRECTIVE_VERBATIM, DIRECTIVE_START);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "\n");

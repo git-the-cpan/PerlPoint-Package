@@ -5,6 +5,7 @@
 # ---------------------------------------------------------------------------------------
 # version | date   | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.06    |27.02.02| JSTENZEL | auto-anchors headlines (for \REF);
 # 0.05    |10.06.01| JSTENZEL | new script namespace "PerlPoint::Converter::pp2tree";
 #         |        | JSTENZEL | adapted to new tag declarations;
 # 0.04    |07.12.00| JSTENZEL | new module namespace "PerlPoint";
@@ -88,10 +89,11 @@ my ($parser)=new PerlPoint::Parser;
 
 # and call it
 $parser->run(
-             stream  => \@streamData,
-             files   => \@ARGV,
-             trace   => TRACE_NOTHING,
-             display => DISPLAY_ALL,
+             stream          => \@streamData,
+             files           => \@ARGV,
+             headlineLinks   => 1,
+             trace           => TRACE_NOTHING,
+             display         => DISPLAY_ALL,
             );
 
 # build a backend

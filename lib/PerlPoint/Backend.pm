@@ -5,6 +5,7 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.11    |08.03.2002| JSTENZEL | new method docstreams();
 # 0.10    |14.08.2001| JSTENZEL | adapted to new stream data format, introduced modes;
 #         |          | JSTENZEL | slight POD fixes;
 #         |16.08.2001| JSTENZEL | added bind(), headlineNr() and move2chapter();
@@ -48,7 +49,7 @@ B<PerlPoint::Backend> - frame class to transform PerlPoint::Parser output
 
 =head1 VERSION
 
-This manual describes version B<0.10>.
+This manual describes version B<0.11>.
 
 =head1 SYNOPSIS
 
@@ -153,7 +154,7 @@ features as it is necessary to build the converter you want!
 package PerlPoint::Backend;
 
 # declare version
-$VERSION=$VERSION="0.10";
+$VERSION=$VERSION="0.11";
 
 # pragmata
 use strict;
@@ -1244,6 +1245,51 @@ sub toc
  }
 
 
+=pod
+
+=head2 docstreams()
+
+Supplies the names of all document streams in the data stream.
+A data streams needs to be bound to the object.
+
+B<Parameters:>
+
+=over 4
+
+=item object
+
+An object as built by I<new()>.
+
+=back
+
+B<Returns:>
+
+A list of document stream titles in list context, the number of document
+streams in scalar context.
+
+B<Example:>
+
+  @docstreams=$backend->docstreams;
+
+=cut
+sub docstreams
+ {
+  # get parameters
+  my ($me)=@_;
+
+  # and check them
+  confess "[BUG] Missing object parameter.\n" unless $me;
+  confess "[BUG] Object parameter is no ", __PACKAGE__, " object.\n"  unless ref $me and ref $me eq __PACKAGE__;
+  confess "[BUG] There is no stream associated to this backend object yet, use bind() or run().\n" unless defined $me->{data};
+
+  # build an array of docstream titles
+  my @docstreams=keys %{$me->{data}[STREAM_DOCSTREAMS]};
+
+  # supply result as wished
+  wantarray ? @docstreams : scalar(@docstreams);
+ }
+
+
 1;
 
 
@@ -1277,7 +1323,7 @@ as well.
 
 =head1 AUTHOR
 
-Copyright (c) Jochen Stenzel (perl@jochen-stenzel.de), 1999-2001.
+Copyright (c) Jochen Stenzel (perl@jochen-stenzel.de), 1999-2002.
 All rights reserved.
 
 This module is free software, you can redistribute it and/or modify it

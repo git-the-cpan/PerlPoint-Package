@@ -87,6 +87,12 @@ t/conditions.pp
 
 t/documents.t
 
+t/docstreams1.t
+t/docstreams2.t
+t/docstreams3.t
+t/docstreams.pp
+t/docstream-default-checks.pl
+
 t/embedded.t
 t/embedded.pp
 
@@ -99,14 +105,18 @@ t/headlines.pp
 t/include1.t
 t/include2.t
 t/include3.t
+t/include6.t
 t/include.pp
 t/include1.pp
 t/include2.pp
 t/include3.pp
 t/include4.pp
 t/include5.pp
+t/include6.pp
 t/include.perl
 t/include2.perl
+t/includelib/searchMeInPath.pp
+t/includelib2/searchMeInPath2.pp
 
 t/linehints.t
 t/linehints.pp
@@ -116,6 +126,11 @@ t/lists.pp
 
 t/macros.t
 t/macros.pp
+
+t/pfilters.t
+t/pfilters.pp
+t/pfilter-code.pp
+t/pfilter-checks.pl
 
 t/simple.t
 t/simple.pp

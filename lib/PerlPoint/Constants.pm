@@ -5,6 +5,9 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.16    |< 02.03.02| JSTENZEL | added DIRCTIVE_DSTREAM_ENTRYPOINT constant;
+#         |02.03.2002| JSTENZEL | added DSTREAM_... constants;
+#         |29.09.2001| JSTENZEL | added STREAM_DOCSTREAMS;
 # 0.15    |10.08.2001| JSTENZEL | added STREAM_... constants;
 #         |          | JSTENZEL | reorganized POD slightly;
 #         |14.08.2001| JSTENZEL | added missed doc of TAG_... constants;
@@ -43,7 +46,7 @@ B<PerlPoint::Constants> - public PerlPoint module constants
 
 =head1 VERSION
 
-This manual describes version B<0.15>.
+This manual describes version B<0.16>.
 
 =head1 DESCRIPTION
 
@@ -63,7 +66,7 @@ of the using modules B<PerlPoint::Parser> and B<PerlPoint::Backend>.
 package PerlPoint::Constants;
 
 # declare version
-$VERSION=$VERSION=0.15;
+$VERSION=$VERSION=0.16;
 
 # startup actions
 BEGIN
@@ -116,6 +119,10 @@ flags a "definition point" paragraph;
 =item DIRECTIVE_DPOINT_ITEM
 
 flags a "definition point" item (the stuff to be defined);
+
+=item DIRECTIVE_DSTREAM_ENTRYPOINT
+
+flags the switch into another document stream;
 
 =item DIRECTIVE_HEADLINE
 
@@ -183,30 +190,31 @@ flags a verbatim block paragraph;
 
   # directive constants
   startupGenerateConstants(
-                           'DIRECTIVE_START',        # entity start;
-                           'DIRECTIVE_COMPLETE',     # entity complete;
+                           'DIRECTIVE_START',                  # entity start;
+                           'DIRECTIVE_COMPLETE',               # entity complete;
 
-                           'DIRECTIVE_BLOCK',        # block;
-                           'DIRECTIVE_COMMENT',      # comment;
-                           'DIRECTIVE_DLIST',        # definition list;
-                           'DIRECTIVE_DOCUMENT',     # document;
-                           'DIRECTIVE_DPOINT',       # definition list point;
-                           'DIRECTIVE_DPOINT_ITEM',  # definition list point;
-                           'DIRECTIVE_HEADLINE',     # headline;
-                           'DIRECTIVE_LIST_LSHIFT',  # shift list left;
-                           'DIRECTIVE_LIST_RSHIFT',  # shift list right;
-                           'DIRECTIVE_NEW_LINE',     # backend line hint;
-                           'DIRECTIVE_OLIST',        # ordered list;
-                           'DIRECTIVE_OPOINT',       # ordered list point;
-                           'DIRECTIVE_TAG',          # tag;
-                           'DIRECTIVE_TEXT',         # text;
-                           'DIRECTIVE_ULIST',        # unordered list;
-                           'DIRECTIVE_UPOINT',       # unordered list point;
-                           'DIRECTIVE_VARSET',       # backend hint: variable setting;
-                           'DIRECTIVE_VARRESET',     # backend hint: reset *all* variables;
-                           'DIRECTIVE_VERBATIM',     # verbatim;
+                           'DIRECTIVE_BLOCK',                  # block;
+                           'DIRECTIVE_COMMENT',                # comment;
+                           'DIRECTIVE_DLIST',                  # definition list;
+                           'DIRECTIVE_DOCUMENT',               # document;
+                           'DIRECTIVE_DPOINT',                 # definition list point;
+                           'DIRECTIVE_DPOINT_ITEM',            # definition list point;
+                           'DIRECTIVE_HEADLINE',               # headline;
+                           'DIRECTIVE_LIST_LSHIFT',            # shift list left;
+                           'DIRECTIVE_LIST_RSHIFT',            # shift list right;
+                           'DIRECTIVE_NEW_LINE',               # backend line hint;
+                           'DIRECTIVE_OLIST',                  # ordered list;
+                           'DIRECTIVE_OPOINT',                 # ordered list point;
+                           'DIRECTIVE_TAG',                    # tag;
+                           'DIRECTIVE_TEXT',                   # text;
+                           'DIRECTIVE_ULIST',                  # unordered list;
+                           'DIRECTIVE_UPOINT',                 # unordered list point;
+                           'DIRECTIVE_VARSET',                 # backend hint: variable setting;
+                           'DIRECTIVE_VARRESET',               # backend hint: reset *all* variables;
+                           'DIRECTIVE_VERBATIM',               # verbatim;
+                           'DIRECTIVE_DSTREAM_ENTRYPOINT',     # document stream entry point;
 
-                           'DIRECTIVE_SIMPLE',       # a pseudo directive (never used directly - MUST be the last here!);
+                           'DIRECTIVE_SIMPLE',                 # a pseudo directive (never used directly - MUST be the last here!);
                           );
 
 =pod
@@ -305,6 +313,10 @@ and C<PerlPoint::Backend>.
 
 stream data identifier - a string identifying the data structure as a PerlPoint stream.
 
+=item STREAM_DOCSTREAMS
+
+a list of all detected document stream identifiers.
+
 =item STREAM_TOKENS
 
 token stream.
@@ -321,6 +333,7 @@ headline stream.
   # stream data structure part constants
   startupGenerateConstants(
                            'STREAM_IDENT',           # stream data identifier;
+                           'STREAM_DOCSTREAMS',      # list of document streams (hash);
                            'STREAM_TOKENS',          # token stream;
                            'STREAM_HEADLINES',       # headline stream;
                           );
@@ -348,7 +361,7 @@ start/completion flag (C<DIRECTIVE_START>, C<DIRECTIVE_COMPLETE>).
 
 =item STREAM_DIR_DATA
 
-data part, depends on directive type.
+beginning of the data part, depends on directive type.
 
 
 =back
@@ -361,8 +374,43 @@ data part, depends on directive type.
                            'STREAM_DIR_HINTS',       # backend hints stored by the parser;
                            'STREAM_DIR_TYPE',        # directive type;
                            'STREAM_DIR_STATE',       # directive state (starting, complete);
-                           'STREAM_DIR_DATA',        # data part;
+                           'STREAM_DIR_DATA',        # data part (index of first element);
                           );
+
+
+=pod
+
+=head2 Document stream handling constants
+
+declare how document streams should be handled by the parser.
+
+=over 4
+
+=item DSTREAM_DEFAULT
+
+Document stream entry points are streamed directly - so the backend
+can handle them.
+
+=item DSTREAM_IGNORE
+
+Document streams (except of the main stream) are completely ignored.
+
+=item DSTREAM_HEADLINES
+
+Document stream entry points are streamed as headlines.
+
+=back
+
+=cut
+
+  # declare display constants
+  startupGenerateConstants(
+                           'DSTREAM_DEFAULT',        # just stream them;
+                           'DSTREAM_IGNORE',         # ignore all streams except of "main";
+                           'DSTREAM_HEADLINES',      # stream entry points as headlines;
+                          );
+ }
+
 
 
 
@@ -452,6 +500,7 @@ suppresses warnings;
   use constant 'DISPLAY_NOINFO'   => 1;            # suppress informations;
   use constant 'DISPLAY_NOWARN'   => 2;            # suppress warnings;
 
+
 =pod
 
 =head2 Cache constants
@@ -487,7 +536,8 @@ Cleans up an existing cache before the parser starts (and possibly rebuilds it).
   use constant 'CACHE_OFF'        => 0;            # MUST be 0! Deactivates the cache.
   use constant 'CACHE_ON'         => 1;            # activates the cache;
   use constant 'CACHE_CLEANUP'    => 2;            # cache cleanup;
- }
+
+
 
 # modules
 use Exporter;
@@ -504,6 +554,7 @@ use Exporter;
            DIRECTIVE_DOCUMENT
            DIRECTIVE_DPOINT
            DIRECTIVE_DPOINT_ITEM
+           DIRECTIVE_DSTREAM_ENTRYPOINT
            DIRECTIVE_HEADLINE
            DIRECTIVE_LIST_LSHIFT
            DIRECTIVE_LIST_RSHIFT
@@ -535,12 +586,16 @@ use Exporter;
 	   CACHE_OFF
 	   CACHE_ON
 	   CACHE_CLEANUP
+
+	   DSTREAM_DEFAULT
+	   DSTREAM_IGNORE
+           DSTREAM_HEADLINES
           );
 
 %EXPORT_TAGS=(
               parsing => [qw(PARSING_OK PARSING_COMPLETED PARSING_ERROR PARSING_FAILED PARSING_IGNORE PARSING_ERASE)],
               stream  => [qw(
-                             STREAM_IDENT STREAM_TOKENS STREAM_HEADLINES
+                             STREAM_IDENT STREAM_DOCSTREAMS STREAM_TOKENS STREAM_HEADLINES
                              STREAM_DIR_HINTS STREAM_DIR_TYPE STREAM_DIR_STATE STREAM_DIR_DATA
                             )],
               tags    => [qw(TAGS_OPTIONAL TAGS_MANDATORY TAGS_DISABLED)],

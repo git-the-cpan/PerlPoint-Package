@@ -5,6 +5,7 @@
 # ---------------------------------------------------------------------------------------
 # version | date   | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.06    |27.02.02| JSTENZEL | auto-anchors headlines (for \REF);
 # 0.05    |24.07.01| JSTENZEL | now adds additional lines to complete examples;
 # 0.04    |26.03.01| JSTENZEL | adapted to new tag templates;
 #         |10.06.01| JSTENZEL | new script namespace "PerlPoint::Converter::pp2pod";
@@ -69,7 +70,7 @@ use Getopt::Long;
 use PerlPoint::Tags;
 use PerlPoint::Backend;
 use PerlPoint::Constants;
-use PerlPoint::Parser 0.34;
+use PerlPoint::Parser 0.37;
 use PerlPoint::Tags::Basic;
 use Getopt::ArgvFile qw(argvFile);
 
@@ -91,10 +92,11 @@ my ($parser)=new PerlPoint::Parser;
 
 # and call it
 $parser->run(
-             stream  => \@streamData,
-             files   => \@ARGV,
-             trace   => TRACE_NOTHING,
-             display => DISPLAY_NOINFO,
+             stream          => \@streamData,
+             files           => \@ARGV,
+             headlineLinks   => 1,
+             trace           => TRACE_NOTHING,
+             display         => DISPLAY_NOINFO,
             ) or exit 1;
 
 # build a backend

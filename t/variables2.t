@@ -5,6 +5,7 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.09    |< 14.04.02| JSTENZEL | blocks got rid of a trailing newline;
 # 0.08    |22.07.2001| JSTENZEL | adapted to improved lexer;
 # 0.07    |20.03.2001| JSTENZEL | adapted to tag templates;
 #         |23.03.2001| JSTENZEL | adapted to by line lexing of verbatim blocks;
@@ -37,7 +38,7 @@ use PerlPoint::Parser 0.34;
 use PerlPoint::Constants;
 
 # prepare tests
-BEGIN {plan tests=>200;}
+BEGIN {plan tests=>197;}
 
 # declare variables
 my (@streamData, @results);
@@ -116,7 +117,6 @@ ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "\n");
 ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '  ');
 ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'word');
 ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ', word.');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "\n");
 ok(shift(@results), $_) foreach (DIRECTIVE_BLOCK, DIRECTIVE_COMPLETE);
 ok(shift(@results), $_) foreach (DIRECTIVE_VERBATIM, DIRECTIVE_START);
 ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "\n");

@@ -1,20 +1,10 @@
 
-
 # = HISTORY SECTION =====================================================================
 
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
-# 0.04    |< 14.04.02| JSTENZEL | added SCI function tests;
-#         |13.10.2001| JSTENZEL | switched to Test::More;
-# 0.03    |20.03.2001| JSTENZEL | adapted to tag templates;
-#         |24.05.2001| JSTENZEL | adapted to paragraph reformatting: text paragraphs
-#         |          |          | no longer contain a final whitespace string;
-#         |01.06.2001| JSTENZEL | adapted to modified lexing algorithm which takes
-#         |          |          | "words" as long as possible;
-#         |05.06.2001| JSTENZEL | adapted to further optimized lexing;
-# 0.02    |09.12.2000| JSTENZEL | new namespace: "PP" => "PerlPoint";
-# 0.01    |08.10.2000| JSTENZEL | new.
+# 0.01    |02.03.2002| JSTENZEL | new.
 # ---------------------------------------------------------------------------------------
 
 # PerlPoint test script
@@ -29,7 +19,7 @@ use Safe;
 use Test::More qw(no_plan);
 use PerlPoint::Backend;
 use PerlPoint::Parser 0.37;
-use PerlPoint::Constants;
+use PerlPoint::Constants 0.16;
 
 # declare variables
 my (@streamData, @results);
@@ -40,10 +30,10 @@ my ($parser)=new PerlPoint::Parser;
 # and call it
 $parser->run(
              stream          => \@streamData,
-             files           => ['t/conditions.pp'],
-             activeBaseData  => {
-                                 userSettings => {flag1=>1},
-                                },
+             files           => ['t/docstreams.pp'],
+             filter          => 'pp|perl|anything',
+             docstreams2skip => ['The ignored docstream'],
+             docstreaming    => DSTREAM_IGNORE,
              safe            => new Safe,
              trace           => TRACE_NOTHING,
              display         => DISPLAY_NOINFO+DISPLAY_NOWARN,
@@ -51,7 +41,7 @@ $parser->run(
 
 # build a backend
 my $backend=new PerlPoint::Backend(
-                                   name    => 'installation test: condition paragraphs',
+                                   name    => 'installation test: document streams (except for the main stream)',
                                    trace   => TRACE_NOTHING,
                                    display => DISPLAY_NOINFO,
                                   );
@@ -62,6 +52,7 @@ $backend->register($_, \&handler) foreach (
                                            DIRECTIVE_COMMENT,
                                            DIRECTIVE_DOCUMENT,
                                            DIRECTIVE_DPOINT,
+                                           DIRECTIVE_DSTREAM_ENTRYPOINT,
                                            DIRECTIVE_HEADLINE,
                                            DIRECTIVE_LIST_LSHIFT,
                                            DIRECTIVE_LIST_RSHIFT,
@@ -77,29 +68,61 @@ $backend->register($_, \&handler) foreach (
 $backend->run(\@streamData);
 
 # perform checks
-is(shift(@results), $_) foreach (DIRECTIVE_DOCUMENT, DIRECTIVE_START, 'conditions.pp');
+is(shift(@results), $_) foreach (DIRECTIVE_DOCUMENT, DIRECTIVE_START, 'docstreams.pp');
+
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 1, 'A two stream doc', '');
+{
+ my $docstreams=shift(@results);
+ is(ref($docstreams), 'HASH');
+ is(join(' ', sort keys %$docstreams), '');
+}
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'A two stream doc');
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 1);
 
 is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
-is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Conditions allow to maintain all versions of a presentation in one file.');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'This document compares two imaginary objects.');
 is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
+
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 2, 'Advantages', '');
+{
+ my $docstreams=shift(@results);
+ is(ref($docstreams), 'HASH');
+ is(join(' ', sort keys %$docstreams), '');
+}
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Advantages');
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 2);
 
 is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
-is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Back to main text.');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'What they are good in.');
 is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
+
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 2, 'Suggestions', '');
+{
+ my $docstreams=shift(@results);
+ is(ref($docstreams), 'HASH');
+ is(join(' ', sort keys %$docstreams), '');
+}
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Suggestions');
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 2);
 
 is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
-is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'flag1 set.');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Talks about things to be improved.');
 is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
+
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 2, 'Conclusion', '');
+{
+ my $docstreams=shift(@results);
+ is(ref($docstreams), 'HASH');
+ is(join(' ', sort keys %$docstreams), '');
+}
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Conclusion');
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 2);
 
 is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
-is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'flag1 or flag2 set.');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'What the editors think and suggest.');
 is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 
-is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
-is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Variable is greater than 10.');
-is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
-
-is(shift(@results), $_) foreach (DIRECTIVE_DOCUMENT, DIRECTIVE_COMPLETE, 'conditions.pp');
+is(shift(@results), $_) foreach (DIRECTIVE_DOCUMENT, DIRECTIVE_COMPLETE, 'docstreams.pp');
 
 
 # SUBROUTINES ###############################################################################

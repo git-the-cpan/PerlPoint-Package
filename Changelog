@@ -6,6 +6,262 @@
 
 
 
+=0.37
+
+This is a maintenance update. It can replace version 0.36 transparently
+except for verbatim block paragraph filters and \C<pp2sdf> output handling.
+See next section for details.
+
+
+==Incompatible changes
+
+* Paragraph filters intended to be applied to verbatim paragraphs need
+  to be adapted: they now receive the \I<full> paragraph text
+  \I<including> the enclosing heredoc parts (e.g. \C<<<EOE> and matching
+  \C<EOE>).
+
+* Extended headline stream interface. This only effects converter authors,
+  but not really, because there are just two \I<additional> parameters now.
+  See below.
+
+* \BC<pp2sdf> now needs an explicit result file setup by the new option
+  \C<-sdffile>. Previous versions wrote to \C<STDOUT>.
+
+
+
+
+==Bugfixes
+
+* \C<pp2sdf>: \BC<\\SEQ> did not set an anchor when the \C<name> option
+  was specified.
+
+* A combination of \C<\\REF>, \C<\\SEQ> and activated cache caused trouble
+  illustrating open tasks in the implementation both of finish hooks and
+  anchor objects. This is fixed, see
+  \REF{type=linked name="0.37 | Features | Cache"} below for details.
+
+* For grammatical reasons, paragraph filters applied to blocks or lists
+  could cause trouble in detection of the subsequent paragraph. This is
+  fixed.
+
+* Filtered paragraphs were cached but are made potentially dynamic in an
+  unpredictable way by the filter(s). So they are cached no longer.
+
+* Filtering of headlines and verbatim blocks was not really fully
+  supported yet. Improved.
+
+
+==Features
+
+\LOCALTOC{type=linked}
+
+
+===Document streams
+
+Robert Inder asked how to achieve an HTML layout where notes are
+placed below the slide context. When we discussed several ideas,
+I thought it might be useful to have a general solution which I
+called \I<"document streams">. Thanks, Robert!
+
+So what is a document stream? Consider the following layout:
+
+  -------------------------------------
+  |         header navigation         |
+  -------------------------------------
+  |                                   |
+  |              Title                |
+  |                                   |
+  | Introduction text, points etc.    |
+  |                                   |
+  -------------------------------------
+  |                 |                 |
+  | Here we are     | Here we are     |
+  | talking about   | talking about   |
+  | subtheme 1.     | subtheme 2.     |
+  |                 |                 |
+  -------------------------------------
+  |               notes               |
+  -------------------------------------
+  |         trailer navigation        |
+  -------------------------------------
+
+The kernel parts can be easily generalized into a more abstract scheme:
+
+  -------------------------------------
+  |                                   |
+  |            main stream            |
+  |                                   |
+  -------------------------------------
+  |                 |                 |
+  |  item 1 stream  |  item 2 stream  |
+  |                 |                 |
+  -------------------------------------
+  |              stream 3             |
+  -------------------------------------
+
+This may be used in many ways - to compare software or hardware items,
+to place reader hints besides a main text, to write about the lifes of
+two or more individuals and present certain life parts in parallel, and
+so on.
+
+But how to distinguish document streams in a PerlPoint document? Well,
+here are the simple rules:
+
+* Every headline (re)enters the main stream.
+
+* \I<Stream entry points> enter certain streams. They are a new one line
+  paragraph type, beginning with a \BC<~> character and ending with
+  the line (like comments do):
+
+  =Main stream
+
+  Bla bla
+
+  \B<~The first docstream>
+
+  Blu blu
+
+  \B<~The 2nd doc stream>
+
+  Bli bli
+
+  ==Back to main stream
+
+Converters need to add docstream support, so currently only \C<pp2sdf>
+provides a first (reference) implementation. \I<It is completely up to
+a converter how it supports and "translates" document streams.> But
+to implement generally useful methods in the framework, the parser
+can be set up to transform all docstream entry points into headlines
+(at a sublevel of the current headline level) or to ignore all document
+streams at all (except of the main stream).
+
+More, docstreams can be skipped more selectively as well: the parsers
+\C<run()> method provides a new parameter \BC<docstreams2skip> to pass
+the parts to be ignored. When an ignored docstream is entered, all
+subsequent document parts till the next entry point (or headline) are
+completely ignored (including conditions - take care).
+
+Finally, \I<headline> start directives now provide a list of docstreams
+used in this certain chapter - allowing converter authors to adapt the
+chapters layout dynamically. See "Writing converters" for details.
+
+
+
+===\\INCLUDE
+
+Now it's easy to use a central repository of (macro / variable / code /
+filter / document) libraries:
+
+* \BC<\\INCLUDE> now searches pathes specified by an environment variable
+  \BC<PERLPOINTLIB> (similar to \C<perl>, shells, linkers etc.) if the
+  specified file cannot be found directly. In the tradition of \C<PATH>
+  and \C<PERL5LIB>, pathes are delimited by (optional whitespaces and)
+  semicolons.
+
+  path1\B<;>path2\B<;> path3   \B<;>   path4\B<;>path5
+
+* The new C<PERLPOINTLIB> path feature is available immediately with
+  this package version, regardless of converter adaptations.
+
+* Converters can pass a new parameter \C<libpath> to the parsers method
+  \C<run>. The argument of \C<libpath> should be a reference to an array
+  filled by converter options. I suggest a new conventional option
+  \I<\C<-includelib>> to be invoked multiple times (in the tradition of
+  \C<-I> options available for \C<perl> and various compilers).
+
+* \C<-includelib> needs converter adaptations, so please use
+  \C<PERLPOINTLIB> till updated converters appear.
+
+Pathes specified via \C<-includelib> (or the internal representation
+\C<libpath>, respectively) are searched \I<before> pathes specified via
+\C<PERLPOINTLIB>.
+
+* Pathes of included files are resolved now - circular inclusions caused
+  by links pointing to the same file can be detected earlier this way. As
+  a side effect, the resulting absolute file names improve error messages.
+
+
+===Cache
+
+* Paragraphs containing tags using finish hooks are no longer cached.
+  A tag finished after parsing makes the whole paragraph depending on
+  something that cannot be cached on base of the parsed text.
+
+* Anchors defined by a cached paragraph are cached now as well - and
+  restored after a cache hit.
+
+* The implementation of the mentioned last point required an extension
+  of the internal cache format. Cache files made by versions prior
+  0.37 will be rebuilt automatically next time they are used.
+
+
+
+===pp2sdf
+
+* Avoiding more backslashes in paragraphs starting with an SDF command.
+
+* New option \BC<-result> to specify an output file.
+
+* Supports document streams by three modes: docstreams can be ignored,
+  entry points can be made headlines, or \C<pp2sdf> can produce one
+  document per docstream.
+
+* Provides new conventional converter options \BC<-includelib>,
+  \BC<-docstreaming> and \BC<-skipstream>.
+
+
+===Misc
+
+* Slightly improved the \C<README> file.
+
+* \BC<flagSet()> now takes a \I<list> of flag names and checks if at least one
+  of the flags is set (implicit \I<or> condition). This makes it more handy
+  to write combined conditions. Thanks to Helmut Steinbach to make me
+  thinking about this.
+
+  old:
+
+  ? flagSet('a') or flagSet('b') or flagSet('all')
+
+  new:
+
+  ? flagSet(qw(a b all))
+
+
+* \C<PerlPoint::Anchors> was extended by a logging mode to trace newly
+  added anchors.
+
+* Added tests of condition interface functions (currently \C<flagSet()>
+  and \C<varValue()>).
+
+* Improved headline tests.
+
+* Added paragraph filter tests.
+
+* Paragraph filter functions can access the type of the paragraph
+  using the new variable $main::_pfilterType.
+
+* Empty text paragraphs are no longer made part of the stream.
+
+* Blocks were streamed with a final newline, improved.
+
+* Demos \C<pp2pod> and \C<pp2tree> auto-anchor headlines now (so
+  \C<\\REF> can be used).
+
+* New headline shortcuts. Thanks to Robert Inder who asked for them.
+  A shortcut is a plain string appended to the headline title,
+  separated by a "~". \I<Converters need to be adapted - currently
+  there is no shortcut support available.>
+
+  =A very long headline which may not fit
+   into the navigation bars \B<~ \I<Long headline>>
+
+* Updated \C<hilit19> extensions for Emacs (in the \C<utilities> directory).
+
+* Updated docs.
+
+
+
 =0.36
 
 This is a major update - in the sense that it modifies a lot of internals,

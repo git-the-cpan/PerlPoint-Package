@@ -5,6 +5,10 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.09    |< 14.04.02| JSTENZEL | empty text paragraphs are not streamed any longer;
+#         |          | JSTENZEL | blocks got rid of a trailing newline;
+#         |          | JSTENZEL | adapted to headline shortcuts;
+#         |15.04.2002| JSTENZEL | adapted to chapter docstream hints;
 # 0.08    |22.07.2001| JSTENZEL | adapted to improved lexer;
 #         |13.10.2001| JSTENZEL | adapted to headline title providing;
 #         |          | JSTENZEL | switched to Test::More;
@@ -89,10 +93,12 @@ is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'This text was included.');
 is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 
-is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
-is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
-
-is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 11, 'First level headline moved to level 11');
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 11, 'First level headline moved to level 11', '');
+{
+ my $docstreams=shift(@results);
+ is(ref($docstreams), 'ARRAY');
+ is(join(' ', @$docstreams), '');
+}
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'First level headline moved to level 11');
 is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 11);
 
@@ -120,7 +126,6 @@ is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 is(shift(@results), $_) foreach (DIRECTIVE_BLOCK, DIRECTIVE_START);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'something.');
-is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "\n");
 is(shift(@results), $_) foreach (DIRECTIVE_BLOCK, DIRECTIVE_COMPLETE);
 is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Continued frame source.');

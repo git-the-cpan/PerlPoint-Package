@@ -63,6 +63,7 @@ Once we have the intermediate data, there's another job all converters need to p
 
 With this framework, a converter author can focus just on target format generation. That's the part naturally most interesting to him.
 
+
 ==The language implementation
 
 Let's go back to the parser. It was said that it implements the "\PP base language definition to recognize paragraphs, macros, variables, tags, and so on". Does this mean that the complete language is implemented there? No, that's not the case. Instead of this, there is an important part left to the converter author to make the design as flexible as possible. This point is the definition of tags.
@@ -88,6 +89,7 @@ Tags are defined by \I<Perl modules>, for a simple reason: I looked for a way to
 \? Hardly nothing.
 
 But there are even more advantages. Defining tags by modules provides a simple way to \I<combine> definitions, to publish them in a central tag repository (CPAN) and to use them in various converters. \PP even offers a way to say the parser "We do not implement the tags of target language SuperDooper, but please treat them as tags anywhere (we will ignore them in the backend running subsequently)." - which makes it easy to process one and the same source by numerous converters defining completely different tag sets.
+
 
 ==The whole picture
 
@@ -620,6 +622,7 @@ Of course the variables to declare strongly depend on how you are going to const
       %options,                   # option hash;
      );
 
+
 ==Option handling
 
 Option handling is a highly individual part of software design. CPAN provides numerous modules which solve this task in several ways. This reflects the very different preferences of various people, and we do not want to restrict anyone in this field. On the other hand, \PP will be obviously easier to use if its several converters provide similar working interfaces. For this reason, the following conventions are established:
@@ -674,13 +677,16 @@ I personally prefer \BC<Getopt::Long> for option handling. Your preferences may 
              "activeContents",    \GREEN<# evaluation of active contents;>
              "cache",             \GREEN<# control the cache;>
              "cacheCleanup",      \GREEN<# cache cleanup;>
+             "docstreaming=s",    \GREEN<# document stream handling;>
              "help",              \GREEN<# online help, usage;>
+             "includelib=s@",     \GREEN<# library pathes;>
              "nocopyright",       \GREEN<# suppress copyright message;>
              "noinfo",            \GREEN<# suppress runtime informations;>
              "nowarn",            \GREEN<# suppress runtime warnings;>
              "quiet",             \GREEN<# suppress all runtime messages except of error ones;>
              "safeOpcode=s@",     \GREEN<# permitted opcodes in active contents;>
              "set=s@",            \GREEN<# user settings;>
+             "skipstream=s@",     \GREEN<# skip certain document streams;>
              "tagset=s@",         \GREEN<# add a tag set to the scripts own tag declarations;>
              "trace:i",           \GREEN<# activate trace messages;>
             );
@@ -691,8 +697,17 @@ I personally prefer \BC<Getopt::Long> for option handling. Your preferences may 
 
 :\BC<cacheCleanup>: enforces a cleanup of existing cache files.
 
+:\BC<docstreaming>: specifies how document streams shall be handled.
+
 :\BC<help>: displays a usage message, which is usually the complete converter manpage.
             The converter is stopped after performing the display task.
+
+:\BC<includelib>: specifies a directory to be scanned for files included via an
+                  \C<\\INCLUDE> tag - think of \C<perl>'s \C<-I> option. Users are
+                  allowed to specify as many directories as necessary, to be investigated
+                  in the specified order. (Note: the environment variable \C<PERLPOINTLIB>
+                  can be used for the same purpose, but \C<-includelib> pathes will be
+                  scanned first.)
 
 :\BC<nocopyright>, \BC<noinfo> and \BC<nowarn>: suppress informations a user can occasionally
                                                 live without: copyright messages, informations
@@ -712,6 +727,8 @@ I personally prefer \BC<Getopt::Long> for option handling. Your preferences may 
 
 :\BC<set>: provides a way to inject user defined settings into Active Contents. This is helpful
            to process documents in various ways, without a need to modify document sources.
+
+:\BC<skipstream>: allows a user to hide a certain document stream. Can be specified multiply.
 
 :\BC<tagset>: can be used multiply to declare that foreign tags shall be accepted. Foreign tags
               are tags not supported by the converter, but defined for other converters. By 
@@ -825,6 +842,12 @@ The objects method \C<run()> invokes the parser to process all document sources.
                                    CONVERTER_VERSION => do {no strict 'refs'; ${join('::', __PACKAGE__, 'VERSION')}},
                                   },
 
+               libpath         => exists $options{includelib} ? $options{includelib} : [],
+
+               docstreams2skip => exists $options{skipstream} ? $options{skipstream} : [],
+
+               docstreaming    => (exists $options{docstreaming} and ($options{docstreaming}==DSTREAM_HEADLINES or $options{docstreaming}==DSTREAM_IGNORE)) ? $options{docstreaming} : DSTREAM_DEFAULT,
+
                vispro          => 1,
 
                cache           =>   (exists $options{cache} ? CACHE_ON : CACHE_OFF)
@@ -862,7 +885,31 @@ So what happens here?
                       \C<$main::\PP>. The keys \C<targetLanguage> and \C<userSettings> are
                       provided by convention, but you may add whatever keys you need.
 
+:\BC<libpath>: passes the library pathes a user specified via \C<-includelib>, see above
+               for details. Please copy this code.
+
+:\BC<docstreams2skip>: passes the names of document streams to skip which are specified via
+                       user option \C<-skipstream>, see above for details. Please copy this
+                       code.
+
+:\BC<docstreaming>: specifies how document streams shall be handled. It is up to you
+                    which fashions of docstream handling your converter will provide.
+                    Nevertheless, two styles are supported directly by the parser (which
+                    makes them available in all converters), so please pass \C<DSTREAM_HEADLINE>
+                    and \C<DSTREAM_IGNORE> directly to the parser if they are specified by a user.
+                    \C<DSTREAM_HEADLINES> transforms stream entry points into headlines,
+                    while \C<DSTREAM_IGNORE> ignores all streams except the "main stream".
+                    In all other cases, please set the value of this parameter to
+                    \C<DSTREAM_DEFAULT>, which makes the parser supply all stream entry points
+                    in the intermediate data so your converter can deal with them itself.
+                    A final hint: for user convenience, your converter could allow to specify
+                    streaming modes by strings instead of by numbers. (And it is recommended
+                    to do so because the internal constants are subject to changes, but the
+                    user interface should be as stable as possible.) So please adapt this
+                    code appropriately.
+
 :\BC<vispro>: if set to a true value, the parser will display runtime informations.
+              Please copy this code.
 
 :\BC<cache>: used to pass the cache settings. Please copy this code.
 
@@ -1138,27 +1185,28 @@ All parameters beginning with the third one are absolutely type specific.
 If there are beginning and completing elements, all parameters will be provided at both places except where noted.
 
 @|
-1: type directive          | 2: used flags (modes)                        | 3...: more parameters
-\BC<DIRECTIVE_BLOCK>       | \C<DIRECTIVE_START>, \C<DIRECTIVE_COMPLETE>  | -
-\BC<DIRECTIVE_COMMENT>     | \C<DIRECTIVE_START>, \C<DIRECTIVE_COMPLETE>  | -
-\BC<DIRECTIVE_DLIST>       | \C<DIRECTIVE_START>, \C<DIRECTIVE_COMPLETE>  | a reserved parameter, two parameters describing type and level of a preceeding list shift if any (0 otherwise, only provided in \I<start> directives), two parameters describing type and level of a following list shift if any (0 otherwise, only provided in \I<completion> directives)
-\BC<DIRECTIVE_DOCUMENT>    | \C<DIRECTIVE_START>, \C<DIRECTIVE_COMPLETE>  | (base)name of source file
-\BC<DIRECTIVE_DPOINT>      | \C<DIRECTIVE_START>, \C<DIRECTIVE_COMPLETE>  | a reserved parameter, two parameters describing type and level of a preceeding list shift if any (0 otherwise, only provided in \I<start> directives), two parameters describing type and level of a following list shift if any (0 otherwise, only provided in \I<completion> directives)
-\BC<DIRECTIVE_DPOINT_ITEM> | \C<DIRECTIVE_START>, \C<DIRECTIVE_COMPLETE>  | -
-\BC<DIRECTIVE_HEADLINE>    | \C<DIRECTIVE_START>, \C<DIRECTIVE_COMPLETE>  | Headline level. The full headline title (tags stripped off) is provided additionally in the startup directive \I<only>.
-\BC<DIRECTIVE_LIST_LSHIFT> | \C<DIRECTIVE_START>                          | number of levels to shift
-\BC<DIRECTIVE_LIST_RSHIFT> | \C<DIRECTIVE_START>                          | number of levels to shift
-\BC<DIRECTIVE_NEW_LINE>    | \C<DIRECTIVE_START>                          | a hash reference: key "file" provides the current source file name, key "line" the new line number
-\BC<DIRECTIVE_OLIST>       | \C<DIRECTIVE_START>, \C<DIRECTIVE_COMPLETE>  | A prefered startup number (defaults to 1). Two parameters describing type and level of a preceeding list shift if any (0 otherwise, only provided in \I<start> directives), two parameters describing type and level of a following list shift if any (0 otherwise, only provided in \I<completion> directives)
-\BC<DIRECTIVE_OPOINT>      | \C<DIRECTIVE_START>, \C<DIRECTIVE_COMPLETE>  | -
-\BC<DIRECTIVE_SIMPLE>      | \C<DIRECTIVE_START>                          | a list of strings
-\BC<DIRECTIVE_TAG>         | \C<DIRECTIVE_START>, \C<DIRECTIVE_COMPLETE>  | First, the tag name, then a reference to a hash of tag options taken from the source. \I<Tag options in the open directive might have been modified by a tag finish hook and therefore differ from the options provided in the closing directive, which reflects the original options (before finish hook invokation).>
-\BC<DIRECTIVE_TEXT>        | \C<DIRECTIVE_START>, \C<DIRECTIVE_COMPLETE>  | -
-\BC<DIRECTIVE_ULIST>       | \C<DIRECTIVE_START>, \C<DIRECTIVE_COMPLETE>  | -
-\BC<DIRECTIVE_UPOINT>      | \C<DIRECTIVE_START>, \C<DIRECTIVE_COMPLETE>  | -
-\BC<DIRECTIVE_VARRESET>    | \C<DIRECTIVE_START>                          | -
-\BC<DIRECTIVE_VARSET>      | \C<DIRECTIVE_START>                          | a hash reference: key "var" provides the variables name, key "value" the new value
-\BC<DIRECTIVE_VERBATIM>    | \C<DIRECTIVE_START>, \C<DIRECTIVE_COMPLETE>  | -
+1: type directive                 | 2: used flags (modes)                        | 3...: more parameters
+\BC<DIRECTIVE_BLOCK>              | \C<DIRECTIVE_START>, \C<DIRECTIVE_COMPLETE>  | -
+\BC<DIRECTIVE_COMMENT>            | \C<DIRECTIVE_START>, \C<DIRECTIVE_COMPLETE>  | -
+\BC<DIRECTIVE_DLIST>              | \C<DIRECTIVE_START>, \C<DIRECTIVE_COMPLETE>  | a reserved parameter, two parameters describing type and level of a preceeding list shift if any (0 otherwise, only provided in \I<start> directives), two parameters describing type and level of a following list shift if any (0 otherwise, only provided in \I<completion> directives)
+\BC<DIRECTIVE_DOCUMENT>           | \C<DIRECTIVE_START>, \C<DIRECTIVE_COMPLETE>  | (base)name of source file
+\BC<DIRECTIVE_DPOINT>             | \C<DIRECTIVE_START>, \C<DIRECTIVE_COMPLETE>  | a reserved parameter, two parameters describing type and level of a preceeding list shift if any (0 otherwise, only provided in \I<start> directives), two parameters describing type and level of a following list shift if any (0 otherwise, only provided in \I<completion> directives)
+\BC<DIRECTIVE_DPOINT_ITEM>        | \C<DIRECTIVE_START>, \C<DIRECTIVE_COMPLETE>  | -
+\BC<DIRECTIVE_DSTREAM_ENTRYPOINT> | \C<DIRECTIVE_START>                          | stream name
+\BC<DIRECTIVE_HEADLINE>           | \C<DIRECTIVE_START>, \C<DIRECTIVE_COMPLETE>  | Headline level. The full headline title (tags stripped off), a short version of the title and a reference to an array of docstreams used in this chapter are provided additionally in the startup directive \I<only>. (If no short title version (or "shortcut") was specified, an empty string is provided.)
+\BC<DIRECTIVE_LIST_LSHIFT>        | \C<DIRECTIVE_START>                          | number of levels to shift
+\BC<DIRECTIVE_LIST_RSHIFT>        | \C<DIRECTIVE_START>                          | number of levels to shift
+\BC<DIRECTIVE_NEW_LINE>           | \C<DIRECTIVE_START>                          | a hash reference: key "file" provides the current source file name, key "line" the new line number
+\BC<DIRECTIVE_OLIST>              | \C<DIRECTIVE_START>, \C<DIRECTIVE_COMPLETE>  | A prefered startup number (defaults to 1). Two parameters describing type and level of a preceeding list shift if any (0 otherwise, only provided in \I<start> directives), two parameters describing type and level of a following list shift if any (0 otherwise, only provided in \I<completion> directives)
+\BC<DIRECTIVE_OPOINT>             | \C<DIRECTIVE_START>, \C<DIRECTIVE_COMPLETE>  | -
+\BC<DIRECTIVE_SIMPLE>             | \C<DIRECTIVE_START>                          | a list of strings
+\BC<DIRECTIVE_TAG>                | \C<DIRECTIVE_START>, \C<DIRECTIVE_COMPLETE>  | First, the tag name, then a reference to a hash of tag options taken from the source. \I<Tag options in the open directive might have been modified by a tag finish hook and therefore differ from the options provided in the closing directive, which reflects the original options (before finish hook invokation).>
+\BC<DIRECTIVE_TEXT>               | \C<DIRECTIVE_START>, \C<DIRECTIVE_COMPLETE>  | -
+\BC<DIRECTIVE_ULIST>              | \C<DIRECTIVE_START>, \C<DIRECTIVE_COMPLETE>  | -
+\BC<DIRECTIVE_UPOINT>             | \C<DIRECTIVE_START>, \C<DIRECTIVE_COMPLETE>  | -
+\BC<DIRECTIVE_VARRESET>           | \C<DIRECTIVE_START>                          | -
+\BC<DIRECTIVE_VARSET>             | \C<DIRECTIVE_START>                          | a hash reference: key "var" provides the variables name, key "value" the new value
+\BC<DIRECTIVE_VERBATIM>           | \C<DIRECTIVE_START>, \C<DIRECTIVE_COMPLETE>  | -
 
 
 And here is how these directives correspond to the \PP source elements. To make reading
@@ -1213,6 +1261,12 @@ by enclosing colons.
     main stream
 
   [DOCUMENT, COMPLETED]
+
+
+\B<Document stream entry point:> This directive is extremely simple, so there
+                                 is no completion directive.
+
+  [DSTREAM_ENTRYPOINT, START]
 
 
 \B<Headline:>

@@ -31,4 +31,10 @@ heavy
 
 ===Several trailing whitespaces                                     
 
+=A headline with \I<a tag>
+
+=And another one which is so long that we need a shortcut ~ Abbreviated
+
+=This headlines looks like abbreviated, \~ but actually it's just a usual headline
+
 ====A final simple headline (without final carriage return ...)

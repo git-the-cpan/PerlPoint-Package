@@ -5,6 +5,8 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.02    |< 14.04.02| JSTENZEL | empty text paragraphs are not streamed any longer;
+#         |          | JSTENZEL | switched to Test::More;
 # 0.01    |28.05.2001| JSTENZEL | new.
 # ---------------------------------------------------------------------------------------
 
@@ -17,13 +19,10 @@ use strict;
 # load modules
 use Carp;
 use Safe;
-use Test;
 use PerlPoint::Backend;
+use Test::More qw(no_plan);
 use PerlPoint::Parser 0.34;
 use PerlPoint::Constants;
-
-# prepare tests
-BEGIN {plan tests=>191;}
 
 # declare variables
 my (@streamData, @results);
@@ -75,241 +74,233 @@ $backend->run(\@streamData);
 shift(@results) until $results[0] eq DIRECTIVE_DOCUMENT and $results[1] eq DIRECTIVE_START;
 
 # source stream begins
-ok(shift(@results), $_) foreach (DIRECTIVE_DOCUMENT, DIRECTIVE_START, 'include3.pp');
+is(shift(@results), $_) foreach (DIRECTIVE_DOCUMENT, DIRECTIVE_START, 'include3.pp');
 
 # variables are set
-ok(shift(@results), $_) foreach (DIRECTIVE_VARSET, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_VARSET, DIRECTIVE_START);
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), 'value var');
- ok($pars->{var}, 'toBeRestored1');
- ok($pars->{value}, 'value1');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 'value var');
+ is($pars->{var}, 'toBeRestored1');
+ is($pars->{value}, 'value1');
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_VARSET, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_VARSET, DIRECTIVE_START);
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), 'value var');
- ok($pars->{var}, 'toBeRestored2');
- ok($pars->{value}, 'value2');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 'value var');
+ is($pars->{var}, 'toBeRestored2');
+ is($pars->{value}, 'value2');
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_VARSET, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_VARSET, DIRECTIVE_START);
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), 'value var');
- ok($pars->{var}, 'canBeOverwritten');
- ok($pars->{value}, 'value3');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 'value var');
+ is($pars->{var}, 'canBeOverwritten');
+ is($pars->{value}, 'value3');
 }
 
 # original values
-ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Original values');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, q(: "value1", "value2", "value3".));
-ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Original values');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, q(: "value1", "value2", "value3".));
+is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 
 # internal variable is set
-ok(shift(@results), $_) foreach (DIRECTIVE_VARSET, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_VARSET, DIRECTIVE_START);
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), 'value var');
- ok($pars->{var}, '_SOURCE_LEVEL');
- ok($pars->{value}, 2);
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 'value var');
+ is($pars->{var}, '_SOURCE_LEVEL');
+ is($pars->{value}, 2);
 }
-
-# including a source makes an empty paragraph here ... could be improved!
-ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 
 # variables are set
-ok(shift(@results), $_) foreach (DIRECTIVE_VARSET, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_VARSET, DIRECTIVE_START);
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), 'value var');
- ok($pars->{var}, 'toBeRestored1');
- ok($pars->{value}, 'newValue1');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 'value var');
+ is($pars->{var}, 'toBeRestored1');
+ is($pars->{value}, 'newValue1');
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_VARSET, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_VARSET, DIRECTIVE_START);
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), 'value var');
- ok($pars->{var}, 'toBeRestored2');
- ok($pars->{value}, 'newValue2');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 'value var');
+ is($pars->{var}, 'toBeRestored2');
+ is($pars->{value}, 'newValue2');
 }
 
 # use Data::Dumper; warn Dumper(\@results);
 
-ok(shift(@results), $_) foreach (DIRECTIVE_VARSET, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_VARSET, DIRECTIVE_START);
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), 'value var');
- ok($pars->{var}, 'canBeOverwritten');
- ok($pars->{value}, 'newValue3');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 'value var');
+ is($pars->{var}, 'canBeOverwritten');
+ is($pars->{value}, 'newValue3');
 }
 
 # use Data::Dumper; warn Dumper(\@results);
 
 # in the nested source
-ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Values inside nested source');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, q(: "newValue1", "newValue2", "newValue3".));
-ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Values inside nested source');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, q(: "newValue1", "newValue2", "newValue3".));
+is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 
 # internal variable is set
-ok(shift(@results), $_) foreach (DIRECTIVE_VARSET, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_VARSET, DIRECTIVE_START);
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), 'value var');
- ok($pars->{var}, '_SOURCE_LEVEL');
- ok($pars->{value}, 1);
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 'value var');
+ is($pars->{var}, '_SOURCE_LEVEL');
+ is($pars->{value}, 1);
 }
 
 # all variables are reset ...
-ok(shift(@results), $_) foreach (DIRECTIVE_VARRESET, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_VARRESET, DIRECTIVE_START);
 
 # ... and set again to restore original values
-ok(shift(@results), $_) foreach (DIRECTIVE_VARSET, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_VARSET, DIRECTIVE_START);
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), 'value var');
- ok($pars->{var}, '_PARSER_VERSION');
- ok($pars->{value}, $PerlPoint::Parser::VERSION);
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 'value var');
+ is($pars->{var}, '_PARSER_VERSION');
+ is($pars->{value}, $PerlPoint::Parser::VERSION);
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_VARSET, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_VARSET, DIRECTIVE_START);
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), 'value var');
- ok($pars->{var}, '_SOURCE_LEVEL');
- ok($pars->{value}, 1);
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 'value var');
+ is($pars->{var}, '_SOURCE_LEVEL');
+ is($pars->{value}, 1);
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_VARSET, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_VARSET, DIRECTIVE_START);
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), 'value var');
- ok($pars->{var}, '_STARTDIR');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 'value var');
+ is($pars->{var}, '_STARTDIR');
  # skip the value test here
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_VARSET, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_VARSET, DIRECTIVE_START);
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), 'value var');
- ok($pars->{var}, 'canBeOverwritten');
- ok($pars->{value}, 'value3');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 'value var');
+ is($pars->{var}, 'canBeOverwritten');
+ is($pars->{value}, 'value3');
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_VARSET, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_VARSET, DIRECTIVE_START);
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), 'value var');
- ok($pars->{var}, 'toBeRestored1');
- ok($pars->{value}, 'value1');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 'value var');
+ is($pars->{var}, 'toBeRestored1');
+ is($pars->{value}, 'value1');
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_VARSET, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_VARSET, DIRECTIVE_START);
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), 'value var');
- ok($pars->{var}, 'toBeRestored2');
- ok($pars->{value}, 'value2');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 'value var');
+ is($pars->{var}, 'toBeRestored2');
+ is($pars->{value}, 'value2');
 }
 
 # restored values
-ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'After 1st inclusion');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, q(: "value1", "value2", "value3".));
-ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'After 1st inclusion');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, q(: "value1", "value2", "value3".));
+is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 
 # internal variable is set
-ok(shift(@results), $_) foreach (DIRECTIVE_VARSET, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_VARSET, DIRECTIVE_START);
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), 'value var');
- ok($pars->{var}, '_SOURCE_LEVEL');
- ok($pars->{value}, 2);
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 'value var');
+ is($pars->{var}, '_SOURCE_LEVEL');
+ is($pars->{value}, 2);
 }
-
-# including a source makes an empty paragraph here ... could be improved!
-ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 
 # variables are set
-ok(shift(@results), $_) foreach (DIRECTIVE_VARSET, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_VARSET, DIRECTIVE_START);
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), 'value var');
- ok($pars->{var}, 'toBeRestored1');
- ok($pars->{value}, 'newValue1');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 'value var');
+ is($pars->{var}, 'toBeRestored1');
+ is($pars->{value}, 'newValue1');
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_VARSET, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_VARSET, DIRECTIVE_START);
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), 'value var');
- ok($pars->{var}, 'toBeRestored2');
- ok($pars->{value}, 'newValue2');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 'value var');
+ is($pars->{var}, 'toBeRestored2');
+ is($pars->{value}, 'newValue2');
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_VARSET, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_VARSET, DIRECTIVE_START);
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), 'value var');
- ok($pars->{var}, 'canBeOverwritten');
- ok($pars->{value}, 'newValue3');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 'value var');
+ is($pars->{var}, 'canBeOverwritten');
+ is($pars->{value}, 'newValue3');
 }
 
 # in the nested source
-ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Values inside nested source');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, q(: "newValue1", "newValue2", "newValue3".));
-ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Values inside nested source');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, q(: "newValue1", "newValue2", "newValue3".));
+is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 
 # internal variable is set
-ok(shift(@results), $_) foreach (DIRECTIVE_VARSET, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_VARSET, DIRECTIVE_START);
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), 'value var');
- ok($pars->{var}, '_SOURCE_LEVEL');
- ok($pars->{value}, 1);
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 'value var');
+ is($pars->{var}, '_SOURCE_LEVEL');
+ is($pars->{value}, 1);
 }
 
 # variables are restored
-ok(shift(@results), $_) foreach (DIRECTIVE_VARSET, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_VARSET, DIRECTIVE_START);
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), 'value var');
- ok($pars->{var}, 'toBeRestored1');
- ok($pars->{value}, 'value1');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 'value var');
+ is($pars->{var}, 'toBeRestored1');
+ is($pars->{value}, 'value1');
 }
-ok(shift(@results), $_) foreach (DIRECTIVE_VARSET, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_VARSET, DIRECTIVE_START);
 {
  my $pars=shift(@results);
- ok(ref($pars), 'HASH');
- ok(join(' ', sort keys %$pars), 'value var');
- ok($pars->{var}, 'toBeRestored2');
- ok($pars->{value}, 'value2');
+ is(ref($pars), 'HASH');
+ is(join(' ', sort keys %$pars), 'value var');
+ is($pars->{var}, 'toBeRestored2');
+ is($pars->{value}, 'value2');
 }
 
 # restored values
-ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'After 2nd inclusion');
-ok(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, q(: "value1", "value2", "newValue3".));
-ok(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
+is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'After 2nd inclusion');
+is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, q(: "value1", "value2", "newValue3".));
+is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 
-ok(shift(@results), $_) foreach (DIRECTIVE_DOCUMENT, DIRECTIVE_COMPLETE, 'include3.pp');
+is(shift(@results), $_) foreach (DIRECTIVE_DOCUMENT, DIRECTIVE_COMPLETE, 'include3.pp');
 
 
 # SUBROUTINES ###############################################################################

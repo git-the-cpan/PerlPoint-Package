@@ -163,6 +163,150 @@ $nested2=$number $nested1 $number
 
 
 
+
+\INCLUDE{file="pfilter-code.pp" type=pp}
+
+
+||numberLines||=A filtered headline
+
+
+
+||numberLines(10)||  A
+  filtered
+  block.
+
+
+
+  With a
+  continuation.
+
+
+
+||numberLines(80)||  Another
+  filtered
+  block.
+
+-
+
+  With a non filtered
+  successor.
+
+
+
+||numberLines||<<EOE
+  A
+
+  filtered
+
+  verbatim block.
+EOE
+
+
+
+||numberLines||A filtered text.
+
+
+
+||numberLines||* A filtered bullet list point.
+
+# A filtered ordered list point.
+
+:A filtered definition: list point.
+
+
+
+||numberLines||  A
+  filtered
+  block
+  - following a filtered list.
+  \I<This should work!>
+
+
+\B<A Tag> starts the successor paragraph (should cause no trouble).
+
+
+
+||numberLines||* A filtered bullet list point.
+
+# A filtered ordered list point.
+
+:A filtered definition: list point.
+
+
+
+\B<A Tag> starts the successor paragraph (should cause no trouble).
+
+
+
+=A two stream doc
+
+This document compares two imaginary objects.
+
+~The ignored docstream
+
+This part shall not be made part of the document.
+
+~The first object
+
+Manufacturer, price, and more common data of the 1st item.
+
+~The 2nd object
+
+Manufacturer, price, and more common data of the 2nd item.
+
+
+==Advantages
+
+What they are good in.
+
+~The first object
+
+Advantages of this 1st item.
+
+~The ignored docstream
+
+This part shall not be made part of the document.
+
+
+~The 2nd object
+
+Advantages of this 2nd item.
+
+
+
+==Suggestions
+
+Talks about things to be improved.
+
+~The first object
+
+1st item can be improved this way.
+
+~The 2nd object
+
+2nd item can be improved this way.
+
+~The ignored docstream
+
+? 0
+
+This part shall not be made part of the document.
+Therefore the condition above should be ignored.
+
+
+
+==Conclusion
+
+What the editors think and suggest.
+
+~The first object
+A short summary about item 1.
+
+~The 2nd object
+A short summary about item 2.
+
+
+
 <<CODE
  This is a verbatim block.
 

@@ -5,6 +5,11 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.07    |< 14.04.02| JSTENZEL | blocks got rid of a trailing newline;
+#         |          | JSTENZEL | added paragraph filter tests using new do() strategy;
+#         |          | JSTENZEL | adapted to headline shortcuts;
+#         |          | JSTENZEL | added document stream tests;
+#         |15.04.2002| JSTENZEL | adapted to chapter docstream hints;
 # 0.06    |18.08.2001| JSTENZEL | switched from Test to Test::More;
 #         |13.10.2001| JSTENZEL | adapted to headline title providing;
 #         |27.11.2001| JSTENZEL | adapted to additional shift hints in list directives;
@@ -32,14 +37,15 @@
 
 # pragmata
 use strict;
+use vars qw(@results);
 
 # load modules
 use Carp;
 use Safe;
 use Test::More qw(no_plan);
 use PerlPoint::Backend;
-use PerlPoint::Parser 0.34;
-use PerlPoint::Constants 0.09;
+use PerlPoint::Parser 0.37;
+use PerlPoint::Constants 0.16;
 
 # declare test tags
 use lib qw(t);
@@ -47,19 +53,21 @@ use PerlPoint::Tags;
 use PerlPoint::Tags::_tags;
 
 # declare variables
-my (@streamData, @results);
+my (@streamData);
 
 # build parser
 my ($parser)=new PerlPoint::Parser;
 
 # and call it
 $parser->run(
-             stream  => \@streamData,
-             files   => ['t/cache.pp'],
-             safe    => new Safe,
-	     cache   => CACHE_ON,
-             trace   => TRACE_NOTHING,
-             display => DISPLAY_NOINFO,
+             stream          => \@streamData,
+             files           => ['t/cache.pp'],
+             safe            => new Safe,
+             docstreams2skip => ['The ignored docstream'],
+             docstreaming    => DSTREAM_DEFAULT,
+	     cache           => CACHE_ON,
+             trace           => TRACE_NOTHING,
+             display         => DISPLAY_NOINFO,
             );
 
 # build a backend
@@ -456,7 +464,12 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
 }
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
 is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
-is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 1, 'Tag in a headline');
+is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 1, 'Tag in a headline', '');
+{
+ my $docstreams=shift(@results);
+ is(ref($docstreams), 'ARRAY');
+ is(join(' ', @$docstreams), '');
+}
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Tag in a ');
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'TEST');
 {
@@ -577,7 +590,6 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TEST');
  is(join(' ', sort keys %$pars), '');
 }
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
-is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "\n");
 is(shift(@results), $_) foreach (DIRECTIVE_BLOCK, DIRECTIVE_COMPLETE);
 is(shift(@results), $_) foreach (DIRECTIVE_VERBATIM, DIRECTIVE_START);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "\n");
@@ -667,7 +679,6 @@ is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "\n");
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '  ');
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'word');
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ', word.');
-is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "\n");
 is(shift(@results), $_) foreach (DIRECTIVE_BLOCK, DIRECTIVE_COMPLETE);
 is(shift(@results), $_) foreach (DIRECTIVE_VERBATIM, DIRECTIVE_START);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, "\n");
@@ -694,6 +705,16 @@ is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '17 word 3rd 17');
 is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
+
+
+# paragraph filter tests
+# ------------------------
+do 't/pfilter-checks.pl';
+
+# docstream tests
+# ------------------------
+do 't/docstream-default-checks.pl';
+
 
 # perform checks: verbatim
 shift(@results) until $results[0] eq DIRECTIVE_VERBATIM or not @results;
