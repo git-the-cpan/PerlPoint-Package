@@ -1,4 +1,70 @@
 
+=0.29
+
+* modified the parser module a way that its version can be
+  displayed by CPAN;
+
+* New common way to pass basic data to active contents:
+  translator authors can pass a hash of settings which is
+  mirrored in the active contents namespace as %$PerlPoint.
+  This makes it easy to pass things like the current target
+  language or call specific user settings.
+
+  Two conventions are already introduced: \I<targetLanguage>
+  and \I<userSettings> (allowing users to control the translation
+  process more detailled by passing simple translator options).
+
+  See \B<pp2sdf> for an example of usage.
+
+* pp2sdf target code embedding is now restricted to SDF and
+  HTML, but these both \I<are> officially supported now (as
+  well as Perl, of course ;-);
+
+* Simplified backslash handling in macros. Before 0.29, each
+  macro level (and each tag level in the macro replacement,
+  of course) added a need of yet another backslash before closing
+  angle brackets (and literal backslashes) in the targetted text,
+  making it difficult to nest a number of macros (especially
+  if they were declared by others).
+
+  So, until now, one had to write
+
+<<EOE
+    \I<$var-\>{key}>
+    \I<\B<$var-\>{key}>>
+EOE
+
+  but
+
+<<EOE
+    \I<$var-\>{key}>
+    \MACRO<\I<$var-\\\>{key}>>
+    \MACRO<\MACRO<\I<$var-\\\\\\\>{key}>>>
+EOE
+
+  - not really handable. And inconsistently (nested \I<tags> never
+  required aditional backslashes, but macros did).
+
+  From now on, only \I<one> backslash is necessary \I<ever>:
+
+<<EOE
+    \I<$var-\>{key}>
+    \I<\B<$var-\>{key}>>
+
+    \MACRO<\I<$var-\>{key}>>
+    \MACRO<\MACRO<\I<$var-\>{key}>>>
+EOE
+
+  \B<Note: existing PerlPoint sources might have to be updated.>
+
+* Accelerated macro handling - earlier versions used to \I<reparse>
+  a macro body which delayed parsing in case of deep macro nesting.
+  From now on, every token is only parsed \I<once>.
+  As an additional benefit, a significant amount of code could be
+  removed and the backend module needs no longer to be used by the
+  parser which accelerates startup time of translators in general.
+
+
 =0.28
 
 * removed an old POD headline prefix in README which caused

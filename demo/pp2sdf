@@ -5,6 +5,11 @@
 # ---------------------------------------------------------------------------------------
 # version | date   | author | changes
 # ---------------------------------------------------------------------------------------
+# 0.04    |21.12.00| ste    | using new active contents base data feature;
+#         |22.12.00| ste    | added SDF and HTML filters;
+#         |        | ste    | supports embedded HTML now;
+#         |27.12.00| ste    | new option "set" to pass user settings to the PerlPoint
+#         |        |        | parser;
 # 0.03    |07.12.00| ste    | new module namespace "PerlPoint";
 # 0.02    |28.11.00| ste    | "<" characters outside verbatim blocks are now replaced by
 #         |        |        | SDF escapes ({{CHAR:lt}}) to avoid SDF confusion assuming
@@ -20,15 +25,19 @@ B<pp2sdf> - translates PerlPoint to SDF
 
 =head1 VERSION
 
-This manual describes version B<0.03>.
+This manual describes version B<0.04>.
 
 =head1 DESCRIPTION
 
 This is a demonstration application of the PerlPoint package. It
 translates PerlPoint into SDF.
 
-SDF as a target format is useful because sdf itself can produce
-various other formats.
+SDF is, of course, no presentation format by itself. Nevertheless
+it I<is> useful as a target format because sdf can produce
+various other formats. Presentation formats are fine but often
+one wants to provide additional handouts, notes or a printed version.
+pp2sdf opens a simple way to do this.
+
 
 =head1 SYNOPSIS
 
@@ -103,6 +112,28 @@ come with perl.)
 This option can be used multiply.
 
 You may want to store these options in default option files, see below for details.
+
+
+=item -set <flag>
+
+This option allows you to pass certain settings - of your choice - to active contents
+(like conditions) where it can be accessed via the $PerlPoint hash reference. For
+example, your PerlPoint code could contain a condition like
+
+  ? $PerlPoint->{userSettings}{special}
+
+  Special part.
+
+  ? 1
+
+. The special part enclosed by the two conditions would then be processed I<only> if you
+call B<pp2sdf> with
+
+  -set special
+
+- and if active contents was enabled by I<-active>, of course.
+
+This option can be used multiply.
 
 =item -trace [<level>]
 
@@ -182,6 +213,90 @@ but only if pp2sdf is called under your account, so this is for personal prefere
 A personal default option file overwrites global settings, and all default options are
 overwritten by options passed to the script call.
 
+
+=head1 EMBEDDING TARGET CODE
+
+There may be things you want to see in the target document but find no way to express
+them in PerlPoint. Well, PerlPoint lets you embed target code very easily directly into
+the PerlPoint script. Nevertheless, it is recommended to use native PerlPoint wherever
+possible ;-).
+
+Please note that embedded target code intended for certain translators like B<pp2sdf>
+may be B<I<ignored>> if the PerlPoint document is processed by I<other> translators.
+pp2html, for example, accepts embedded HTML but ignores embedded SDF.
+
+=head2 Embedding SDF
+
+Just use the B<\EMBED> and B<\END_EMBED> tags to place native SDF if really
+necessary:
+
+  This is \I<PerlPoint> with embedded
+  \EMBED{lang=sdf}{{B:SDF}}\END_EMBED.
+
+  \EMBED{lang=sdf}
+
+  H2: An SDF chapter
+
+  Note: An SDF note.
+
+  \END_EMBED
+
+You may as well I<include> complete SDF files by B<\INCLUDE>.
+
+  \INLUDE{type=sdf file="snippet.sdf"}
+
+
+=head2 Embedding HTML
+
+is as easy as embedding SDF directly. It is, of course, only useful if you plan
+to transform your presentation to an HTML page via SDF. You can embed complete
+HTML sections:
+
+  \EMBED{lang=html}
+
+  <h1>An HTML chapter</h1>
+
+  <p>
+  This was written in <i>HTML</i>.
+
+  \END_EMBED
+
+This way B<pp2sdf> will produce SDF inline blocks like this:
+
+  !block inline
+
+  <h1>An HTML chapter</h1>
+
+  <p>
+  This was written in <i>HTML</i>.
+
+  !endblock
+
+Further proceeding is up to sdf, so please refer to the SDF manuals for details.
+
+Alternatively, you may choose to embed HTML directly into a PerlPoint paragraph:
+
+  This is \I<PerlPoint> with embedded
+  \EMBED{lang=html}<b>HTML</b>\END_EMBED.
+
+This will be translated into an SDF inline I<phrase>:
+
+  This is {{I:PerlPoint}} with embedded {{INLINE:<b>HTML</b>}}.
+
+Please note that for unknown reasons SDF processes POD tags in inline I<phrases> (even
+if it was not intended to use POD). In the example above, this causes a wrong result
+because an C<L> tag is assumed. This is currently a feature of sdf, not pp2sdf.
+
+HTML code can be embedded by complete I<files> as well, of course:
+
+  \INLUDE{type=html file="snippet.html"}
+
+
+=head3 Embedding other languages
+
+B<pp2sdf> will ignore any other embedded or included target language than SDF and HTML.
+
+
 =head1 FILES
 
 =head1 ENVIRONMENT
@@ -197,6 +312,8 @@ are described with this option.
 =back
 
 =head1 NOTES
+
+=head2 This is alpha code
 
 This is a first attempt of a working PerlPoint to SDF translator. It handles
 all of the PerlPoint elements but is still alpha software because
@@ -265,7 +382,7 @@ distribution for more details.
 
 
 # declare version
-$VERSION=$VERSION=0.03;
+$VERSION=$VERSION=0.04;
 
 # pragmata
 use strict;
@@ -273,23 +390,25 @@ use strict;
 # load modules
 use Carp;
 use Safe;
-use PerlPoint::Backend;
 use Getopt::Long;
-use PerlPoint::Constants;
 use File::Basename;
-use PerlPoint::Parser 0.25;
+use PerlPoint::Backend;
+use PerlPoint::Constants;
+use PerlPoint::Parser 0.29;
 use Getopt::ArgvFile qw(argvFile);
 
 
 # declare variables
 my (
-    @streamData, 
+    $htmlBuffer,                # intermediate buffer for embedded HTML;
+
+    @streamData,                # PerlPoint stream;
     @openLists,
 
     %flags,
     %options,                   # option hash;
     %table,                     # a table buffer
-    %tagHash,
+    %tagHash,                   # accepted PerlPoint tags;
    );
 
 
@@ -308,6 +427,7 @@ GetOptions(\%options,
                       "nowarn",            # suppress runtime warnings;
                       "quiet",             # suppress all runtime messages except of error ones;
                       "safeOpcode=s@",     # permitted opecodes in active contents;
+                      "set=s@",            # user settings;
                       "trace:i",           # activate trace messages;
           );
 
@@ -340,22 +460,30 @@ $safe->permit(@{$options{safeOpcode}}) if exists $options{safeOpcode};
 
 # and call it
 $parser->run(
-             stream  => \@streamData,
-             tags    => \%tagHash,
-             files   => \@ARGV,
-             safe    => exists $options{activeContents} ? $safe : undef,
-             vispro  => 1,
-             cache   =>   (exists $options{cache} ? CACHE_ON : CACHE_OFF)
-                        + (exists $options{cacheCleanup} ? CACHE_CLEANUP : 0),
-             display =>   DISPLAY_ALL
-                        + (exists $options{noinfo} ? DISPLAY_NOINFO : 0)
-                        + (exists $options{nowarn} ? DISPLAY_NOWARN : 0),
-             trace   => TRACE_NOTHING
-                        + ((exists $options{trace} and $options{trace} &  1) ? TRACE_PARAGRAPHS : 0)
-                        + ((exists $options{trace} and $options{trace} &  2) ? TRACE_LEXER      : 0)
-                        + ((exists $options{trace} and $options{trace} &  4) ? TRACE_PARSER     : 0)
-                        + ((exists $options{trace} and $options{trace} &  8) ? TRACE_SEMANTIC   : 0)
-                        + ((exists $options{trace} and $options{trace} & 16) ? TRACE_ACTIVE     : 0),
+             stream         => \@streamData,
+             tags           => \%tagHash,
+             files          => \@ARGV,
+
+             filter         => 'perl|sdf|html',
+
+             safe           => exists $options{activeContents} ? $safe : undef,
+             activeBaseData => {
+                                targetLanguage => 'SDF',
+                                userSettings   => {map {$_=>1} exists $options{set} ? @{$options{set}} : ()},
+                               },
+
+             vispro         => 1,
+             cache          =>   (exists $options{cache} ? CACHE_ON : CACHE_OFF)
+                               + (exists $options{cacheCleanup} ? CACHE_CLEANUP : 0),
+             display        =>   DISPLAY_ALL
+                               + (exists $options{noinfo} ? DISPLAY_NOINFO : 0)
+                               + (exists $options{nowarn} ? DISPLAY_NOWARN : 0),
+             trace          => TRACE_NOTHING
+                               + ((exists $options{trace} and $options{trace} &  1) ? TRACE_PARAGRAPHS : 0)
+                               + ((exists $options{trace} and $options{trace} &  2) ? TRACE_LEXER      : 0)
+                               + ((exists $options{trace} and $options{trace} &  4) ? TRACE_PARSER     : 0)
+                               + ((exists $options{trace} and $options{trace} &  8) ? TRACE_SEMANTIC   : 0)
+                               + ((exists $options{trace} and $options{trace} & 16) ? TRACE_ACTIVE     : 0),
             ) or exit(1);
 
 # build a backend
@@ -391,7 +519,7 @@ $backend->register(DIRECTIVE_COMMENT, \&handleComment);
 
 
 # init several variables
-$flags{listlevel}=1;
+@flags{qw(listlevel html)}=(1, 0);
 
 # and run it
 $backend->run(\@streamData);
@@ -512,6 +640,36 @@ sub handleTag
      # ok, well done
      return(1);
     }
+  elsif (uc($tag) eq 'EMBED' and $settings->{lang}=~/^html$/i)
+    {
+     # act mode dependend
+     if ($mode==DIRECTIVE_START)
+       {
+        # flag that we are within embedded HTML
+        $flags{html}=1;
+       }
+     else
+       {
+        # flag that embedded HTML is now buffered completely
+        $flags{html}++;
+
+        # complete SDF inlining
+        present(
+                $htmlBuffer=~/\n/ ? "\n!block inline\n" : "{{INLINE:",
+                $htmlBuffer,
+                $htmlBuffer=~/\n/ ? "\n!endblock\n"     : "}}",
+               );
+
+        # flag that embedded HTML is completed
+        $flags{html}=0;
+
+        # clean up HTML buffer
+        $htmlBuffer='';
+       }
+
+     # ok, well done
+     return(1);
+    }
 
   # declare tag translations
   my %tags=(
@@ -619,14 +777,15 @@ sub present
   my $string=join('', @_);
 
   # replace characters which may confuse sdf
-  $string=~s/</{{CHAR:lt}}/g unless $flags{block} and $flags{block} eq '>';
+  $string=~s/</{{CHAR:lt}}/g unless    ($flags{block} and $flags{block} eq '>')
+                                    or $flags{html};
 
   # present result
-  unless (%table)
-    {print $string;}
+  if ($flags{html}==1)
+    {$htmlBuffer.=$string;}
+  elsif (%table)
+    {$table{rows}[$#{$table{rows}}][$#{$table{rows}[$#{$table{rows}}]}].=$string;}
   else
-    {
-     $table{rows}[$#{$table{rows}}][$#{$table{rows}[$#{$table{rows}}]}].=$string;
-    }
+    {print $string;}
  }
   

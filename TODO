@@ -1,4 +1,15 @@
 
+=Preface
+
+These are just \I<ideas>. Possibly not everything in this list
+will be implemented. Further ideas are welcome.
+
+
+=General
+
+* add an intro to PerlPoint
+
+
 =List shifting
 
 * current stream representation might not be optimal
@@ -9,8 +20,6 @@
 
 =Tables
 
-* shortcut version as specified
-
 * Allow nested tables? (Syntax!)
 
 * allow truly embedded tables?!:
@@ -18,19 +27,18 @@
    bla bla \\table{colsep=+ rowsep=|} c11 + c12 | c21 + c22 \\end_table blu bla
 
 
-=Aliases (macros)
-
-* specified but still unimplemented
-
-
 =Parser
 
 * add error recovery;
+
+* subchapter element feature (just an idea ...);
 
 
 =pp2pod
 
 * complete? (may be sufficient enough as a demonstration ...)
+
+* apply interface to pp2sdf;
 
 
 =pp2pp
@@ -42,3 +50,11 @@
 
 * implement target modes 2 and 1;
 
+* apply interface to pp2sdf;
+
+
+=pp2sdf
+
+* add index (supporting pp2html index tags as possible);
+
+* add documentation in PerlPoint format;

@@ -486,6 +486,20 @@ sub _Parse {
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.29    |21.12.2000| JSTENZEL | direct setting of $VERSION variable to enable CPAN to
+#         |          |          | detect and display the parser module version;
+#         |          | JSTENZEL | introduced base settings for active contents provided
+#         |          |          | in %$PerlPoint - a new common way to pass things like
+#         |          |          | the current target language;
+#         |27.12.2000| JSTENZEL | closing angle brackets are to be guarded only *once*
+#         |          |          | now - in former versions each macro level added the need
+#         |          |          | of yet another backslash;
+#         |28.12.2000| JSTENZEL | macro bodies are no longer reparsed which accelerates
+#         |          |          | procesing of nested macros drastically (and avoids the
+#         |          |          | overhead and dangers of rebuilding a source string and
+#         |          |          | parsing it again - this way, parsing becomes easier to
+#         |          |          | maintain in case of syntax extensions (nevertheless, the
+#         |          |          | old code worked well!);
 # 0.28    |14.12.2000| JSTENZEL | made it finally backward compatible to perl 5.005 again;
 # 0.27    |07.12.2000| JSTENZEL | moved package namespace from "PP" to "PerlPoint";
 # 0.26    |30.11.2000| JSTENZEL | "Perl Point" => "PerlPoint";
@@ -604,7 +618,7 @@ B<PerlPoint::Parser> - a PerlPoint Parser
 
 =head1 VERSION
 
-This manual describes version B<0.28>.
+This manual describes version B<0.29>.
 
 =head1 SYNOPSIS
 
@@ -846,14 +860,21 @@ is evaluated as Perl code. The (boolean) evaluation result then determines if
 subsequent PerlPoint is read and parsed. If the result is false, all subsequent
 paragraphs until the next condition are I<skipped>.
 
-This feature can be used to maintain various language versions of a presentation
+Note that base data is made available by a hash global (package) hash reference
+$PerlPoint. See I<run()> for details about how to set these data up.
+
+Conditions can be used to maintain various language versions of a presentation
 in one source file:
 
-  ? $language eq 'German'
+  ? $PerlPoint->{targetLanguage} eq 'German'
 
 Or you could enable parts of your document by date:
 
   ? time>$dateOfTalk
+
+or by a special setting:
+
+  ? $PerlPoint->{userSettings}{setting}
 
 Please note that the condition code shares its variables with embedded and included
 code.
@@ -877,7 +898,8 @@ values (if declared).
   This variable is called $var.
 
 All variables are made available to embedded and included Perl code as well as to
-conditions and can be accessed there as package variables of "main::". Because a
+conditions and can be accessed there as package variables of "main::" (or whatever
+package name the Safe object is set up to). Because a
 variable is already replaced by the parser if possible, you have to use the fully
 qualified name or to guard the variables "$" prefix character to do so:
 
@@ -1240,17 +1262,17 @@ B<Example:>
  require 5.00503;
 
  # declare module version
- {
-  no strict 'refs';
-  ${join('::', __PACKAGE__, 'VERSION')}=0.28;
-  ${join('::', __PACKAGE__, 'VERSION')}=${join('::', __PACKAGE__, 'VERSION')}; # to suppress a warning of exclusive usage only;
- }
+ $PerlPoint::Parser::VERSION=0.29;
+ $PerlPoint::Parser::VERSION=$PerlPoint::Parser::VERSION; # to suppress a warning of exclusive usage only;
+
+ # pragmata
+ use strict;
+ use fields;
 
  # load modules
  use Cwd;
  use Carp;
  use IO::File;
- use PerlPoint::Backend;
  use File::Basename;
  use PerlPoint::Constants 0.09;
  use Digest::SHA1 qw(sha1_base64);
@@ -1305,32 +1327,6 @@ B<Example:>
                      DIRECTIVE_OPOINT,
                     }=();
 
- # build a reverse engineering backend
- my $reversedInput='';
- my $reverseStream=new PerlPoint::Backend(
-                                          name    => 'reverse engineering',
-                                          trace   => TRACE_NOTHING,
-                                          display => DISPLAY_NOINFO,
-                                         );
-
- # register a complete set of backend handlers (please note that the usage of the "&" prefix
- # before the tag constants is essentiell to make them usabel later - I do not know if this
- # is a bug of perl 5.6 or anything else but it looks really buggy)
- $reverseStream->register(&DIRECTIVE_BLOCK, \&reverseUnexpected);
- $reverseStream->register(&DIRECTIVE_COMMENT, \&reverseUnexpected);
- $reverseStream->register(&DIRECTIVE_DOCUMENT, \&reverseUnexpected);
- $reverseStream->register(&DIRECTIVE_DPOINT, \&reverseUnexpected);
- $reverseStream->register(&DIRECTIVE_HEADLINE, \&reverseUnexpected);
- $reverseStream->register(&DIRECTIVE_LIST_LSHIFT, \&reverseUnexpected);
- $reverseStream->register(&DIRECTIVE_LIST_RSHIFT, \&reverseUnexpected);
- $reverseStream->register(&DIRECTIVE_OPOINT, \&reverseUnexpected);
- $reverseStream->register(&DIRECTIVE_TAG, \&reverseTag);
- $reverseStream->register(&DIRECTIVE_TEXT, \&reverseUnexpected);
- $reverseStream->register(&DIRECTIVE_UPOINT, \&reverseUnexpected);
- $reverseStream->register(&DIRECTIVE_VERBATIM, \&reverseUnexpected);
- $reverseStream->register(&DIRECTIVE_SIMPLE, \&reverseSimple);
-
-
 
 
 sub new {
@@ -1360,14 +1356,15 @@ sub new {
 			'Table_separator' => 24,
 			"+" => 47,
 			'Headline_cache_hit' => 49,
-			'Heredoc_open' => 50,
+			'StreamedPart' => 50,
+			'Heredoc_open' => 51,
 			'Table' => 27,
 			"=" => 28,
-			'Paragraph_cache_hit' => 53,
-			'Space' => 55,
-			"/" => 56,
+			'Paragraph_cache_hit' => 54,
+			'Space' => 56,
+			"/" => 57,
 			'Word' => 30,
-			'Tag_name' => 57,
+			'Tag_name' => 58,
 			"?" => 32,
 			'Dpoint_cache_hit' => 33
 		},
@@ -1395,24 +1392,24 @@ sub new {
 			'table_paragraph' => 22,
 			'headline_level' => 25,
 			'table_separator' => 48,
-			'compound_block' => 51,
+			'compound_block' => 52,
 			'alias_definition' => 26,
 			'comment' => 29,
-			'variable_assignment' => 54,
-			'table' => 52,
+			'variable_assignment' => 55,
+			'table' => 53,
 			'literal' => 31,
-			'dlist_opener' => 58,
+			'dlist_opener' => 59,
 			'ulist' => 34
 		}
 	},
 	{#State 1
-		DEFAULT => -118,
+		DEFAULT => -119,
 		GOTOS => {
-			'@20-1' => 59
+			'@20-1' => 60
 		}
 	},
 	{#State 2
-		DEFAULT => -94
+		DEFAULT => -95
 	},
 	{#State 3
 		DEFAULT => -78
@@ -1425,7 +1422,7 @@ sub new {
 		DEFAULT => -25,
 		GOTOS => {
 			'opoint_opener' => 8,
-			'opoint' => 60
+			'opoint' => 61
 		}
 	},
 	{#State 5
@@ -1436,14 +1433,14 @@ sub new {
 	},
 	{#State 7
 		ACTIONS => {
-			"=" => 61
+			"=" => 62
 		},
 		DEFAULT => -90
 	},
 	{#State 8
 		DEFAULT => -34,
 		GOTOS => {
-			'@3-1' => 62
+			'@3-1' => 63
 		}
 	},
 	{#State 9
@@ -1452,7 +1449,7 @@ sub new {
 	{#State 10
 		DEFAULT => -45,
 		GOTOS => {
-			'@6-1' => 63
+			'@6-1' => 64
 		}
 	},
 	{#State 11
@@ -1462,8 +1459,8 @@ sub new {
 		},
 		DEFAULT => -27,
 		GOTOS => {
-			'dpoint' => 64,
-			'dlist_opener' => 58
+			'dpoint' => 65,
+			'dlist_opener' => 59
 		}
 	},
 	{#State 12
@@ -1473,15 +1470,15 @@ sub new {
 		DEFAULT => -83
 	},
 	{#State 14
-		DEFAULT => -121,
+		DEFAULT => -122,
 		GOTOS => {
-			'@22-1' => 65
+			'@22-1' => 66
 		}
 	},
 	{#State 15
 		DEFAULT => -52,
 		GOTOS => {
-			'@8-1' => 66
+			'@8-1' => 67
 		}
 	},
 	{#State 16
@@ -1503,59 +1500,59 @@ sub new {
 			'Opoint_cache_hit' => 16,
 			'Upoint_cache_hit' => 45,
 			"*" => 21,
-			"<" => 70,
-			">" => 71,
+			"<" => 71,
+			">" => 72,
 			'Dpoint_cache_hit' => 33
 		},
 		DEFAULT => -4,
 		GOTOS => {
 			'olist' => 4,
-			'list_shift' => 68,
+			'list_shift' => 69,
 			'dpoint' => 6,
-			'list_part' => 69,
+			'list_part' => 70,
 			'opoint' => 37,
-			'list_shifter' => 67,
+			'list_shifter' => 68,
 			'opoint_opener' => 8,
 			'upoint' => 9,
 			'dlist' => 11,
-			'dlist_opener' => 58,
+			'dlist_opener' => 59,
 			'ulist' => 34
 		}
 	},
 	{#State 21
 		DEFAULT => -39,
 		GOTOS => {
-			'@4-1' => 72
+			'@4-1' => 73
 		}
 	},
 	{#State 22
 		DEFAULT => -11
 	},
 	{#State 23
-		DEFAULT => -124,
+		DEFAULT => -125,
 		GOTOS => {
-			'@24-1' => 73
+			'@24-1' => 74
 		}
 	},
 	{#State 24
-		DEFAULT => -117
+		DEFAULT => -118
 	},
 	{#State 25
 		ACTIONS => {
-			"=" => 74
+			"=" => 75
 		},
 		DEFAULT => -15,
 		GOTOS => {
-			'@1-1' => 75
+			'@1-1' => 76
 		}
 	},
 	{#State 26
 		DEFAULT => -12
 	},
 	{#State 27
-		DEFAULT => -114,
+		DEFAULT => -115,
 		GOTOS => {
-			'@18-1' => 76
+			'@18-1' => 77
 		}
 	},
 	{#State 28
@@ -1570,13 +1567,13 @@ sub new {
 	{#State 31
 		DEFAULT => -55,
 		GOTOS => {
-			'@9-1' => 77
+			'@9-1' => 78
 		}
 	},
 	{#State 32
 		DEFAULT => -20,
 		GOTOS => {
-			'@2-1' => 78
+			'@2-1' => 79
 		}
 	},
 	{#State 33
@@ -1589,7 +1586,7 @@ sub new {
 		},
 		DEFAULT => -26,
 		GOTOS => {
-			'upoint' => 79
+			'upoint' => 80
 		}
 	},
 	{#State 35
@@ -1603,7 +1600,7 @@ sub new {
 	},
 	{#State 38
 		ACTIONS => {
-			"#" => 80
+			"#" => 81
 		},
 		DEFAULT => -37
 	},
@@ -1614,13 +1611,13 @@ sub new {
 		DEFAULT => -47
 	},
 	{#State 41
-		DEFAULT => -93
+		DEFAULT => -94
 	},
 	{#State 42
 		DEFAULT => -91
 	},
 	{#State 43
-		DEFAULT => -92
+		DEFAULT => -93
 	},
 	{#State 44
 		DEFAULT => -1
@@ -1630,7 +1627,7 @@ sub new {
 	},
 	{#State 46
 		ACTIONS => {
-			'' => 81,
+			'' => 82,
 			'EOL' => 3,
 			"\@" => 1,
 			"#" => 38,
@@ -1648,14 +1645,15 @@ sub new {
 			'Table_separator' => 24,
 			"+" => 47,
 			'Headline_cache_hit' => 49,
-			'Heredoc_open' => 50,
+			'StreamedPart' => 50,
+			'Heredoc_open' => 51,
 			'Table' => 27,
 			"=" => 28,
-			'Paragraph_cache_hit' => 53,
-			'Space' => 55,
-			"/" => 56,
+			'Paragraph_cache_hit' => 54,
+			'Space' => 56,
+			"/" => 57,
 			'Word' => 30,
-			'Tag_name' => 57,
+			'Tag_name' => 58,
 			"?" => 32,
 			'Dpoint_cache_hit' => 33
 		},
@@ -1675,27 +1673,27 @@ sub new {
 			'basic' => 12,
 			'tag' => 43,
 			'element' => 13,
-			'paragraph' => 82,
+			'paragraph' => 83,
 			'condition' => 17,
 			'text' => 19,
 			'list' => 20,
 			'table_paragraph' => 22,
 			'headline_level' => 25,
 			'table_separator' => 48,
-			'compound_block' => 51,
+			'compound_block' => 52,
 			'alias_definition' => 26,
 			'comment' => 29,
-			'variable_assignment' => 54,
-			'table' => 52,
+			'variable_assignment' => 55,
+			'table' => 53,
 			'literal' => 31,
-			'dlist_opener' => 58,
+			'dlist_opener' => 59,
 			'ulist' => 34
 		}
 	},
 	{#State 47
-		DEFAULT => -126,
+		DEFAULT => -127,
 		GOTOS => {
-			'@25-1' => 83
+			'@25-1' => 84
 		}
 	},
 	{#State 48
@@ -1705,105 +1703,84 @@ sub new {
 		DEFAULT => -17
 	},
 	{#State 50
-		DEFAULT => -57,
-		GOTOS => {
-			'@10-1' => 84
-		}
+		DEFAULT => -92
 	},
 	{#State 51
-		ACTIONS => {
-			'Block_cache_hit' => 39,
-			'Ils' => 15,
-			"-" => 87
-		},
-		DEFAULT => -6,
+		DEFAULT => -57,
 		GOTOS => {
-			'block' => 86,
-			'block_flagnew' => 85
+			'@10-1' => 85
 		}
 	},
 	{#State 52
-		DEFAULT => -84
-	},
-	{#State 53
-		DEFAULT => -14
-	},
-	{#State 54
-		DEFAULT => -8
-	},
-	{#State 55
-		DEFAULT => -89
-	},
-	{#State 56
 		ACTIONS => {
-			"/" => 88
+			'Block_cache_hit' => 39,
+			'Ils' => 15,
+			"-" => 88
+		},
+		DEFAULT => -6,
+		GOTOS => {
+			'block' => 87,
+			'block_flagnew' => 86
 		}
 	},
+	{#State 53
+		DEFAULT => -84
+	},
+	{#State 54
+		DEFAULT => -14
+	},
+	{#State 55
+		DEFAULT => -8
+	},
+	{#State 56
+		DEFAULT => -89
+	},
 	{#State 57
-		DEFAULT => -99,
-		GOTOS => {
-			'@14-1' => 89
+		ACTIONS => {
+			"/" => 89
 		}
 	},
 	{#State 58
-		DEFAULT => -42,
+		DEFAULT => -100,
 		GOTOS => {
-			'@5-1' => 90
+			'@14-1' => 90
 		}
 	},
 	{#State 59
-		ACTIONS => {
-			'Word' => 91
-		},
+		DEFAULT => -42,
 		GOTOS => {
-			'words' => 92
+			'@5-1' => 91
 		}
 	},
 	{#State 60
-		DEFAULT => -29
-	},
-	{#State 61
 		ACTIONS => {
-			'EOL' => 3,
-			'Table_separator' => 24,
-			'Include' => 23,
-			'Named_variable' => 93,
-			'Table' => 27,
-			'Symbolic_variable' => 42,
-			'Space' => 55,
-			'Word' => 30,
-			'Tag_name' => 57,
-			'Embed' => 14
+			'Word' => 92
 		},
 		GOTOS => {
-			'included' => 2,
-			'text' => 94,
-			'table' => 52,
-			'embedded' => 41,
-			'basic' => 12,
-			'table_separator' => 48,
-			'literal' => 31,
-			'tag' => 43,
-			'element' => 13
+			'words' => 93
 		}
+	},
+	{#State 61
+		DEFAULT => -29
 	},
 	{#State 62
 		ACTIONS => {
 			'EOL' => 3,
 			'Table_separator' => 24,
 			'Include' => 23,
-			'Named_variable' => 93,
+			'Named_variable' => 94,
+			'StreamedPart' => 50,
 			'Table' => 27,
 			'Symbolic_variable' => 42,
-			'Space' => 55,
+			'Space' => 56,
 			'Word' => 30,
-			'Tag_name' => 57,
+			'Tag_name' => 58,
 			'Embed' => 14
 		},
 		GOTOS => {
 			'included' => 2,
 			'text' => 95,
-			'table' => 52,
+			'table' => 53,
 			'embedded' => 41,
 			'basic' => 12,
 			'table_separator' => 48,
@@ -1814,50 +1791,22 @@ sub new {
 	},
 	{#State 63
 		ACTIONS => {
-			'Symbolic_variable' => 42,
-			'Space' => 55,
-			'Include' => 23,
-			'Word' => 30,
-			'Tag_name' => 57,
-			'Named_variable' => 93,
-			'Embed' => 14
-		},
-		GOTOS => {
-			'included' => 2,
-			'embedded' => 41,
-			'tag' => 43,
-			'elements' => 97,
-			'element' => 96
-		}
-	},
-	{#State 64
-		DEFAULT => -33
-	},
-	{#State 65
-		ACTIONS => {
-			"{" => 98
-		},
-		GOTOS => {
-			'used_tagpars' => 99
-		}
-	},
-	{#State 66
-		ACTIONS => {
 			'EOL' => 3,
 			'Table_separator' => 24,
 			'Include' => 23,
-			'Named_variable' => 93,
+			'Named_variable' => 94,
+			'StreamedPart' => 50,
 			'Table' => 27,
 			'Symbolic_variable' => 42,
-			'Space' => 55,
+			'Space' => 56,
 			'Word' => 30,
-			'Tag_name' => 57,
+			'Tag_name' => 58,
 			'Embed' => 14
 		},
 		GOTOS => {
 			'included' => 2,
-			'text' => 100,
-			'table' => 52,
+			'text' => 96,
+			'table' => 53,
 			'embedded' => 41,
 			'basic' => 12,
 			'table_separator' => 48,
@@ -1866,13 +1815,69 @@ sub new {
 			'element' => 13
 		}
 	},
-	{#State 67
-		DEFAULT => -62,
+	{#State 64
+		ACTIONS => {
+			'Symbolic_variable' => 42,
+			'Space' => 56,
+			'Include' => 23,
+			'Word' => 30,
+			'Tag_name' => 58,
+			'Named_variable' => 94,
+			'StreamedPart' => 50,
+			'Embed' => 14
+		},
 		GOTOS => {
-			'@12-1' => 101
+			'included' => 2,
+			'embedded' => 41,
+			'tag' => 43,
+			'elements' => 98,
+			'element' => 97
+		}
+	},
+	{#State 65
+		DEFAULT => -33
+	},
+	{#State 66
+		ACTIONS => {
+			"{" => 99
+		},
+		GOTOS => {
+			'used_tagpars' => 100
+		}
+	},
+	{#State 67
+		ACTIONS => {
+			'EOL' => 3,
+			'Table_separator' => 24,
+			'Include' => 23,
+			'Named_variable' => 94,
+			'StreamedPart' => 50,
+			'Table' => 27,
+			'Symbolic_variable' => 42,
+			'Space' => 56,
+			'Word' => 30,
+			'Tag_name' => 58,
+			'Embed' => 14
+		},
+		GOTOS => {
+			'included' => 2,
+			'text' => 101,
+			'table' => 53,
+			'embedded' => 41,
+			'basic' => 12,
+			'table_separator' => 48,
+			'literal' => 31,
+			'tag' => 43,
+			'element' => 13
 		}
 	},
 	{#State 68
+		DEFAULT => -62,
+		GOTOS => {
+			'@12-1' => 102
+		}
+	},
+	{#State 69
 		ACTIONS => {
 			'Colon' => 10,
 			"*" => 21,
@@ -1884,41 +1889,42 @@ sub new {
 		GOTOS => {
 			'olist' => 4,
 			'dpoint' => 6,
-			'list_part' => 102,
+			'list_part' => 103,
 			'opoint' => 37,
 			'opoint_opener' => 8,
 			'upoint' => 9,
 			'dlist' => 11,
-			'dlist_opener' => 58,
+			'dlist_opener' => 59,
 			'ulist' => 34
 		}
 	},
-	{#State 69
+	{#State 70
 		DEFAULT => -23
 	},
-	{#State 70
+	{#State 71
 		DEFAULT => -66
 	},
-	{#State 71
+	{#State 72
 		DEFAULT => -65
 	},
-	{#State 72
+	{#State 73
 		ACTIONS => {
 			'EOL' => 3,
 			'Table_separator' => 24,
 			'Include' => 23,
-			'Named_variable' => 93,
+			'Named_variable' => 94,
+			'StreamedPart' => 50,
 			'Table' => 27,
 			'Symbolic_variable' => 42,
-			'Space' => 55,
+			'Space' => 56,
 			'Word' => 30,
-			'Tag_name' => 57,
+			'Tag_name' => 58,
 			'Embed' => 14
 		},
 		GOTOS => {
 			'included' => 2,
-			'text' => 103,
-			'table' => 52,
+			'text' => 104,
+			'table' => 53,
 			'embedded' => 41,
 			'basic' => 12,
 			'table_separator' => 48,
@@ -1927,194 +1933,199 @@ sub new {
 			'element' => 13
 		}
 	},
-	{#State 73
+	{#State 74
 		ACTIONS => {
-			"{" => 98
+			"{" => 99
 		},
 		GOTOS => {
-			'used_tagpars' => 104
+			'used_tagpars' => 105
 		}
 	},
-	{#State 74
+	{#State 75
 		DEFAULT => -19
 	},
-	{#State 75
+	{#State 76
 		ACTIONS => {
 			'Table' => 27,
 			'Symbolic_variable' => 42,
-			'Space' => 55,
+			'Space' => 56,
 			'Table_separator' => 24,
 			'Include' => 23,
 			'Word' => 30,
-			'Tag_name' => 57,
-			'Named_variable' => 93,
+			'Tag_name' => 58,
+			'Named_variable' => 94,
+			'StreamedPart' => 50,
 			'Embed' => 14
 		},
 		GOTOS => {
 			'included' => 2,
-			'table' => 52,
+			'table' => 53,
 			'embedded' => 41,
-			'basic' => 106,
-			'basics' => 105,
+			'basic' => 107,
+			'basics' => 106,
 			'table_separator' => 48,
 			'tag' => 43,
 			'element' => 13
 		}
 	},
-	{#State 76
+	{#State 77
 		ACTIONS => {
-			"{" => 98
+			"{" => 99
 		},
 		GOTOS => {
-			'used_tagpars' => 107
+			'used_tagpars' => 108
 		}
 	},
-	{#State 77
+	{#State 78
 		ACTIONS => {
 			'EOL' => 3,
 			'Table_separator' => 24,
 			'Include' => 23,
-			'Named_variable' => 93,
+			'Named_variable' => 94,
+			'StreamedPart' => 50,
 			'Table' => 27,
 			'Symbolic_variable' => 42,
-			'Space' => 55,
+			'Space' => 56,
 			'Word' => 30,
-			'Tag_name' => 57,
+			'Tag_name' => 58,
 			'Embed' => 14
 		},
 		DEFAULT => -67,
 		GOTOS => {
 			'included' => 2,
-			'literals' => 108,
-			'table' => 52,
+			'literals' => 109,
+			'table' => 53,
 			'embedded' => 41,
 			'basic' => 12,
 			'table_separator' => 48,
-			'literal' => 110,
-			'optional_literals' => 109,
-			'tag' => 43,
-			'element' => 13
-		}
-	},
-	{#State 78
-		ACTIONS => {
-			'Table' => 27,
-			'Symbolic_variable' => 42,
-			'Space' => 55,
-			'Table_separator' => 24,
-			'Include' => 23,
-			'Word' => 30,
-			'Tag_name' => 57,
-			'Named_variable' => 93,
-			'Embed' => 14
-		},
-		GOTOS => {
-			'included' => 2,
-			'table' => 52,
-			'embedded' => 41,
-			'basic' => 106,
-			'basics' => 111,
-			'table_separator' => 48,
+			'literal' => 111,
+			'optional_literals' => 110,
 			'tag' => 43,
 			'element' => 13
 		}
 	},
 	{#State 79
-		DEFAULT => -31
-	},
-	{#State 80
-		DEFAULT => -38
-	},
-	{#State 81
-		DEFAULT => -0
-	},
-	{#State 82
-		DEFAULT => -2
-	},
-	{#State 83
 		ACTIONS => {
-			'Word' => 112
-		}
-	},
-	{#State 84
-		ACTIONS => {
-			'Empty_line' => 113,
-			'EOL' => 3,
-			'Table_separator' => 24,
-			'Include' => 23,
-			'Named_variable' => 93,
 			'Table' => 27,
 			'Symbolic_variable' => 42,
-			'Space' => 55,
+			'Space' => 56,
+			'Table_separator' => 24,
+			'Include' => 23,
 			'Word' => 30,
-			'Tag_name' => 57,
+			'Tag_name' => 58,
+			'Named_variable' => 94,
+			'StreamedPart' => 50,
 			'Embed' => 14
 		},
 		GOTOS => {
 			'included' => 2,
-			'literals_and_empty_lines' => 115,
-			'table' => 52,
+			'table' => 53,
 			'embedded' => 41,
-			'literal_or_empty_line' => 114,
-			'basic' => 12,
+			'basic' => 107,
+			'basics' => 112,
 			'table_separator' => 48,
-			'literal' => 116,
 			'tag' => 43,
 			'element' => 13
 		}
 	},
+	{#State 80
+		DEFAULT => -31
+	},
+	{#State 81
+		DEFAULT => -38
+	},
+	{#State 82
+		DEFAULT => -0
+	},
+	{#State 83
+		DEFAULT => -2
+	},
+	{#State 84
+		ACTIONS => {
+			'Word' => 113
+		}
+	},
 	{#State 85
+		ACTIONS => {
+			'Empty_line' => 114,
+			'EOL' => 3,
+			'Table_separator' => 24,
+			'Include' => 23,
+			'Named_variable' => 94,
+			'StreamedPart' => 50,
+			'Table' => 27,
+			'Symbolic_variable' => 42,
+			'Space' => 56,
+			'Word' => 30,
+			'Tag_name' => 58,
+			'Embed' => 14
+		},
+		GOTOS => {
+			'included' => 2,
+			'literals_and_empty_lines' => 116,
+			'table' => 53,
+			'embedded' => 41,
+			'literal_or_empty_line' => 115,
+			'basic' => 12,
+			'table_separator' => 48,
+			'literal' => 117,
+			'tag' => 43,
+			'element' => 13
+		}
+	},
+	{#State 86
 		ACTIONS => {
 			'Block_cache_hit' => 39,
 			'Ils' => 15
 		},
 		GOTOS => {
-			'compound_block' => 117,
+			'compound_block' => 118,
 			'block' => 40
 		}
 	},
-	{#State 86
+	{#State 87
 		DEFAULT => -48
 	},
-	{#State 87
+	{#State 88
 		DEFAULT => -50,
 		GOTOS => {
-			'@7-1' => 118
-		}
-	},
-	{#State 88
-		DEFAULT => -60,
-		GOTOS => {
-			'@11-2' => 119
+			'@7-1' => 119
 		}
 	},
 	{#State 89
-		ACTIONS => {
-			"{" => 98
-		},
-		DEFAULT => -102,
+		DEFAULT => -60,
 		GOTOS => {
-			'used_tagpars' => 121,
-			'optional_tagpars' => 120
+			'@11-2' => 120
 		}
 	},
 	{#State 90
 		ACTIONS => {
+			"{" => 99
+		},
+		DEFAULT => -103,
+		GOTOS => {
+			'used_tagpars' => 122,
+			'optional_tagpars' => 121
+		}
+	},
+	{#State 91
+		ACTIONS => {
 			'EOL' => 3,
 			'Table_separator' => 24,
 			'Include' => 23,
-			'Named_variable' => 93,
+			'Named_variable' => 94,
+			'StreamedPart' => 50,
 			'Table' => 27,
 			'Symbolic_variable' => 42,
-			'Space' => 55,
+			'Space' => 56,
 			'Word' => 30,
-			'Tag_name' => 57,
+			'Tag_name' => 58,
 			'Embed' => 14
 		},
 		GOTOS => {
 			'included' => 2,
-			'text' => 122,
-			'table' => 52,
+			'text' => 123,
+			'table' => 53,
 			'embedded' => 41,
 			'basic' => 12,
 			'table_separator' => 48,
@@ -2123,522 +2134,534 @@ sub new {
 			'element' => 13
 		}
 	},
-	{#State 91
-		DEFAULT => -97
-	},
 	{#State 92
-		ACTIONS => {
-			'Word' => 123
-		},
-		DEFAULT => -119,
-		GOTOS => {
-			'@21-3' => 124
-		}
+		DEFAULT => -98
 	},
 	{#State 93
-		DEFAULT => -90
+		ACTIONS => {
+			'Word' => 124
+		},
+		DEFAULT => -120,
+		GOTOS => {
+			'@21-3' => 125
+		}
 	},
 	{#State 94
-		DEFAULT => -59
+		DEFAULT => -90
 	},
 	{#State 95
-		DEFAULT => -35
+		DEFAULT => -59
 	},
 	{#State 96
-		DEFAULT => -86
+		DEFAULT => -35
 	},
 	{#State 97
+		DEFAULT => -86
+	},
+	{#State 98
 		ACTIONS => {
-			'Colon' => 125,
+			'Colon' => 126,
 			'Symbolic_variable' => 42,
-			'Space' => 55,
+			'Space' => 56,
 			'Include' => 23,
 			'Word' => 30,
-			'Tag_name' => 57,
-			'Named_variable' => 93,
+			'Tag_name' => 58,
+			'Named_variable' => 94,
+			'StreamedPart' => 50,
 			'Embed' => 14
 		},
 		GOTOS => {
 			'included' => 2,
 			'embedded' => 41,
 			'tag' => 43,
-			'element' => 126
-		}
-	},
-	{#State 98
-		DEFAULT => -104,
-		GOTOS => {
-			'@16-1' => 127
+			'element' => 127
 		}
 	},
 	{#State 99
-		DEFAULT => -122,
+		DEFAULT => -105,
 		GOTOS => {
-			'@23-3' => 128
+			'@16-1' => 128
 		}
 	},
 	{#State 100
-		DEFAULT => -53
-	},
-	{#State 101
-		ACTIONS => {
-			'Number' => 130
-		},
-		DEFAULT => -95,
+		DEFAULT => -123,
 		GOTOS => {
-			'optional_number' => 129
+			'@23-3' => 129
 		}
 	},
+	{#State 101
+		DEFAULT => -53
+	},
 	{#State 102
-		DEFAULT => -24
+		ACTIONS => {
+			'Number' => 131
+		},
+		DEFAULT => -96,
+		GOTOS => {
+			'optional_number' => 130
+		}
 	},
 	{#State 103
-		DEFAULT => -40
+		DEFAULT => -24
 	},
 	{#State 104
-		DEFAULT => -125
+		DEFAULT => -40
 	},
 	{#State 105
+		DEFAULT => -126
+	},
+	{#State 106
 		ACTIONS => {
-			'Empty_line' => 132,
+			'Empty_line' => 133,
 			'Table_separator' => 24,
 			'Include' => 23,
-			'Named_variable' => 93,
+			'Named_variable' => 94,
+			'StreamedPart' => 50,
 			'Table' => 27,
 			'Symbolic_variable' => 42,
-			'Space' => 55,
+			'Space' => 56,
 			'Word' => 30,
-			'Tag_name' => 57,
+			'Tag_name' => 58,
 			'Embed' => 14
 		},
 		GOTOS => {
 			'included' => 2,
-			'table' => 52,
+			'table' => 53,
 			'embedded' => 41,
-			'basic' => 131,
+			'basic' => 132,
 			'table_separator' => 48,
 			'tag' => 43,
 			'element' => 13
 		}
 	},
-	{#State 106
+	{#State 107
 		DEFAULT => -81
 	},
-	{#State 107
-		DEFAULT => -115,
+	{#State 108
+		DEFAULT => -116,
 		GOTOS => {
-			'@19-3' => 133
+			'@19-3' => 134
 		}
 	},
-	{#State 108
+	{#State 109
 		ACTIONS => {
 			'EOL' => 3,
 			'Table_separator' => 24,
 			'Include' => 23,
-			'Named_variable' => 93,
+			'Named_variable' => 94,
+			'StreamedPart' => 50,
 			'Table' => 27,
 			'Symbolic_variable' => 42,
-			'Space' => 55,
+			'Space' => 56,
 			'Word' => 30,
-			'Tag_name' => 57,
+			'Tag_name' => 58,
 			'Embed' => 14
 		},
 		DEFAULT => -68,
 		GOTOS => {
 			'included' => 2,
-			'table' => 52,
+			'table' => 53,
 			'embedded' => 41,
 			'basic' => 12,
 			'table_separator' => 48,
-			'literal' => 134,
+			'literal' => 135,
 			'tag' => 43,
 			'element' => 13
-		}
-	},
-	{#State 109
-		ACTIONS => {
-			'Empty_line' => 135
 		}
 	},
 	{#State 110
-		DEFAULT => -69
+		ACTIONS => {
+			'Empty_line' => 136
+		}
 	},
 	{#State 111
-		ACTIONS => {
-			'Empty_line' => 136,
-			'Table_separator' => 24,
-			'Include' => 23,
-			'Named_variable' => 93,
-			'Table' => 27,
-			'Symbolic_variable' => 42,
-			'Space' => 55,
-			'Word' => 30,
-			'Tag_name' => 57,
-			'Embed' => 14
-		},
-		GOTOS => {
-			'included' => 2,
-			'table' => 52,
-			'embedded' => 41,
-			'basic' => 131,
-			'table_separator' => 48,
-			'tag' => 43,
-			'element' => 13
-		}
+		DEFAULT => -69
 	},
 	{#State 112
 		ACTIONS => {
-			'Colon' => 137
-		}
-	},
-	{#State 113
-		DEFAULT => -76
-	},
-	{#State 114
-		DEFAULT => -73
-	},
-	{#State 115
-		ACTIONS => {
-			'Empty_line' => 113,
-			'EOL' => 3,
+			'Empty_line' => 137,
 			'Table_separator' => 24,
 			'Include' => 23,
-			'Named_variable' => 93,
-			'Heredoc_close' => 139,
+			'Named_variable' => 94,
+			'StreamedPart' => 50,
 			'Table' => 27,
 			'Symbolic_variable' => 42,
-			'Space' => 55,
+			'Space' => 56,
 			'Word' => 30,
-			'Tag_name' => 57,
+			'Tag_name' => 58,
 			'Embed' => 14
 		},
 		GOTOS => {
 			'included' => 2,
-			'table' => 52,
+			'table' => 53,
 			'embedded' => 41,
-			'literal_or_empty_line' => 138,
-			'basic' => 12,
+			'basic' => 132,
 			'table_separator' => 48,
-			'literal' => 116,
 			'tag' => 43,
 			'element' => 13
 		}
 	},
+	{#State 113
+		ACTIONS => {
+			'Colon' => 138
+		}
+	},
+	{#State 114
+		DEFAULT => -76
+	},
+	{#State 115
+		DEFAULT => -73
+	},
 	{#State 116
-		DEFAULT => -75
+		ACTIONS => {
+			'Empty_line' => 114,
+			'EOL' => 3,
+			'Table_separator' => 24,
+			'Include' => 23,
+			'Named_variable' => 94,
+			'StreamedPart' => 50,
+			'Heredoc_close' => 140,
+			'Table' => 27,
+			'Symbolic_variable' => 42,
+			'Space' => 56,
+			'Word' => 30,
+			'Tag_name' => 58,
+			'Embed' => 14
+		},
+		GOTOS => {
+			'included' => 2,
+			'table' => 53,
+			'embedded' => 41,
+			'literal_or_empty_line' => 139,
+			'basic' => 12,
+			'table_separator' => 48,
+			'literal' => 117,
+			'tag' => 43,
+			'element' => 13
+		}
 	},
 	{#State 117
-		ACTIONS => {
-			'Block_cache_hit' => 39,
-			'Ils' => 15,
-			"-" => 87
-		},
-		DEFAULT => -49,
-		GOTOS => {
-			'block' => 86,
-			'block_flagnew' => 85
-		}
+		DEFAULT => -75
 	},
 	{#State 118
 		ACTIONS => {
-			'Empty_line' => 140
+			'Block_cache_hit' => 39,
+			'Ils' => 15,
+			"-" => 88
+		},
+		DEFAULT => -49,
+		GOTOS => {
+			'block' => 87,
+			'block_flagnew' => 86
 		}
 	},
 	{#State 119
 		ACTIONS => {
+			'Empty_line' => 141
+		}
+	},
+	{#State 120
+		ACTIONS => {
 			'Table_separator' => 24,
 			'Include' => 23,
-			'Named_variable' => 93,
+			'Named_variable' => 94,
+			'StreamedPart' => 50,
 			'Table' => 27,
 			'Symbolic_variable' => 42,
-			'Space' => 55,
+			'Space' => 56,
 			'Word' => 30,
-			'Tag_name' => 57,
+			'Tag_name' => 58,
 			'Embed' => 14
 		},
 		DEFAULT => -79,
 		GOTOS => {
 			'included' => 2,
-			'basics' => 141,
+			'basics' => 142,
 			'table_separator' => 48,
-			'optional_basics' => 142,
-			'table' => 52,
+			'optional_basics' => 143,
+			'table' => 53,
 			'embedded' => 41,
-			'basic' => 106,
+			'basic' => 107,
 			'element' => 13,
 			'tag' => 43
 		}
 	},
-	{#State 120
-		DEFAULT => -100,
+	{#State 121
+		DEFAULT => -101,
 		GOTOS => {
-			'@15-3' => 143
+			'@15-3' => 144
 		}
 	},
-	{#State 121
-		DEFAULT => -103
-	},
 	{#State 122
-		DEFAULT => -43
+		DEFAULT => -104
 	},
 	{#State 123
-		DEFAULT => -98
+		DEFAULT => -43
 	},
 	{#State 124
+		DEFAULT => -99
+	},
+	{#State 125
 		ACTIONS => {
 			'EOL' => 3,
 			'Table_separator' => 24,
 			'Include' => 23,
-			'Named_variable' => 93,
+			'Named_variable' => 94,
+			'StreamedPart' => 50,
 			'Table' => 27,
 			'Symbolic_variable' => 42,
-			'Space' => 55,
+			'Space' => 56,
 			'Word' => 30,
-			'Tag_name' => 57,
+			'Tag_name' => 58,
 			'Embed' => 14
 		},
 		DEFAULT => -67,
 		GOTOS => {
 			'included' => 2,
-			'literals' => 108,
-			'table' => 52,
+			'literals' => 109,
+			'table' => 53,
 			'embedded' => 41,
 			'basic' => 12,
 			'table_separator' => 48,
-			'literal' => 110,
-			'optional_literals' => 144,
+			'literal' => 111,
+			'optional_literals' => 145,
 			'tag' => 43,
 			'element' => 13
 		}
 	},
-	{#State 125
+	{#State 126
 		DEFAULT => -46
 	},
-	{#State 126
-		DEFAULT => -87
-	},
 	{#State 127
-		ACTIONS => {
-			'Word' => 146
-		},
-		GOTOS => {
-			'tagpar' => 147,
-			'tagpars' => 145
-		}
+		DEFAULT => -87
 	},
 	{#State 128
 		ACTIONS => {
-			'Empty_line' => 113,
-			'EOL' => 3,
-			'Table_separator' => 24,
-			'Include' => 23,
-			'Named_variable' => 93,
-			'Table' => 27,
-			'Symbolic_variable' => 42,
-			'Space' => 55,
-			'Word' => 30,
-			'Tag_name' => 57,
-			'Embed' => 14
+			'Word' => 147
 		},
-		DEFAULT => -71,
 		GOTOS => {
-			'included' => 2,
-			'literals_and_empty_lines' => 148,
-			'table' => 52,
-			'embedded' => 41,
-			'literal_or_empty_line' => 114,
-			'basic' => 12,
-			'optional_literals_and_empty_lines' => 149,
-			'table_separator' => 48,
-			'literal' => 116,
-			'tag' => 43,
-			'element' => 13
+			'tagpar' => 148,
+			'tagpars' => 146
 		}
 	},
 	{#State 129
-		DEFAULT => -63,
-		GOTOS => {
-			'@13-3' => 150
-		}
-	},
-	{#State 130
-		DEFAULT => -96
-	},
-	{#State 131
-		DEFAULT => -82
-	},
-	{#State 132
-		DEFAULT => -16
-	},
-	{#State 133
 		ACTIONS => {
-			'Empty_line' => 113,
+			'Empty_line' => 114,
 			'EOL' => 3,
 			'Table_separator' => 24,
 			'Include' => 23,
-			'Named_variable' => 93,
+			'Named_variable' => 94,
+			'StreamedPart' => 50,
 			'Table' => 27,
 			'Symbolic_variable' => 42,
-			'Space' => 55,
+			'Space' => 56,
 			'Word' => 30,
-			'Tag_name' => 57,
+			'Tag_name' => 58,
 			'Embed' => 14
 		},
 		DEFAULT => -71,
 		GOTOS => {
 			'included' => 2,
-			'literals_and_empty_lines' => 148,
-			'table' => 52,
+			'literals_and_empty_lines' => 149,
+			'table' => 53,
 			'embedded' => 41,
-			'literal_or_empty_line' => 114,
+			'literal_or_empty_line' => 115,
 			'basic' => 12,
-			'optional_literals_and_empty_lines' => 151,
+			'optional_literals_and_empty_lines' => 150,
 			'table_separator' => 48,
-			'literal' => 116,
+			'literal' => 117,
 			'tag' => 43,
 			'element' => 13
 		}
 	},
-	{#State 134
-		DEFAULT => -70
-	},
-	{#State 135
-		DEFAULT => -56
-	},
-	{#State 136
-		DEFAULT => -21
-	},
-	{#State 137
-		DEFAULT => -127,
+	{#State 130
+		DEFAULT => -63,
 		GOTOS => {
-			'@26-4' => 152
+			'@13-3' => 151
 		}
 	},
+	{#State 131
+		DEFAULT => -97
+	},
+	{#State 132
+		DEFAULT => -82
+	},
+	{#State 133
+		DEFAULT => -16
+	},
+	{#State 134
+		ACTIONS => {
+			'Empty_line' => 114,
+			'EOL' => 3,
+			'Table_separator' => 24,
+			'Include' => 23,
+			'Named_variable' => 94,
+			'StreamedPart' => 50,
+			'Table' => 27,
+			'Symbolic_variable' => 42,
+			'Space' => 56,
+			'Word' => 30,
+			'Tag_name' => 58,
+			'Embed' => 14
+		},
+		DEFAULT => -71,
+		GOTOS => {
+			'included' => 2,
+			'literals_and_empty_lines' => 149,
+			'table' => 53,
+			'embedded' => 41,
+			'literal_or_empty_line' => 115,
+			'basic' => 12,
+			'optional_literals_and_empty_lines' => 152,
+			'table_separator' => 48,
+			'literal' => 117,
+			'tag' => 43,
+			'element' => 13
+		}
+	},
+	{#State 135
+		DEFAULT => -70
+	},
+	{#State 136
+		DEFAULT => -56
+	},
+	{#State 137
+		DEFAULT => -21
+	},
 	{#State 138
-		DEFAULT => -74
+		DEFAULT => -128,
+		GOTOS => {
+			'@26-4' => 153
+		}
 	},
 	{#State 139
-		DEFAULT => -58
+		DEFAULT => -74
 	},
 	{#State 140
-		DEFAULT => -51
+		DEFAULT => -58
 	},
 	{#State 141
+		DEFAULT => -51
+	},
+	{#State 142
 		ACTIONS => {
 			'Table_separator' => 24,
 			'Include' => 23,
-			'Named_variable' => 93,
+			'Named_variable' => 94,
+			'StreamedPart' => 50,
 			'Table' => 27,
 			'Symbolic_variable' => 42,
-			'Space' => 55,
+			'Space' => 56,
 			'Word' => 30,
-			'Tag_name' => 57,
+			'Tag_name' => 58,
 			'Embed' => 14
 		},
 		DEFAULT => -80,
 		GOTOS => {
 			'included' => 2,
-			'table' => 52,
+			'table' => 53,
 			'embedded' => 41,
-			'basic' => 131,
+			'basic' => 132,
 			'table_separator' => 48,
 			'tag' => 43,
 			'element' => 13
 		}
 	},
-	{#State 142
-		ACTIONS => {
-			'Empty_line' => 153
-		}
-	},
 	{#State 143
 		ACTIONS => {
-			"<" => 155
-		},
-		DEFAULT => -112,
-		GOTOS => {
-			'optional_tagbody' => 154
+			'Empty_line' => 154
 		}
 	},
 	{#State 144
 		ACTIONS => {
-			'Empty_line' => 156
+			"<" => 156
+		},
+		DEFAULT => -113,
+		GOTOS => {
+			'optional_tagbody' => 155
 		}
 	},
 	{#State 145
 		ACTIONS => {
-			'Space' => 158,
-			"}" => 157
+			'Empty_line' => 157
 		}
 	},
 	{#State 146
-		DEFAULT => -108,
-		GOTOS => {
-			'@17-1' => 159
+		ACTIONS => {
+			'Space' => 159,
+			"}" => 158
 		}
 	},
 	{#State 147
-		DEFAULT => -106
+		DEFAULT => -109,
+		GOTOS => {
+			'@17-1' => 160
+		}
 	},
 	{#State 148
+		DEFAULT => -107
+	},
+	{#State 149
 		ACTIONS => {
-			'Empty_line' => 113,
+			'Empty_line' => 114,
 			'EOL' => 3,
 			'Table_separator' => 24,
 			'Include' => 23,
-			'Named_variable' => 93,
+			'Named_variable' => 94,
+			'StreamedPart' => 50,
 			'Table' => 27,
 			'Symbolic_variable' => 42,
-			'Space' => 55,
+			'Space' => 56,
 			'Word' => 30,
-			'Tag_name' => 57,
+			'Tag_name' => 58,
 			'Embed' => 14
 		},
 		DEFAULT => -72,
 		GOTOS => {
 			'included' => 2,
-			'table' => 52,
+			'table' => 53,
 			'embedded' => 41,
-			'literal_or_empty_line' => 138,
+			'literal_or_empty_line' => 139,
 			'basic' => 12,
 			'table_separator' => 48,
-			'literal' => 116,
+			'literal' => 117,
 			'tag' => 43,
 			'element' => 13
 		}
 	},
-	{#State 149
-		ACTIONS => {
-			'Embedded' => 160
-		}
-	},
 	{#State 150
 		ACTIONS => {
-			'Empty_line' => 161
+			'Embedded' => 161
 		}
 	},
 	{#State 151
 		ACTIONS => {
-			'Tabled' => 162
+			'Empty_line' => 162
 		}
 	},
 	{#State 152
 		ACTIONS => {
+			'Tabled' => 163
+		}
+	},
+	{#State 153
+		ACTIONS => {
 			'EOL' => 3,
 			'Table_separator' => 24,
 			'Include' => 23,
-			'Named_variable' => 93,
+			'Named_variable' => 94,
+			'StreamedPart' => 50,
 			'Table' => 27,
 			'Symbolic_variable' => 42,
-			'Space' => 55,
+			'Space' => 56,
 			'Word' => 30,
-			'Tag_name' => 57,
+			'Tag_name' => 58,
 			'Embed' => 14
 		},
 		GOTOS => {
 			'included' => 2,
-			'text' => 163,
-			'table' => 52,
+			'text' => 164,
+			'table' => 53,
 			'embedded' => 41,
 			'basic' => 12,
 			'table_separator' => 48,
@@ -2647,162 +2670,166 @@ sub new {
 			'element' => 13
 		}
 	},
-	{#State 153
+	{#State 154
 		DEFAULT => -61
 	},
-	{#State 154
-		DEFAULT => -101
-	},
 	{#State 155
+		DEFAULT => -102
+	},
+	{#State 156
 		ACTIONS => {
 			'EOL' => 3,
 			'Table_separator' => 24,
 			'Include' => 23,
-			'Named_variable' => 93,
+			'Named_variable' => 94,
+			'StreamedPart' => 50,
 			'Table' => 27,
 			'Symbolic_variable' => 42,
-			'Space' => 55,
+			'Space' => 56,
 			'Word' => 30,
-			'Tag_name' => 57,
+			'Tag_name' => 58,
 			'Embed' => 14
 		},
 		GOTOS => {
 			'included' => 2,
-			'literals' => 164,
-			'table' => 52,
+			'literals' => 165,
+			'table' => 53,
 			'embedded' => 41,
 			'basic' => 12,
 			'table_separator' => 48,
-			'literal' => 110,
+			'literal' => 111,
 			'tag' => 43,
 			'element' => 13
 		}
 	},
-	{#State 156
-		DEFAULT => -120
-	},
 	{#State 157
-		DEFAULT => -105
+		DEFAULT => -121
 	},
 	{#State 158
-		ACTIONS => {
-			'Word' => 146
-		},
-		GOTOS => {
-			'tagpar' => 165
-		}
+		DEFAULT => -106
 	},
 	{#State 159
 		ACTIONS => {
-			"=" => 166
+			'Word' => 147
+		},
+		GOTOS => {
+			'tagpar' => 166
 		}
 	},
 	{#State 160
-		DEFAULT => -123
+		ACTIONS => {
+			"=" => 167
+		}
 	},
 	{#State 161
-		DEFAULT => -64
+		DEFAULT => -124
 	},
 	{#State 162
-		DEFAULT => -116
+		DEFAULT => -64
 	},
 	{#State 163
-		DEFAULT => -128
+		DEFAULT => -117
 	},
 	{#State 164
+		DEFAULT => -129
+	},
+	{#State 165
 		ACTIONS => {
 			'EOL' => 3,
 			'Table_separator' => 24,
 			'Include' => 23,
-			'Named_variable' => 93,
+			'Named_variable' => 94,
+			'StreamedPart' => 50,
 			'Table' => 27,
 			'Symbolic_variable' => 42,
-			">" => 167,
-			'Space' => 55,
+			">" => 168,
+			'Space' => 56,
 			'Word' => 30,
-			'Tag_name' => 57,
+			'Tag_name' => 58,
 			'Embed' => 14
 		},
 		GOTOS => {
 			'included' => 2,
-			'table' => 52,
+			'table' => 53,
 			'embedded' => 41,
 			'basic' => 12,
 			'table_separator' => 48,
-			'literal' => 134,
+			'literal' => 135,
 			'tag' => 43,
 			'element' => 13
 		}
 	},
-	{#State 165
-		DEFAULT => -107
-	},
 	{#State 166
-		ACTIONS => {
-			"\"" => 168,
-			'Word' => 170
-		},
-		GOTOS => {
-			'tagvalue' => 169
-		}
+		DEFAULT => -108
 	},
 	{#State 167
-		DEFAULT => -113
+		ACTIONS => {
+			"\"" => 169,
+			'Word' => 171
+		},
+		GOTOS => {
+			'tagvalue' => 170
+		}
 	},
 	{#State 168
+		DEFAULT => -114
+	},
+	{#State 169
 		ACTIONS => {
 			'Table' => 27,
 			'Symbolic_variable' => 42,
-			'Space' => 55,
+			'Space' => 56,
 			'Table_separator' => 24,
 			'Include' => 23,
 			'Word' => 30,
-			'Tag_name' => 57,
-			'Named_variable' => 93,
+			'Tag_name' => 58,
+			'Named_variable' => 94,
+			'StreamedPart' => 50,
 			'Embed' => 14
 		},
 		GOTOS => {
 			'included' => 2,
-			'table' => 52,
+			'table' => 53,
 			'embedded' => 41,
-			'basic' => 106,
-			'basics' => 171,
+			'basic' => 107,
+			'basics' => 172,
 			'table_separator' => 48,
 			'tag' => 43,
 			'element' => 13
 		}
-	},
-	{#State 169
-		DEFAULT => -109
 	},
 	{#State 170
 		DEFAULT => -110
 	},
 	{#State 171
+		DEFAULT => -111
+	},
+	{#State 172
 		ACTIONS => {
 			'Table' => 27,
 			'Symbolic_variable' => 42,
-			"\"" => 172,
-			'Space' => 55,
+			"\"" => 173,
+			'Space' => 56,
 			'Table_separator' => 24,
 			'Include' => 23,
 			'Word' => 30,
-			'Tag_name' => 57,
-			'Named_variable' => 93,
+			'Tag_name' => 58,
+			'Named_variable' => 94,
+			'StreamedPart' => 50,
 			'Embed' => 14
 		},
 		GOTOS => {
 			'included' => 2,
-			'table' => 52,
+			'table' => 53,
 			'embedded' => 41,
-			'basic' => 131,
+			'basic' => 132,
 			'table_separator' => 48,
 			'tag' => 43,
 			'element' => 13
 		}
 	},
-	{#State 172
-		DEFAULT => -111
+	{#State 173
+		DEFAULT => -112
 	}
 ],
                                   yyrules  =>
@@ -2813,7 +2840,7 @@ sub new {
 	[#Rule 1
 		 'document', 1,
 sub
-#line 886 "ppParser.yp"
+#line 883 "ppParser.yp"
 {
              # skip empty line "paragraphs"
              unless ($_[1][0] eq '')
@@ -2847,7 +2874,7 @@ sub
 	[#Rule 2
 		 'document', 2,
 sub
-#line 916 "ppParser.yp"
+#line 913 "ppParser.yp"
 {
              # skip empty line "paragraphs"
              unless ($_[2][0] eq '')
@@ -2917,7 +2944,7 @@ sub
 	[#Rule 15
 		 '@1-1', 0,
 sub
-#line 964 "ppParser.yp"
+#line 961 "ppParser.yp"
 {
              # switch to headline intro mode
              stateManager(STATE_HEADLINE);
@@ -2932,7 +2959,7 @@ sub
 	[#Rule 16
 		 'headline', 4,
 sub
-#line 975 "ppParser.yp"
+#line 972 "ppParser.yp"
 {
              # back to default mode
              stateManager(STATE_DEFAULT);
@@ -2966,7 +2993,7 @@ sub
 	[#Rule 18
 		 'headline_level', 1,
 sub
-#line 1006 "ppParser.yp"
+#line 1003 "ppParser.yp"
 {
                    # start new counter and reply it
                    [$flags{headlineLevelOffset}+1, $_[1][1]];
@@ -2975,7 +3002,7 @@ sub
 	[#Rule 19
 		 'headline_level', 2,
 sub
-#line 1011 "ppParser.yp"
+#line 1008 "ppParser.yp"
 {
                    # update counter and reply it
                    [$_[1][0]+1, $_[1][1]];
@@ -2984,7 +3011,7 @@ sub
 	[#Rule 20
 		 '@2-1', 0,
 sub
-#line 1019 "ppParser.yp"
+#line 1016 "ppParser.yp"
 {
                # switch to condition mode
                stateManager(STATE_HEADLINE);
@@ -2996,7 +3023,7 @@ sub
 	[#Rule 21
 		 'condition', 4,
 sub
-#line 1027 "ppParser.yp"
+#line 1024 "ppParser.yp"
 {
                # back to default mode
                stateManager(STATE_DEFAULT);
@@ -3011,7 +3038,14 @@ sub
                    # trace, if necessary
                    warn "[Trace] Evaluating condition ...\n" if $flags{trace} & TRACE_SEMANTIC;
 
-                   # make it a string and evaluate it
+                   # update active contents base data, if necessary
+                   if ($flags{activeBaseData})
+                     {
+                      no strict 'refs';
+                      ${join('::', $safeObject->root, 'PerlPoint')}=dclone($flags{activeBaseData});
+                     }
+
+                   # make the Perl code a string and evaluate it
                    my $perl=join('',  @{$_[3][0]});
                    $safeObject->reval('$^W=0');
                    warn "[Trace] $sourceFile, line $_[6][1]: Evaluating condition code:\n\n$perl\n\n\n" if $flags{trace} & TRACE_ACTIVE;
@@ -3046,7 +3080,7 @@ sub
 	[#Rule 23
 		 'list', 2,
 sub
-#line 1074 "ppParser.yp"
+#line 1078 "ppParser.yp"
 {
          # update token list and reply it
          push(@{$_[1][0]}, @{$_[2][0]});
@@ -3056,7 +3090,7 @@ sub
 	[#Rule 24
 		 'list', 3,
 sub
-#line 1080 "ppParser.yp"
+#line 1084 "ppParser.yp"
 {
          # update statistics, if necessary (shifters are not passed as standalone paragraphs, so ...)
          $statistics{$_[2][0][0][0]}++;
@@ -3069,7 +3103,7 @@ sub
 	[#Rule 25
 		 'list_part', 1,
 sub
-#line 1092 "ppParser.yp"
+#line 1096 "ppParser.yp"
 {
               # embed the points into list directives
               [
@@ -3088,7 +3122,7 @@ sub
 	[#Rule 26
 		 'list_part', 1,
 sub
-#line 1107 "ppParser.yp"
+#line 1111 "ppParser.yp"
 {
               # embed the points into list directives
               [
@@ -3107,7 +3141,7 @@ sub
 	[#Rule 27
 		 'list_part', 1,
 sub
-#line 1122 "ppParser.yp"
+#line 1126 "ppParser.yp"
 {
               # embed the points into list directives
               [
@@ -3129,7 +3163,7 @@ sub
 	[#Rule 29
 		 'olist', 2,
 sub
-#line 1141 "ppParser.yp"
+#line 1145 "ppParser.yp"
 {
           # update token list and reply it
           push(@{$_[1][0]}, @{$_[2][0]});
@@ -3142,7 +3176,7 @@ sub
 	[#Rule 31
 		 'ulist', 2,
 sub
-#line 1151 "ppParser.yp"
+#line 1155 "ppParser.yp"
 {
           # update token list and reply it
           push(@{$_[1][0]}, @{$_[2][0]});
@@ -3155,7 +3189,7 @@ sub
 	[#Rule 33
 		 'dlist', 2,
 sub
-#line 1161 "ppParser.yp"
+#line 1165 "ppParser.yp"
 {
           # update token list and reply it
           push(@{$_[1][0]}, @{$_[2][0]});
@@ -3165,7 +3199,7 @@ sub
 	[#Rule 34
 		 '@3-1', 0,
 sub
-#line 1170 "ppParser.yp"
+#line 1174 "ppParser.yp"
 {
            # switch to opoint mode
            stateManager(STATE_OPOINT);
@@ -3177,7 +3211,7 @@ sub
 	[#Rule 35
 		 'opoint', 3,
 sub
-#line 1178 "ppParser.yp"
+#line 1182 "ppParser.yp"
 {
            # update statistics (list points are not passed as standalone paragraphs, so ...)
            $statistics{&DIRECTIVE_OPOINT}++;
@@ -3214,19 +3248,19 @@ sub
 	[#Rule 37
 		 'opoint_opener', 1,
 sub
-#line 1213 "ppParser.yp"
+#line 1217 "ppParser.yp"
 {[0, $_[1][1]];}
 	],
 	[#Rule 38
 		 'opoint_opener', 2,
 sub
-#line 1215 "ppParser.yp"
+#line 1219 "ppParser.yp"
 {[1, $_[1][1]];}
 	],
 	[#Rule 39
 		 '@4-1', 0,
 sub
-#line 1220 "ppParser.yp"
+#line 1224 "ppParser.yp"
 {
            # switch to upoint mode
            stateManager(STATE_UPOINT);
@@ -3238,7 +3272,7 @@ sub
 	[#Rule 40
 		 'upoint', 3,
 sub
-#line 1228 "ppParser.yp"
+#line 1232 "ppParser.yp"
 {
            # update statistics (list points are not passed as standalone paragraphs, so ...)
            $statistics{&DIRECTIVE_UPOINT}++;
@@ -3268,14 +3302,14 @@ sub
 	[#Rule 42
 		 '@5-1', 0,
 sub
-#line 1256 "ppParser.yp"
+#line 1260 "ppParser.yp"
 {
           }
 	],
 	[#Rule 43
 		 'dpoint', 3,
 sub
-#line 1259 "ppParser.yp"
+#line 1263 "ppParser.yp"
 {
            # update statistics (list points are not passed as standalone paragraphs, so ...)
            $statistics{&DIRECTIVE_DPOINT}++;
@@ -3310,7 +3344,7 @@ sub
 	[#Rule 45
 		 '@6-1', 0,
 sub
-#line 1292 "ppParser.yp"
+#line 1296 "ppParser.yp"
 {
                  # switch to dlist item mode
                  stateManager(STATE_DPOINT_ITEM);
@@ -3322,7 +3356,7 @@ sub
 	[#Rule 46
 		 'dlist_opener', 4,
 sub
-#line 1300 "ppParser.yp"
+#line 1304 "ppParser.yp"
 {
                  # switch to dlist body mode
                  stateManager(STATE_DPOINT);
@@ -3337,7 +3371,7 @@ sub
 	[#Rule 48
 		 'compound_block', 2,
 sub
-#line 1313 "ppParser.yp"
+#line 1317 "ppParser.yp"
 {
                    # this is tricky - to combine both blocks, we have to remove the already
                    # embedded stop/start directives and to supply the 
@@ -3357,7 +3391,7 @@ sub
 	[#Rule 49
 		 'compound_block', 3,
 sub
-#line 1329 "ppParser.yp"
+#line 1333 "ppParser.yp"
 {
                    # update statistics (for the first part which is completed by the intermediate flag paragraph)
                    $statistics{&DIRECTIVE_BLOCK}++;
@@ -3377,7 +3411,7 @@ sub
 	[#Rule 50
 		 '@7-1', 0,
 sub
-#line 1348 "ppParser.yp"
+#line 1352 "ppParser.yp"
 {
                   # switch to control mode
                   stateManager(STATE_CONTROL);
@@ -3389,7 +3423,7 @@ sub
 	[#Rule 51
 		 'block_flagnew', 3,
 sub
-#line 1356 "ppParser.yp"
+#line 1360 "ppParser.yp"
 {
                   # back to default mode
                   stateManager(STATE_DEFAULT);
@@ -3404,7 +3438,7 @@ sub
 	[#Rule 52
 		 '@8-1', 0,
 sub
-#line 1370 "ppParser.yp"
+#line 1374 "ppParser.yp"
 {
           # switch to block mode
           stateManager(STATE_BLOCK);
@@ -3416,7 +3450,7 @@ sub
 	[#Rule 53
 		 'block', 3,
 sub
-#line 1378 "ppParser.yp"
+#line 1382 "ppParser.yp"
 {
           # trace, if necessary
           warn "[Trace] $sourceFile, line $_[3][1]: Block completed.\n" if $flags{trace} & TRACE_PARAGRAPHS;
@@ -3439,7 +3473,7 @@ sub
 	[#Rule 55
 		 '@9-1', 0,
 sub
-#line 1398 "ppParser.yp"
+#line 1402 "ppParser.yp"
 {
          # enter text mode - unless we are in a block (or point (which already set this mode itself))
          unless (   $parserState==STATE_BLOCK
@@ -3461,7 +3495,7 @@ sub
 	[#Rule 56
 		 'text', 4,
 sub
-#line 1417 "ppParser.yp"
+#line 1421 "ppParser.yp"
 {
          # trace, if necessary
          warn "[Trace] $sourceFile, line $_[4][1]: Text completed.\n" unless    not $flags{trace} & TRACE_PARAGRAPHS
@@ -3494,7 +3528,7 @@ sub
 	[#Rule 57
 		 '@10-1', 0,
 sub
-#line 1449 "ppParser.yp"
+#line 1453 "ppParser.yp"
 {
              # switch to verbatim mode
              stateManager(STATE_VERBATIM);
@@ -3512,7 +3546,7 @@ sub
 	[#Rule 58
 		 'verbatim', 4,
 sub
-#line 1464 "ppParser.yp"
+#line 1468 "ppParser.yp"
 {
              # trace, if necessary
              warn "[Trace] $sourceFile, line $_[4][1]: Verbatim block completed.\n" if $flags{trace} & TRACE_PARAGRAPHS;
@@ -3540,7 +3574,7 @@ sub
 	[#Rule 59
 		 'variable_assignment', 3,
 sub
-#line 1491 "ppParser.yp"
+#line 1495 "ppParser.yp"
 {
                         # remove text directives and the final space (made from the final EOL)
                         shift(@{$_[3][0]});
@@ -3566,7 +3600,7 @@ sub
 	[#Rule 60
 		 '@11-2', 0,
 sub
-#line 1516 "ppParser.yp"
+#line 1520 "ppParser.yp"
 {
             # switch to comment mode
             stateManager(STATE_COMMENT);
@@ -3578,7 +3612,7 @@ sub
 	[#Rule 61
 		 'comment', 5,
 sub
-#line 1524 "ppParser.yp"
+#line 1528 "ppParser.yp"
 {
             # back to default mode
             stateManager(STATE_DEFAULT);
@@ -3603,7 +3637,7 @@ sub
 	[#Rule 62
 		 '@12-1', 0,
 sub
-#line 1548 "ppParser.yp"
+#line 1552 "ppParser.yp"
 {
                 # temporarily activate number detection
                 push(@specialStack, $specials{number});
@@ -3613,7 +3647,7 @@ sub
 	[#Rule 63
 		 '@13-3', 0,
 sub
-#line 1554 "ppParser.yp"
+#line 1558 "ppParser.yp"
 {
                 # restore previous number detection mode
                 $specials{number}=pop(@specialStack);
@@ -3628,7 +3662,7 @@ sub
 	[#Rule 64
 		 'list_shift', 5,
 sub
-#line 1565 "ppParser.yp"
+#line 1569 "ppParser.yp"
 {
                 # back to default mode
                 stateManager(STATE_DEFAULT);
@@ -3657,7 +3691,7 @@ sub
 	[#Rule 65
 		 'list_shifter', 1,
 sub
-#line 1593 "ppParser.yp"
+#line 1597 "ppParser.yp"
 {
                  # reply a flag
                  [LIST_SHIFT_RIGHT, $_[1][1]];
@@ -3666,7 +3700,7 @@ sub
 	[#Rule 66
 		 'list_shifter', 1,
 sub
-#line 1598 "ppParser.yp"
+#line 1602 "ppParser.yp"
 {
                  # reply a flag
                  [LIST_SHIFT_LEFT, $_[1][1]];
@@ -3675,7 +3709,7 @@ sub
 	[#Rule 67
 		 'optional_literals', 0,
 sub
-#line 1606 "ppParser.yp"
+#line 1610 "ppParser.yp"
 {
                       # start a new, empty list and reply it
                       [[], $lineNrs{$inHandle}];
@@ -3690,7 +3724,7 @@ sub
 	[#Rule 70
 		 'literals', 2,
 sub
-#line 1616 "ppParser.yp"
+#line 1620 "ppParser.yp"
 {
              # update token list and reply it
              push(@{$_[1][0]}, @{$_[2][0]});
@@ -3700,7 +3734,7 @@ sub
 	[#Rule 71
 		 'optional_literals_and_empty_lines', 0,
 sub
-#line 1625 "ppParser.yp"
+#line 1629 "ppParser.yp"
 {
                                       # start a new, empty list and reply it
                                       [[], $lineNrs{$inHandle}];
@@ -3715,7 +3749,7 @@ sub
 	[#Rule 74
 		 'literals_and_empty_lines', 2,
 sub
-#line 1635 "ppParser.yp"
+#line 1639 "ppParser.yp"
 {
                              # update token list and reply it
                              push(@{$_[1][0]}, @{$_[2][0]});
@@ -3728,7 +3762,7 @@ sub
 	[#Rule 76
 		 'literal_or_empty_line', 1,
 sub
-#line 1645 "ppParser.yp"
+#line 1649 "ppParser.yp"
 {
                           # start a new token list and reply it
                           [[$_[1][0]], $_[1][1]];
@@ -3740,7 +3774,7 @@ sub
 	[#Rule 78
 		 'literal', 1,
 sub
-#line 1654 "ppParser.yp"
+#line 1658 "ppParser.yp"
 {
             # start a new token list and reply it
             [[$_[1][0]], $_[1][1]];
@@ -3749,7 +3783,7 @@ sub
 	[#Rule 79
 		 'optional_basics', 0,
 sub
-#line 1662 "ppParser.yp"
+#line 1666 "ppParser.yp"
 {
                    # start a new, empty list and reply it
                    [[], $lineNrs{$inHandle}];
@@ -3764,7 +3798,7 @@ sub
 	[#Rule 82
 		 'basics', 2,
 sub
-#line 1672 "ppParser.yp"
+#line 1676 "ppParser.yp"
 {
            # update token list and reply it
            push(@{$_[1][0]}, @{$_[2][0]});
@@ -3786,7 +3820,7 @@ sub
 	[#Rule 87
 		 'elements', 2,
 sub
-#line 1690 "ppParser.yp"
+#line 1694 "ppParser.yp"
 {
              # update token list and reply it
              push(@{$_[1][0]}, @{$_[2][0]});
@@ -3796,7 +3830,7 @@ sub
 	[#Rule 88
 		 'element', 1,
 sub
-#line 1700 "ppParser.yp"
+#line 1704 "ppParser.yp"
 {
             # start a new token list and reply it
             [[$_[1][0]], $_[1][1]];
@@ -3805,7 +3839,7 @@ sub
 	[#Rule 89
 		 'element', 1,
 sub
-#line 1705 "ppParser.yp"
+#line 1709 "ppParser.yp"
 {
             # start a new token list and reply it
             [[$_[1][0]], $_[1][1]];
@@ -3814,7 +3848,7 @@ sub
 	[#Rule 90
 		 'element', 1,
 sub
-#line 1710 "ppParser.yp"
+#line 1714 "ppParser.yp"
 {
 	    # disable storage of a checksum (variable definitions may change or have changed)
 	    $flags{checksummed}=0;
@@ -3826,7 +3860,7 @@ sub
 	[#Rule 91
 		 'element', 1,
 sub
-#line 1718 "ppParser.yp"
+#line 1722 "ppParser.yp"
 {
 	    # disable storage of a checksum (variable definitions may change or have changed)
 	    $flags{checksummed}=0;
@@ -3836,7 +3870,14 @@ sub
            }
 	],
 	[#Rule 92
-		 'element', 1, undef
+		 'element', 1,
+sub
+#line 1730 "ppParser.yp"
+{
+            # start a new token list and reply it
+            # (the passed stream is already a reference)
+            [$_[1][0], $_[1][1]];
+           }
 	],
 	[#Rule 93
 		 'element', 1, undef
@@ -3845,37 +3886,40 @@ sub
 		 'element', 1, undef
 	],
 	[#Rule 95
-		 'optional_number', 0,
-sub
-#line 1733 "ppParser.yp"
-{[undef, $lineNrs{$inHandle}];}
+		 'element', 1, undef
 	],
 	[#Rule 96
-		 'optional_number', 1, undef
+		 'optional_number', 0,
+sub
+#line 1743 "ppParser.yp"
+{[undef, $lineNrs{$inHandle}];}
 	],
 	[#Rule 97
+		 'optional_number', 1, undef
+	],
+	[#Rule 98
 		 'words', 1,
 sub
-#line 1740 "ppParser.yp"
+#line 1750 "ppParser.yp"
 {
           # start a new token list and reply it
           [[$_[1][0]], $_[1][1]];
          }
 	],
-	[#Rule 98
+	[#Rule 99
 		 'words', 2,
 sub
-#line 1745 "ppParser.yp"
+#line 1755 "ppParser.yp"
 {
           # update token list and reply it
           push(@{$_[1][0]}, $_[2][0]);
           [$_[1][0], $_[2][1]];
          }
 	],
-	[#Rule 99
+	[#Rule 100
 		 '@14-1', 0,
 sub
-#line 1755 "ppParser.yp"
+#line 1765 "ppParser.yp"
 {
         # trace, if necessary
         warn "[Trace] $sourceFile, line $_[1][1]: Tag $_[1][0] starts.\n" if $flags{trace} & TRACE_PARAGRAPHS;
@@ -3885,19 +3929,19 @@ sub
         @specials{('{', '}', '<', '>')}=(1) x 4;
        }
 	],
-	[#Rule 100
+	[#Rule 101
 		 '@15-3', 0,
 sub
-#line 1764 "ppParser.yp"
+#line 1774 "ppParser.yp"
 {
         # restore special states of "{" and "}"
         @specials{('{', '}')}=splice(@specialStack, -2, 2);
        }
 	],
-	[#Rule 101
+	[#Rule 102
 		 'tag', 5,
 sub
-#line 1769 "ppParser.yp"
+#line 1779 "ppParser.yp"
 {
         # trace, if necessary
         warn "[Trace] $sourceFile, line $_[5][1]: Tag $_[1][0] completed.\n" if $flags{trace} & TRACE_PARAGRAPHS;
@@ -3947,25 +3991,8 @@ sub
               $macro=~s/__${par}__/$value/g;
              }
 
-           # add the body, if necessary
-           if ($macro=~/__body__/)
-             {
-
-              # reverse engineer the body stream
-              $reverseStream->run($_[5][0]);
-
-              # make the body a string to be reparsed
-              my $body=join('', @{$_[5][0]} ? $reversedInput : ());
-
-              # reset reverse engineering string buffer
-              $reversedInput='';
-
-              # combine macro and body
-              $macro=~s/__body__/$body/g;
-             }
-
            # finally, pass the constructed text back to the input stream (by stack)
-           stackInput($_[0], split(/(\n)/, $macro));
+           stackInput($_[0], map {$_ eq '__body__' ? dclone($_[5][0]) : split(/(\n)/, $_)} split(/(__body__)/, $macro));
 
            # reset the "end of input reached" flag if necessary
            $readCompletely=0 if $readCompletely;
@@ -3975,29 +4002,29 @@ sub
           }
        }
 	],
-	[#Rule 102
+	[#Rule 103
 		 'optional_tagpars', 0,
 sub
-#line 1849 "ppParser.yp"
+#line 1842 "ppParser.yp"
 {[[], $lineNrs{$inHandle}];}
 	],
-	[#Rule 103
+	[#Rule 104
 		 'optional_tagpars', 1, undef
 	],
-	[#Rule 104
+	[#Rule 105
 		 '@16-1', 0,
 sub
-#line 1855 "ppParser.yp"
+#line 1848 "ppParser.yp"
 {
                  # temporarily activate special "="
                  push(@specialStack, $specials{'='});
                  $specials{'='}=1;
                 }
 	],
-	[#Rule 105
+	[#Rule 106
 		 'used_tagpars', 4,
 sub
-#line 1861 "ppParser.yp"
+#line 1854 "ppParser.yp"
 {
                  #restore special state of "="
                  $specials{'='}=pop(@specialStack);
@@ -4006,13 +4033,13 @@ sub
                  [$_[3][0], $_[4][1]];
                 }
 	],
-	[#Rule 106
+	[#Rule 107
 		 'tagpars', 1, undef
 	],
-	[#Rule 107
+	[#Rule 108
 		 'tagpars', 3,
 sub
-#line 1873 "ppParser.yp"
+#line 1866 "ppParser.yp"
 {
             # update parameter list
             push(@{$_[1][0]}, @{$_[3][0]});
@@ -4021,10 +4048,10 @@ sub
             [$_[1][0], $_[3][1]];
            }
 	],
-	[#Rule 108
+	[#Rule 109
 		 '@17-1', 0,
 sub
-#line 1884 "ppParser.yp"
+#line 1877 "ppParser.yp"
 {
            # temporarily make "=" and quotes the only specials,
            # but take care to reset the remaining settings defined
@@ -4033,10 +4060,10 @@ sub
            @specials{('=', '"')}=(1, 1);
           }
 	],
-	[#Rule 109
+	[#Rule 110
 		 'tagpar', 4,
 sub
-#line 1892 "ppParser.yp"
+#line 1885 "ppParser.yp"
 {
            # restore special settings
            %specials=@{pop(@specialStack)};
@@ -4045,37 +4072,37 @@ sub
            [[$_[1][0], $_[4][0]], $_[4][1]];
           }
 	],
-	[#Rule 110
+	[#Rule 111
 		 'tagvalue', 1, undef
 	],
-	[#Rule 111
+	[#Rule 112
 		 'tagvalue', 3,
 sub
-#line 1903 "ppParser.yp"
+#line 1896 "ppParser.yp"
 {
              # build a string and supply it
              [join('', @{$_[2][0]}), $_[3][1]];
             }
 	],
-	[#Rule 112
+	[#Rule 113
 		 'optional_tagbody', 0,
 sub
-#line 1911 "ppParser.yp"
+#line 1904 "ppParser.yp"
 {[[], $lineNrs{$inHandle}];}
 	],
-	[#Rule 113
+	[#Rule 114
 		 'optional_tagbody', 3,
 sub
-#line 1913 "ppParser.yp"
+#line 1906 "ppParser.yp"
 {
                      # reply the literals
                      [$_[2][0], $_[3][1]];
                     }
 	],
-	[#Rule 114
+	[#Rule 115
 		 '@18-1', 0,
 sub
-#line 1921 "ppParser.yp"
+#line 1914 "ppParser.yp"
 {
           # trace, if necessary
           warn "[Trace] $sourceFile, line $_[1][1]: Table starts.\n" if $flags{trace} & TRACE_PARAGRAPHS;
@@ -4092,10 +4119,10 @@ sub
           $lexerFlags{el}=LEXER_IGNORE;
          }
 	],
-	[#Rule 115
+	[#Rule 116
 		 '@19-3', 0,
 sub
-#line 1937 "ppParser.yp"
+#line 1930 "ppParser.yp"
 {
           # restore previous handling of empty lines
           $lexerFlags{el}=pop(@specialStack);
@@ -4110,10 +4137,10 @@ sub
           unshift(@tableSeparatorStack, exists $tagpars{separator} ? quotemeta($tagpars{separator}) : '\|');
          }
 	],
-	[#Rule 116
+	[#Rule 117
 		 'table', 6,
 sub
-#line 1951 "ppParser.yp"
+#line 1944 "ppParser.yp"
 {
           # reset column separator memory
           shift(@tableSeparatorStack);
@@ -4148,10 +4175,10 @@ sub
           ];
          }
 	],
-	[#Rule 117
+	[#Rule 118
 		 'table_separator', 1,
 sub
-#line 1988 "ppParser.yp"
+#line 1981 "ppParser.yp"
 {
                     # update counter of completed table columns
                     $tableColumns++;
@@ -4171,10 +4198,10 @@ sub
                     ];
                    }
 	],
-	[#Rule 118
+	[#Rule 119
 		 '@20-1', 0,
 sub
-#line 2010 "ppParser.yp"
+#line 2003 "ppParser.yp"
 {
                     # switch to condition mode
                     stateManager(STATE_TABLE);
@@ -4183,19 +4210,19 @@ sub
                     warn "[Trace] $sourceFile, line $_[1][1]: Table paragraph starts.\n" if $flags{trace} & TRACE_PARAGRAPHS;
                    }
 	],
-	[#Rule 119
+	[#Rule 120
 		 '@21-3', 0,
 sub
-#line 2018 "ppParser.yp"
+#line 2011 "ppParser.yp"
 {
                     # store specified column separator
                     unshift(@tableSeparatorStack, quotemeta(join('', @{$_[3][0]})));
                    }
 	],
-	[#Rule 120
+	[#Rule 121
 		 'table_paragraph', 6,
 sub
-#line 2023 "ppParser.yp"
+#line 2016 "ppParser.yp"
 {
                     # back to default mode
                     stateManager(STATE_DEFAULT);
@@ -4258,10 +4285,10 @@ sub
                       }
                    }
 	],
-	[#Rule 121
+	[#Rule 122
 		 '@22-1', 0,
 sub
-#line 2088 "ppParser.yp"
+#line 2081 "ppParser.yp"
 {
              # switch to embedding mode saving the former state
              push(@stateStack, $parserState);
@@ -4279,10 +4306,10 @@ sub
              @specials{('{', '}')}=(1, 1);
             }
 	],
-	[#Rule 122
+	[#Rule 123
 		 '@23-3', 0,
 sub
-#line 2105 "ppParser.yp"
+#line 2098 "ppParser.yp"
 {
              # restore special state of "{" and "}"
              @specials{('{', '}')}=splice(@specialStack, -2, 2);
@@ -4292,10 +4319,10 @@ sub
              warn "[Error ", ++$semErr, "] $sourceFile, line $_[3][1]: You forgot to specify the language of embedded text.\n" unless exists $tagpars{lang};
             }
 	],
-	[#Rule 123
+	[#Rule 124
 		 'embedded', 6,
 sub
-#line 2114 "ppParser.yp"
+#line 2107 "ppParser.yp"
 {
              # restore parser state
              stateManager(pop(@stateStack));
@@ -4331,6 +4358,13 @@ sub
                 # And does the caller want to evaluate the code?
                 if (@{$_[5][0]} and $safeObject)
                   {
+                   # update active contents base data, if necessary
+                   if ($flags{activeBaseData})
+                     {
+                      no strict 'refs';
+                      ${join('::', $safeObject->root, 'PerlPoint')}=dclone($flags{activeBaseData});
+                     }
+
                    # make the code a string and evaluate it
                    my $perl=join('',  @{$_[5][0]});
                    warn "[Trace] $sourceFile, line $_[6][1]: Evaluating this code:\n\n$perl\n\n\n" if $flags{trace} & TRACE_ACTIVE;
@@ -4369,7 +4403,7 @@ sub
                }
             }
 	],
-	[#Rule 124
+	[#Rule 125
 		 '@24-1', 0,
 sub
 #line 2190 "ppParser.yp"
@@ -4388,7 +4422,7 @@ sub
              @specials{('{', '}')}=(1, 1);
             }
 	],
-	[#Rule 125
+	[#Rule 126
 		 'included', 3,
 sub
 #line 2205 "ppParser.yp"
@@ -4454,6 +4488,13 @@ sub
                       # Does the caller want to evaluate code?
                       if ($safeObject)
                         {
+                         # update active contents base data, if necessary
+                         if ($flags{activeBaseData})
+                           {
+                            no strict 'refs';
+                            ${join('::', $safeObject->root, 'PerlPoint')}=dclone($flags{activeBaseData});
+                           }
+
                          # evaluate the source code (for an unknown reason, we have to precede the constant by "&" here to work)
                          warn "[Info] Evaluating included Perl code.\n" unless $flags{display} & &DISPLAY_NOINFO;
                          my $result=$safeObject->rdo($tagpars{file});
@@ -4513,10 +4554,10 @@ sub
                }
             }
 	],
-	[#Rule 126
+	[#Rule 127
 		 '@25-1', 0,
 sub
-#line 2330 "ppParser.yp"
+#line 2337 "ppParser.yp"
 {
                      # switch to definition mode
                      stateManager(STATE_DEFINITION);
@@ -4525,19 +4566,19 @@ sub
                      warn "[Trace] $sourceFile, line $_[1][1]: Macro definition starts.\n" if $flags{trace} & TRACE_PARAGRAPHS;
                     }
 	],
-	[#Rule 127
+	[#Rule 128
 		 '@26-4', 0,
 sub
-#line 2338 "ppParser.yp"
+#line 2345 "ppParser.yp"
 {
                      # disable all specials to get the body as a plain text
                      @specials{keys %specials}=(0) x scalar(keys %specials);
                     }
 	],
-	[#Rule 128
+	[#Rule 129
 		 'alias_definition', 6,
 sub
-#line 2343 "ppParser.yp"
+#line 2350 "ppParser.yp"
 {
                      # "text" already switched back to default mode (and disabled specials [{}:])
 
@@ -4592,7 +4633,7 @@ sub
     bless($self,$class);
 }
 
-#line 2395 "ppParser.yp"
+#line 2402 "ppParser.yp"
 
 
 
@@ -4612,12 +4653,32 @@ sub stackInput
   # without Ils confusion)
   push(@lines, (defined $parser->YYData->{INPUT} and $parser->YYData->{INPUT}) ? $parser->YYData->{INPUT} : ());
 
-  # lines are expected to be generated by split(/(\n)/, ...) - recombine them
-  # to place the newlines where they belong to (take care in loop counting - array size changes while looping!
-  # - predeclare loop limit with original array size)
-  my $lineNr=@lines;
-  for (my $i=0; $i<$lineNr; $i+=2)
-    {push(@waiting, join('', splice(@lines, 0, 2)));}
+  # combine line parts to lines completed by a trailing newline
+  # (additionally, take that there might be mixed references which have to be stored unchanged)
+  {
+   my $lineBuffer='';
+   foreach my $line (@lines)
+     {
+      if (ref($line))
+        {
+         # push collected string and current reference
+         push(@waiting, $lineBuffer, $line);
+
+         # reset line buffer
+         $lineBuffer='';
+
+         # next turn
+         next;
+        }
+
+      # compose a string ...
+      $lineBuffer.=$line;
+
+      # ... until a newline was found
+      push(@waiting, $lineBuffer), $lineBuffer='' if $line eq "\n";
+     }
+   push(@waiting, $lineBuffer) if $lineBuffer;
+  }
 
   # get next line to read
   my $newInputLine=shift(@waiting);
@@ -4690,6 +4751,14 @@ sub lexer
              # switch back to envelopes input stack
              shift(@inputStack);
             }
+         }
+
+       # if this line was get from stack and is a reference, we got an already prepared stream part
+       if ($lineFromStack and ref($parser->YYData->{INPUT}))
+         {
+          my $streamedPart=$parser->YYData->{INPUT};
+          $parser->YYData->{INPUT}='';
+          return('StreamedPart', [$streamedPart, $lineNrs{$inHandle}]);
          }
      
        # update line counter
@@ -5278,6 +5347,42 @@ All parameters except of the I<object> parameter are named (pass them by hash).
 
 =over 4
 
+=item activeBaseData
+
+This optional parameter allows to pass common data to all active contents
+(conditions, embedded and included Perl) by a I<hash reference>. By convention,
+a translator at least passes the target language and user settings by
+
+  activeBaseData => {
+                     targetLanguage => "lang",
+                     userSettings   => \%userSettings,
+                    },
+
+User settings are intended to allow the specification of per call settings by a
+user, e.g. to include special parts. By using this convention, users can easily
+specify such a part the following way
+
+  ? $PerlPoint->{userSettings}{setting}
+
+  Special part.
+
+  ? 1
+
+It is up to a translator author to declare translator specific settings (and to
+document them). The passed values can be as complex as necessary as long as it
+can be duplicated by C<Storable::dclone()>.
+
+Whenever active contents is invoked, the passed hash reference is copied 
+(duplicated by C<Storable::dclone()>) into the Safe objects namespace
+(see I<safe>) as a global variable $PerlPoint. This way, modifications by
+invoked code do not effect subsequently called code snippets, base data are
+always fresh.
+
+=item activeDataInit
+
+Reserved to pass hook functions to be called preparing every active contents
+invokation. I<The hook is still unimplemented.>
+
 =item cache
 
 This optional parameter controls source file paragraph caching.
@@ -5565,6 +5670,8 @@ sub run
   confess "[BUG] Missing file list reference parameter.\n" unless $pars{files};
   confess "[BUG] File list reference parameter is no array reference.\n" unless ref $pars{files} and ref $pars{files} eq 'ARRAY';
   confess "[BUG] You should pass at least one file to parse.\n" unless @{$pars{files}};
+  confess "[BUG] Active base data reference is no hash reference.\n" if exists $pars{activeBaseData} and ref $pars{activeBaseData} ne 'HASH';
+  confess "[BUG] Active data initializer is no code reference.\n" if exists $pars{activeDataInit} and ref $pars{activeDataInit} ne 'CODE';
   if (exists $pars{filter})
     {
      eval "'lang'=~/$pars{filter}/";
@@ -5586,17 +5693,21 @@ sub run
    $flags{cache},            #  8
    $flags{cached},           #  9
    $flags{vis},              # 10
+   $flags{activeBaseData},   # 11
+   $flags{activeDataInit},   # 12
   )=(
-     $pars{tags},                                                             #  1
-     $pars{stream},                                                           #  2
-     (exists $pars{safe} and ref($pars{safe}) eq 'Safe') ? $pars{safe} : 0,   #  3
-     exists $pars{trace} ? $pars{trace} : TRACE_NOTHING,                      #  4
-     exists $pars{display} ? $pars{display} : DISPLAY_ALL,                    #  5
-     exists $pars{filter} ? $pars{filter} : '',                               #  6
-     (exists $pars{linehints} and $pars{linehints}),                          #  7
-     exists $pars{cache} ? $pars{cache} : CACHE_OFF,                          #  8
-     0,                                                                       #  9
-     exists $pars{vispro} ? $pars{vispro} : 0,                                # 10
+     $pars{tags},                                                                #  1
+     $pars{stream},                                                              #  2
+     (exists $pars{safe} and ref($pars{safe}) eq 'Safe') ? $pars{safe} : 0,      #  3
+     exists $pars{trace} ? $pars{trace} : TRACE_NOTHING,                         #  4
+     exists $pars{display} ? $pars{display} : DISPLAY_ALL,                       #  5
+     exists $pars{filter} ? $pars{filter} : '',                                  #  6
+     (exists $pars{linehints} and $pars{linehints}),                             #  7
+     exists $pars{cache} ? $pars{cache} : CACHE_OFF,                             #  8
+     0,                                                                          #  9
+     exists $pars{vispro} ? $pars{vispro} : 0,                                   # 10
+     exists $pars{activeBaseData} ? fields::phash(%{$pars{activeBaseData}}) : 0, # 11
+     exists $pars{activeDataInit} ? $pars{activeDataInit} : 0,                   # 12
     );
 
   # init more
@@ -5763,39 +5874,6 @@ sub updateChecksums
      # note that something new was cached
      $flags{cached}=1;
     }
- }
-
-# reverse engineering handler: unexpected item
-sub reverseUnexpected
- {
-  # get parameters
-  my ($opcode, $mode)=@_;
-
-  # display a message
-  warn "[Warn] Unexpected stream item $opcode / $mode in reverse engineering component.\n";
- }
-
-
-# reverse simple token
-sub reverseSimple
- {
-  # get parameters
-  my ($opcode, $mode, @contents)=@_;
-
-  # just reply what you got
-  $reversedInput.=join('', @contents);
- }
-
-
-# reverse a tag
-sub reverseTag
- {
-  # get parameters
-  my ($opcode, $mode, $tag, $settings)=@_;
-
-  # act mode dependend (wrote "\\" not '\' for emacs parantheses match)
-  $reversedInput.=join('', "\\", $tag, %$settings ? join('', '{', join(' ', (map {"$_=\"$settings->{$_}\""} keys %$settings)), '}') : '', '<') if $mode==DIRECTIVE_START;
-  $reversedInput.='>' if $mode==DIRECTIVE_COMPLETE;
  }
 
 

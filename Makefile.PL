@@ -14,7 +14,7 @@ require 5.00503;
 # write makefile
 $ok=WriteMakefile(
                   NAME         => 'PerlPoint',
-                  VERSION      => '0.28',
+                  VERSION      => '0.29',
                   PREREQ_PM    => {
 		                   Digest::SHA1 => 1,
                                    IO::File     => 1,

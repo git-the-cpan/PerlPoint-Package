@@ -14,6 +14,20 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.29    |21.12.2000| JSTENZEL | direct setting of $VERSION variable to enable CPAN to
+#         |          |          | detect and display the parser module version;
+#         |          | JSTENZEL | introduced base settings for active contents provided
+#         |          |          | in %$PerlPoint - a new common way to pass things like
+#         |          |          | the current target language;
+#         |27.12.2000| JSTENZEL | closing angle brackets are to be guarded only *once*
+#         |          |          | now - in former versions each macro level added the need
+#         |          |          | of yet another backslash;
+#         |28.12.2000| JSTENZEL | macro bodies are no longer reparsed which accelerates
+#         |          |          | procesing of nested macros drastically (and avoids the
+#         |          |          | overhead and dangers of rebuilding a source string and
+#         |          |          | parsing it again - this way, parsing becomes easier to
+#         |          |          | maintain in case of syntax extensions (nevertheless, the
+#         |          |          | old code worked well!);
 # 0.28    |14.12.2000| JSTENZEL | made it finally backward compatible to perl 5.005 again;
 # 0.27    |07.12.2000| JSTENZEL | moved package namespace from "PP" to "PerlPoint";
 # 0.26    |30.11.2000| JSTENZEL | "Perl Point" => "PerlPoint";
@@ -132,7 +146,7 @@ B<PerlPoint::Parser> - a PerlPoint Parser
 
 =head1 VERSION
 
-This manual describes version B<0.28>.
+This manual describes version B<0.29>.
 
 =head1 SYNOPSIS
 
@@ -374,14 +388,21 @@ is evaluated as Perl code. The (boolean) evaluation result then determines if
 subsequent PerlPoint is read and parsed. If the result is false, all subsequent
 paragraphs until the next condition are I<skipped>.
 
-This feature can be used to maintain various language versions of a presentation
+Note that base data is made available by a hash global (package) hash reference
+$PerlPoint. See I<run()> for details about how to set these data up.
+
+Conditions can be used to maintain various language versions of a presentation
 in one source file:
 
-  ? $language eq 'German'
+  ? $PerlPoint->{targetLanguage} eq 'German'
 
 Or you could enable parts of your document by date:
 
   ? time>$dateOfTalk
+
+or by a special setting:
+
+  ? $PerlPoint->{userSettings}{setting}
 
 Please note that the condition code shares its variables with embedded and included
 code.
@@ -405,7 +426,8 @@ values (if declared).
   This variable is called $var.
 
 All variables are made available to embedded and included Perl code as well as to
-conditions and can be accessed there as package variables of "main::". Because a
+conditions and can be accessed there as package variables of "main::" (or whatever
+package name the Safe object is set up to). Because a
 variable is already replaced by the parser if possible, you have to use the fully
 qualified name or to guard the variables "$" prefix character to do so:
 
@@ -768,17 +790,17 @@ B<Example:>
  require 5.00503;
 
  # declare module version
- {
-  no strict 'refs';
-  ${join('::', __PACKAGE__, 'VERSION')}=0.28;
-  ${join('::', __PACKAGE__, 'VERSION')}=${join('::', __PACKAGE__, 'VERSION')}; # to suppress a warning of exclusive usage only;
- }
+ $PerlPoint::Parser::VERSION=0.29;
+ $PerlPoint::Parser::VERSION=$PerlPoint::Parser::VERSION; # to suppress a warning of exclusive usage only;
+
+ # pragmata
+ use strict;
+ use fields;
 
  # load modules
  use Cwd;
  use Carp;
  use IO::File;
- use PerlPoint::Backend;
  use File::Basename;
  use PerlPoint::Constants 0.09;
  use Digest::SHA1 qw(sha1_base64);
@@ -833,32 +855,6 @@ B<Example:>
                      DIRECTIVE_OPOINT,
                     }=();
 
- # build a reverse engineering backend
- my $reversedInput='';
- my $reverseStream=new PerlPoint::Backend(
-                                          name    => 'reverse engineering',
-                                          trace   => TRACE_NOTHING,
-                                          display => DISPLAY_NOINFO,
-                                         );
-
- # register a complete set of backend handlers (please note that the usage of the "&" prefix
- # before the tag constants is essentiell to make them usabel later - I do not know if this
- # is a bug of perl 5.6 or anything else but it looks really buggy)
- $reverseStream->register(&DIRECTIVE_BLOCK, \&reverseUnexpected);
- $reverseStream->register(&DIRECTIVE_COMMENT, \&reverseUnexpected);
- $reverseStream->register(&DIRECTIVE_DOCUMENT, \&reverseUnexpected);
- $reverseStream->register(&DIRECTIVE_DPOINT, \&reverseUnexpected);
- $reverseStream->register(&DIRECTIVE_HEADLINE, \&reverseUnexpected);
- $reverseStream->register(&DIRECTIVE_LIST_LSHIFT, \&reverseUnexpected);
- $reverseStream->register(&DIRECTIVE_LIST_RSHIFT, \&reverseUnexpected);
- $reverseStream->register(&DIRECTIVE_OPOINT, \&reverseUnexpected);
- $reverseStream->register(&DIRECTIVE_TAG, \&reverseTag);
- $reverseStream->register(&DIRECTIVE_TEXT, \&reverseUnexpected);
- $reverseStream->register(&DIRECTIVE_UPOINT, \&reverseUnexpected);
- $reverseStream->register(&DIRECTIVE_VERBATIM, \&reverseUnexpected);
- $reverseStream->register(&DIRECTIVE_SIMPLE, \&reverseSimple);
-
-
 %}
 
 # declare tokens (not necessary for Parse::Yapp, but helpful for the reader)
@@ -876,6 +872,7 @@ B<Example:>
 %token Include
 %token Heredoc_open
 %token Heredoc_close
+%token StreamedPart
 
 %expect 18
 
@@ -1038,7 +1035,14 @@ condition : '?'
                    # trace, if necessary
                    warn "[Trace] Evaluating condition ...\n" if $flags{trace} & TRACE_SEMANTIC;
 
-                   # make it a string and evaluate it
+                   # update active contents base data, if necessary
+                   if ($flags{activeBaseData})
+                     {
+                      no strict 'refs';
+                      ${join('::', $safeObject->root, 'PerlPoint')}=dclone($flags{activeBaseData});
+                     }
+
+                   # make the Perl code a string and evaluate it
                    my $perl=join('',  @{$_[3][0]});
                    $safeObject->reval('$^W=0');
                    warn "[Trace] $sourceFile, line $_[6][1]: Evaluating condition code:\n\n$perl\n\n\n" if $flags{trace} & TRACE_ACTIVE;
@@ -1722,6 +1726,12 @@ element : Word
             # start a new token list and reply it
             [[exists $variables{$_[1][0]} ? $variables{$_[1][0]} : join('', '$', "{$_[1][0]}")], $_[1][1]];
            }
+        | StreamedPart
+           {
+            # start a new token list and reply it
+            # (the passed stream is already a reference)
+            [$_[1][0], $_[1][1]];
+           }
         | tag
         | embedded
         | included
@@ -1815,25 +1825,8 @@ tag : Tag_name
               $macro=~s/__${par}__/$value/g;
              }
 
-           # add the body, if necessary
-           if ($macro=~/__body__/)
-             {
-
-              # reverse engineer the body stream
-              $reverseStream->run($_[5][0]);
-
-              # make the body a string to be reparsed
-              my $body=join('', @{$_[5][0]} ? $reversedInput : ());
-
-              # reset reverse engineering string buffer
-              $reversedInput='';
-
-              # combine macro and body
-              $macro=~s/__body__/$body/g;
-             }
-
            # finally, pass the constructed text back to the input stream (by stack)
-           stackInput($_[0], split(/(\n)/, $macro));
+           stackInput($_[0], map {$_ eq '__body__' ? dclone($_[5][0]) : split(/(\n)/, $_)} split(/(__body__)/, $macro));
 
            # reset the "end of input reached" flag if necessary
            $readCompletely=0 if $readCompletely;
@@ -2146,6 +2139,13 @@ embedded : Embed
                 # And does the caller want to evaluate the code?
                 if (@{$_[5][0]} and $safeObject)
                   {
+                   # update active contents base data, if necessary
+                   if ($flags{activeBaseData})
+                     {
+                      no strict 'refs';
+                      ${join('::', $safeObject->root, 'PerlPoint')}=dclone($flags{activeBaseData});
+                     }
+
                    # make the code a string and evaluate it
                    my $perl=join('',  @{$_[5][0]});
                    warn "[Trace] $sourceFile, line $_[6][1]: Evaluating this code:\n\n$perl\n\n\n" if $flags{trace} & TRACE_ACTIVE;
@@ -2264,6 +2264,13 @@ included : Include
                       # Does the caller want to evaluate code?
                       if ($safeObject)
                         {
+                         # update active contents base data, if necessary
+                         if ($flags{activeBaseData})
+                           {
+                            no strict 'refs';
+                            ${join('::', $safeObject->root, 'PerlPoint')}=dclone($flags{activeBaseData});
+                           }
+
                          # evaluate the source code (for an unknown reason, we have to precede the constant by "&" here to work)
                          warn "[Info] Evaluating included Perl code.\n" unless $flags{display} & &DISPLAY_NOINFO;
                          my $result=$safeObject->rdo($tagpars{file});
@@ -2411,12 +2418,32 @@ sub stackInput
   # without Ils confusion)
   push(@lines, (defined $parser->YYData->{INPUT} and $parser->YYData->{INPUT}) ? $parser->YYData->{INPUT} : ());
 
-  # lines are expected to be generated by split(/(\n)/, ...) - recombine them
-  # to place the newlines where they belong to (take care in loop counting - array size changes while looping!
-  # - predeclare loop limit with original array size)
-  my $lineNr=@lines;
-  for (my $i=0; $i<$lineNr; $i+=2)
-    {push(@waiting, join('', splice(@lines, 0, 2)));}
+  # combine line parts to lines completed by a trailing newline
+  # (additionally, take that there might be mixed references which have to be stored unchanged)
+  {
+   my $lineBuffer='';
+   foreach my $line (@lines)
+     {
+      if (ref($line))
+        {
+         # push collected string and current reference
+         push(@waiting, $lineBuffer, $line);
+
+         # reset line buffer
+         $lineBuffer='';
+
+         # next turn
+         next;
+        }
+
+      # compose a string ...
+      $lineBuffer.=$line;
+
+      # ... until a newline was found
+      push(@waiting, $lineBuffer), $lineBuffer='' if $line eq "\n";
+     }
+   push(@waiting, $lineBuffer) if $lineBuffer;
+  }
 
   # get next line to read
   my $newInputLine=shift(@waiting);
@@ -2489,6 +2516,14 @@ sub lexer
              # switch back to envelopes input stack
              shift(@inputStack);
             }
+         }
+
+       # if this line was get from stack and is a reference, we got an already prepared stream part
+       if ($lineFromStack and ref($parser->YYData->{INPUT}))
+         {
+          my $streamedPart=$parser->YYData->{INPUT};
+          $parser->YYData->{INPUT}='';
+          return('StreamedPart', [$streamedPart, $lineNrs{$inHandle}]);
          }
      
        # update line counter
@@ -3077,6 +3112,42 @@ All parameters except of the I<object> parameter are named (pass them by hash).
 
 =over 4
 
+=item activeBaseData
+
+This optional parameter allows to pass common data to all active contents
+(conditions, embedded and included Perl) by a I<hash reference>. By convention,
+a translator at least passes the target language and user settings by
+
+  activeBaseData => {
+                     targetLanguage => "lang",
+                     userSettings   => \%userSettings,
+                    },
+
+User settings are intended to allow the specification of per call settings by a
+user, e.g. to include special parts. By using this convention, users can easily
+specify such a part the following way
+
+  ? $PerlPoint->{userSettings}{setting}
+
+  Special part.
+
+  ? 1
+
+It is up to a translator author to declare translator specific settings (and to
+document them). The passed values can be as complex as necessary as long as it
+can be duplicated by C<Storable::dclone()>.
+
+Whenever active contents is invoked, the passed hash reference is copied 
+(duplicated by C<Storable::dclone()>) into the Safe objects namespace
+(see I<safe>) as a global variable $PerlPoint. This way, modifications by
+invoked code do not effect subsequently called code snippets, base data are
+always fresh.
+
+=item activeDataInit
+
+Reserved to pass hook functions to be called preparing every active contents
+invokation. I<The hook is still unimplemented.>
+
 =item cache
 
 This optional parameter controls source file paragraph caching.
@@ -3364,6 +3435,8 @@ sub run
   confess "[BUG] Missing file list reference parameter.\n" unless $pars{files};
   confess "[BUG] File list reference parameter is no array reference.\n" unless ref $pars{files} and ref $pars{files} eq 'ARRAY';
   confess "[BUG] You should pass at least one file to parse.\n" unless @{$pars{files}};
+  confess "[BUG] Active base data reference is no hash reference.\n" if exists $pars{activeBaseData} and ref $pars{activeBaseData} ne 'HASH';
+  confess "[BUG] Active data initializer is no code reference.\n" if exists $pars{activeDataInit} and ref $pars{activeDataInit} ne 'CODE';
   if (exists $pars{filter})
     {
      eval "'lang'=~/$pars{filter}/";
@@ -3385,17 +3458,21 @@ sub run
    $flags{cache},            #  8
    $flags{cached},           #  9
    $flags{vis},              # 10
+   $flags{activeBaseData},   # 11
+   $flags{activeDataInit},   # 12
   )=(
-     $pars{tags},                                                             #  1
-     $pars{stream},                                                           #  2
-     (exists $pars{safe} and ref($pars{safe}) eq 'Safe') ? $pars{safe} : 0,   #  3
-     exists $pars{trace} ? $pars{trace} : TRACE_NOTHING,                      #  4
-     exists $pars{display} ? $pars{display} : DISPLAY_ALL,                    #  5
-     exists $pars{filter} ? $pars{filter} : '',                               #  6
-     (exists $pars{linehints} and $pars{linehints}),                          #  7
-     exists $pars{cache} ? $pars{cache} : CACHE_OFF,                          #  8
-     0,                                                                       #  9
-     exists $pars{vispro} ? $pars{vispro} : 0,                                # 10
+     $pars{tags},                                                                #  1
+     $pars{stream},                                                              #  2
+     (exists $pars{safe} and ref($pars{safe}) eq 'Safe') ? $pars{safe} : 0,      #  3
+     exists $pars{trace} ? $pars{trace} : TRACE_NOTHING,                         #  4
+     exists $pars{display} ? $pars{display} : DISPLAY_ALL,                       #  5
+     exists $pars{filter} ? $pars{filter} : '',                                  #  6
+     (exists $pars{linehints} and $pars{linehints}),                             #  7
+     exists $pars{cache} ? $pars{cache} : CACHE_OFF,                             #  8
+     0,                                                                          #  9
+     exists $pars{vispro} ? $pars{vispro} : 0,                                   # 10
+     exists $pars{activeBaseData} ? fields::phash(%{$pars{activeBaseData}}) : 0, # 11
+     exists $pars{activeDataInit} ? $pars{activeDataInit} : 0,                   # 12
     );
 
   # init more
@@ -3562,39 +3639,6 @@ sub updateChecksums
      # note that something new was cached
      $flags{cached}=1;
     }
- }
-
-# reverse engineering handler: unexpected item
-sub reverseUnexpected
- {
-  # get parameters
-  my ($opcode, $mode)=@_;
-
-  # display a message
-  warn "[Warn] Unexpected stream item $opcode / $mode in reverse engineering component.\n";
- }
-
-
-# reverse simple token
-sub reverseSimple
- {
-  # get parameters
-  my ($opcode, $mode, @contents)=@_;
-
-  # just reply what you got
-  $reversedInput.=join('', @contents);
- }
-
-
-# reverse a tag
-sub reverseTag
- {
-  # get parameters
-  my ($opcode, $mode, $tag, $settings)=@_;
-
-  # act mode dependend (wrote "\\" not '\' for emacs parantheses match)
-  $reversedInput.=join('', "\\", $tag, %$settings ? join('', '{', join(' ', (map {"$_=\"$settings->{$_}\""} keys %$settings)), '}') : '', '<') if $mode==DIRECTIVE_START;
-  $reversedInput.='>' if $mode==DIRECTIVE_COMPLETE;
  }
 
 
