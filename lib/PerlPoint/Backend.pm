@@ -5,6 +5,7 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.12    |04.02.2003| JSTENZEL | new method headlineIds2Data();
 # 0.11    |08.03.2002| JSTENZEL | new method docstreams();
 # 0.10    |14.08.2001| JSTENZEL | adapted to new stream data format, introduced modes;
 #         |          | JSTENZEL | slight POD fixes;
@@ -49,7 +50,7 @@ B<PerlPoint::Backend> - frame class to transform PerlPoint::Parser output
 
 =head1 VERSION
 
-This manual describes version B<0.11>.
+This manual describes version B<0.12>.
 
 =head1 SYNOPSIS
 
@@ -154,7 +155,7 @@ features as it is necessary to build the converter you want!
 package PerlPoint::Backend;
 
 # declare version
-$VERSION=$VERSION="0.11";
+$VERSION=$VERSION="0.12";
 
 # pragmata
 use strict;
@@ -178,6 +179,7 @@ use fields qw(
 
 # load modules
 use Carp;
+use Storable qw(dclone);
 use PerlPoint::Constants 0.15 qw(:DEFAULT :stream);
 
 
@@ -1068,6 +1070,66 @@ sub headlineNr
 
 =pod
 
+=head2 headlineIds2Data()
+
+
+B<Parameters:>
+
+=over 4
+
+=item object
+
+An object as built by I<new()>.
+
+=item list of headline ids
+
+A list of ids. An id is an I<absolute> headline number, starting with 1.
+
+=back
+
+B<Returns:>
+
+The number of headlines in the stream if a stream is associated, an undefined value otherwise.
+
+B<Example:>
+
+  $backend->headlineNr;
+
+=cut
+sub headlineIds2Data
+ {
+  # get parameters
+  my ($me, $ids)=@_;
+
+  # and check them
+  confess "[BUG] Missing object parameter.\n" unless $me;
+  confess "[BUG] Object parameter is no ", __PACKAGE__, " object.\n" unless ref $me and ref $me eq __PACKAGE__;
+  confess "[BUG] Missing headline id parameter.\n" unless $ids;
+  confess "[BUG] Headline id parameter is no array reference.\n" unless ref $ids and ref $ids eq 'ARRAY';
+
+  # data already provided?
+  confess "[BUG] Please use bind() first to associate data.\n" unless defined $me->{data};
+
+  # declare variables
+  my (@results);
+
+  # handle all ids
+  foreach my $id (@$ids)
+    {
+     # check id
+     confess qq([BUG] Invalid id "$id".\n) unless $id=~/^\d+$/ and $id>0 and $id<=@{$me->{data}[STREAM_HEADLINES]};
+
+     # get data
+     push(@results, $me->{data}[STREAM_TOKENS][$me->{data}[STREAM_HEADLINES][$id-1]]);
+    }
+
+  # supply results
+  \@results;
+ }
+
+
+=pod
+
 =head2 currentChapterNr()
 
 Replies the number of the currently processed chapter - in the stream associated with the object.
@@ -1227,14 +1289,14 @@ sub toc
                       # get parameters
                       my ($opcode, $mode, @contents)=@_;
 
-                      # update headline string (use of .= operator avoids warnins)
+                      # update headline string (use of .= operator avoids warnings)
                       $results->[$c][1].=join('', @contents)
                      }
                    );
 
   # switch helper object into headline mode, move behind the startup
   # headline and run it (it will stop automatically when it will have
-  # handled all subchapters)
+  # been handled all subchapters)
   $helper->bind($me->{data});
   $helper->mode(STREAM_HEADLINES);
   $helper->move2chapter($start+1);

@@ -297,7 +297,7 @@ So based on your option and body declarations, the parser controls how it checks
          ...
         );
 
-Whenever the parser detects an occurence of the defined tag, it will invoke the hook function and pass the source line number, a reference to a hash of option name / value pairs to check, a refernce to an array of body elements, and an anchor collection object. Using the \I<option hash> reference, the hook can read \I<and modify> the options. Different to this, the \I<body array> is \I<a copy> of the body part of the stream. Therefore the hook cannot modify the body part. (The parser depends on the body stream structure, and modifications could damage the streams integrity.)
+Whenever the parser detects an occurence of the defined tag, it will invoke the hook function and pass the source line number, a reference to a hash of option name / value pairs to check, a reference to an array of body elements, and an anchor collection object. Using the \I<option hash> reference, the hook can read \I<and modify> the options. Different to this, the \I<body array> is \I<a copy> of the body part of the stream. Therefore the hook cannot modify the body part. (The parser depends on the body stream structure, and modifications could damage the streams integrity.)
 
 
 \B<Example>
@@ -454,7 +454,7 @@ These hooks are defined via the \C<finish> key. Here's an example from an implem
 
 This hook \RED<uses the anchor collection> to verify several passed links. If everything is ok, it extracts the value of the finally chosen anchor and stores it in an internal "option" slot (remember the \REF{name="Tag option conventions" type=linked}<tag option conventions>). To do so, \BLUE<it modifies the tag options>.
 
-The \MAGENTA<interface> is quite similar to parsing hooks, except for data that cannot be provided after parsing, like source line number or the body contents. So a post-parsing hook receives the options hash (which it can modify as is wishes) and the anchor collection object and should return one of the follwing values:
+The \MAGENTA<interface> is quite similar to parsing hooks, except for data that cannot be provided after parsing, like source line number or the body contents. So a post-parsing hook receives the options hash (which it can modify as it wishes) and the anchor collection object and should return one of the follwing values:
 
 @|
 return code            | description

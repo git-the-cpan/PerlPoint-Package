@@ -1,4 +1,4 @@
-#!/usr/local/perl5.6/bin/perl -w
+#!/usr/local/bin/perl -w
 
 # = HISTORY SECTION =====================================================================
 
@@ -18,6 +18,7 @@
 #         |        |          | need (and cause warnings then);
 #         |02.01.03| JSTENZEL | more common trace option translation;
 #         |        | JSTENZEL | added TRACE_TMPFILES recognition;
+#         |10.04.03| JSTENZEL | bugfix: tables were not printed;
 # 0.10    |up to   | JSTENZEL | bugfix: \SEQ did not set an anchor when necessary;
 #         |14.04.02| JSTENZEL | avoiding backslash prefixing of paragraphs starting
 #         |        |          | with SDF tags unspecified yet: resulting from PerlPoint
@@ -746,6 +747,7 @@ use Getopt::ArgvFile qw(argvFile);
 
 # declare variables
 my (
+    $table,                     # a table buffer
     $htmlBuffer,                # intermediate buffer for embedded HTML;
 
     @streamData,                # PerlPoint stream;
@@ -757,11 +759,12 @@ my (
 
     %flags,
     %options,                   # option hash;
-    %table,                     # a table buffer
     %tagHash,                   # accepted PerlPoint tags;
     %formatting,                # formatting configurations;
     %docstreamdata,             # data used to handle document streams;
-   );
+   )=(
+      {},			# table buffer init value
+     );
 
 # precompile a pattern describing accepted SDF paragraph style markers
 my $paragraphStyles=qr(^(Note|Sign)$);
@@ -1134,19 +1137,23 @@ sub handleTag
      if ($mode==DIRECTIVE_START)
        {
         # start a new table (in memory)
-        %table=();
+        $table={};
        }
      else
        {
         # get the greatest number of columns
         my $rowNr=0;
-        $rowNr>=@$_ or $rowNr=@$_ for (@{$table{rows}});
+        $rowNr>=@$_ or $rowNr=@$_ for (@{$table->{rows}});
+
+        # clean up global table buffer, use a local copy fro completion
+        my $tableBuffer=$table;
+	$table={};
 
         # open table
         present("\n\n!block table; noheadings\n");
         present(join(';', map {"c$_";} (1..$rowNr)), "\n");
 
-        foreach my $row (@{$table{rows}})
+        foreach my $row (@{$tableBuffer->{rows}})
           {
            present(join(';', map {
                                   # remove laeding and trailing whitespaces
@@ -1165,9 +1172,6 @@ sub handleTag
 
         # close table
         present("\n!endblock\n\n");
-
-        # clean up
-        %table=();
        }
 
      # ok, well done
@@ -1176,7 +1180,7 @@ sub handleTag
   elsif ($tag eq 'TABLE_ROW')
     {
      # act mode dependend
-     push(@{$table{rows}}, []) if $mode==DIRECTIVE_START;
+     push(@{$table->{rows}}, []) if $mode==DIRECTIVE_START;
 
      # ok, well done
      return(1);
@@ -1184,7 +1188,7 @@ sub handleTag
   elsif ($tag eq 'TABLE_COL')
     {
      # act mode dependend
-     push(@{$table{rows}[-1]}, '') if $mode==DIRECTIVE_START;
+     push(@{$table->{rows}[-1]}, '') if $mode==DIRECTIVE_START;
 
      # ok, well done
      return(1);
@@ -1192,8 +1196,8 @@ sub handleTag
   elsif ($tag eq 'TABLE_HL')
     {
      # act mode dependend
-     push(@{$table{rows}[-1]}, '{{B:') if $mode==DIRECTIVE_START;
-     $table{rows}[-1][-1].='}}'        if $mode==DIRECTIVE_COMPLETE;
+     push(@{$table->{rows}[-1]}, '{{B:') if $mode==DIRECTIVE_START;
+     $table->{rows}[-1][-1].='}}'        if $mode==DIRECTIVE_COMPLETE;
 
      # ok, well done
      return(1);
@@ -1583,8 +1587,8 @@ sub present
   # present result
   if ($flags{html}==1)
     {$htmlBuffer.=$string;}
-  elsif (%table)
-    {$table{rows}[-1][-1].=$string;}
+  elsif (%$table)
+    {$table->{rows}[-1][-1].=$string;}
   else
     {
      # active docstream?
@@ -1611,3 +1615,4 @@ sub present
     }
  }
   
+

@@ -58,8 +58,8 @@ $parser->run(
 
 # build a backend
 my $backend=new PerlPoint::Backend(
-                                   name    =>'installation test: variables',
-                                   trace   =>TRACE_NOTHING,
+                                   name    => 'installation test: variables 2',
+                                   trace   => TRACE_NOTHING,
                                    display => DISPLAY_NOINFO,
                                   );
 

@@ -124,6 +124,9 @@ t/include2.perl
 t/includelib/searchMeInPath.pp
 t/includelib2/searchMeInPath2.pp
 
+t/index.t
+t/index.pp
+
 t/linehints.t
 t/linehints.pp
 
@@ -152,7 +155,9 @@ t/text.pp
 
 t/variables1.t
 t/variables2.t
+t/variables3.t
 t/variables.pp
+t/variables3.pp
 
 t/verbatim.t
 t/verbatim.pp

@@ -45,6 +45,12 @@ If you are using CPAN.pm or CPANPLUS, try to
 install Bundle::PerlPoint to get all PerlPoint
 related packages at once.
 
+Note: To make use of new features with pp2html,
+      you need PerlPoint::Package > 1.01. Till
+      this is available, use the patched version
+      of pp2html that is provided on our
+      SourceForge project site.
+
 
 DOCUMENTATION
 
@@ -129,7 +135,7 @@ came up there and are still making their way into the software.
 
 AUTHOR
 
-Copyright (c) Jochen Stenzel (perl@jochen-stenzel.de), 1999-2002.
+Copyright (c) Jochen Stenzel (perl@jochen-stenzel.de), 1999-2004.
 All rights reserved.
 
 This module is free software, you can redistribute it and/or modify it

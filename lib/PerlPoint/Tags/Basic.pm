@@ -5,6 +5,10 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.03    |26.01.2003| JSTENZEL | X is a basic tag now;
+#         |          | JSTENZEL | new index related tags INDEX and INDEXRELATIONS;
+#         |02.02.2003| JSTENZEL | X is now checking if it is the innermost tag/macro;
+#         |26.04.2003| JSTENZEL | documented new tags;
 # 0.02    |02.10.2001| JSTENZEL | added LOCALTOC;
 #         |11.10.2001| JSTENZEL | added SEQ;
 #         |12.10.2001| JSTENZEL | added REF;
@@ -24,7 +28,7 @@ B<PerlPoint::Tags::Basic> - declares basic PerlPoint tags
 
 =head1 VERSION
 
-This manual describes version B<0.02>.
+This manual describes version B<0.03>.
 
 =head1 SYNOPSIS
 
@@ -108,6 +112,107 @@ to be displayed. The option set is open - there can be more options
 but they will not be checked by the parser.
 
 The image source file name will be supplied I<absolutely> in the stream.
+
+
+=head2 INDEX
+
+Generates an index listing all keywords collected via I<X>. Index formatting
+is up to the converters.
+
+
+=head2 INDEXRELATIONS
+
+Inserts a chapter "cross reference" based on the keywords found in all
+chapters using this tag.
+
+So, the tag has two functions. First, it I<collects> all index entries
+made in its chapters (and optionally all its subchapters). Second, it
+includes a reference to other chapters with I<INDEXRELATIONS> which
+match the own index entries according to the configuration.
+
+Configuration is done via options.
+
+=over 4
+
+=item format
+
+This setting configures what kind of list will be generated. The following
+values are specified:
+
+=over 4
+
+=item bullets
+
+produces an unordered list,
+
+=item enumerated
+
+produces an I<ordered> list,
+
+=item numbers
+
+produces a list where each chapter is preceeded by its chapter number,
+according to the documents hierarchy (C<1.1.5>, C<2.3.> etc.).
+
+=back
+
+If this option is omitted, the setting defaults to C<bullets>.
+
+=item readdepth
+
+Configures where keyword shall be collected - B<startpage> includes
+only the chapter where the tag is located in, while B<full> includes
+all the subchapters as well.
+
+Defaults to C<full>.
+
+=item reldepth
+
+Determines which keywords of other chapters shall be taken into account:
+keywords found in the chapters containing I<INDEXRELATIONS> directly
+(B<startpage>), or all their subchapters as well (B<full>).
+
+Defaults to C<full>.
+
+=item threshold
+
+Sets up what chapters shall be counted as "related", basing on the matching
+index entries: can set up absolutely (C<3 similar entries at least>) or
+by a percentage (C<50% of I<my> entries shall be marked there at least>).
+
+Defaults to 100%.
+
+=item type
+
+B<linked> makes each listed chapter title a link to the related
+chapter. Note that this feature depends on the target formats link
+support, so results may vary.
+
+By default, titles are displayed as I<plain text> - B<plain> can be
+used to specify this explicitly.
+
+=back
+
+B<Examples:>
+
+
+  \INDEXRELATIONS{format=numbers}
+
+C<>
+
+  \INDEXRELATIONS{threshold="100%"
+                  format=enumerated
+                  type=plain}
+
+C<>
+
+  \INDEXRELATIONS{readdepth=full
+                  reldepth=startpage
+                  threshold="50%"
+                  format=bullets
+                  type=linked}
+
+
 
 
 =head2 LOCALTOC
@@ -341,6 +446,15 @@ No user option.
 Enforces an syntactical error which stops document processing immediately.
 Most useful when used with tag conditions.
 
+=head2 X
+
+Marks the body to included into the index. Formatting of the index is up to
+the converters, as is its location unless the I<INDEX> tag is used to include
+it explicitly.
+
+There are no basic options, but usually converters declare their own, so please
+refer to the docs of your preferred converter for option details.
+
 
 =head1 TAG SETS
 
@@ -358,7 +472,7 @@ require 5.00503;
 package PerlPoint::Tags::Basic;
 
 # declare package version (as a STRING!!)
-$VERSION="0.02";
+$VERSION="0.03";
 
 # declare base "class"
 use base qw(PerlPoint::Tags);
@@ -381,14 +495,208 @@ use PerlPoint::Constants 0.14 qw(:parsing :tags);
 # = CODE SECTION =========================================================================
 
 # private variables
-my (%seq);
+my (%seq, %index);
 
 # tag declarations
 %tags=(
        # base fomatting tags: no options, mandatory body
-       B     => {body => TAGS_MANDATORY,},
-       C     => {body => TAGS_MANDATORY,},
-       I     => {body => TAGS_MANDATORY,},
+       B => {body => TAGS_MANDATORY,},
+       C => {body => TAGS_MANDATORY,},
+       I => {body => TAGS_MANDATORY,},
+
+
+       # index entry
+       X => {
+             # optional options, mandatory body
+             options => TAGS_OPTIONAL,
+             body    => TAGS_MANDATORY,
+
+             # hook - update the hash of index entries
+             hook    => sub
+                         {
+                          # take parameters
+                          my ($tagLine, $options, $body, $anchors, $headlineIds)=@_;
+
+                          # probably we should check if the index entry is the innermost tag
+                          # - which it currently should be, but of course this makes it more
+                          # inconvenient for users ...
+                          warn qq(\n\n[Error] Index tags need to be the innermost tags/macros in line $tagLine, sorry.\n) and return(PARSING_ERROR) if grep((ref), @$body);
+
+                          # add or update entry (this only works if the tag is the innermost tag/macro)
+                          $index{tags}{$headlineIds}{join(' ', @$body)}++;
+
+                          # flag success
+                          PARSING_OK;
+                         },
+            },
+
+
+       # full index
+       INDEX => {
+                 # no body, currently no options
+                 body    => TAGS_DISABLED,
+
+                 # finish hook - provide index data
+                 finish    => sub
+                               {
+                                # take parameters
+                                my ($options)=@_;
+
+                                # provide data via option (should we pass a copy instead?)
+                                $options->{__data}=$index{tags};
+
+                                # flag success
+                                PARSING_OK;
+                               },
+            },
+
+
+       # index crossref (related chapters according to matching index entries)
+       INDEXRELATIONS => {
+                          # options, no body
+                          options => TAGS_OPTIONAL,
+                          body    => TAGS_DISABLED,
+
+                          # hook!
+                          hook    => sub
+                                      {
+                                       # take parameters
+                                       my ($tagLine, $options, $body, $anchors, $headlineIds)=@_;
+
+                                       # declare variables
+                                       my $ok=PARSING_OK;
+
+                                       # check options
+                                       $ok=PARSING_ERROR,  warn qq(\n\n[Error] Option "readdepth" of tag INDEXRELATIONS needs to be "startpage" or "full", line $tagLine.\n) if exists $options->{readdepth} and $options->{readdepth}!~/^(startpage|full)$/;
+                                       $ok=PARSING_ERROR,  warn qq(\n\n[Error] Option "reldepth" of tag INDEXRELATIONS needs to be "startpage" or "full", line $tagLine.\n) if exists $options->{reldepth} and $options->{reldepth}!~/^(startpage|full)$/;
+                                       $ok=PARSING_ERROR,  warn qq(\n\n[Error] Option "threshold" of tag INDEXRELATIONS needs to be a number or a valid percentage spec, line $tagLine.\n) if exists $options->{threshold} and $options->{threshold}!~/^\s*((((\d{1,2})|(100))\s*\%)|(\d+))\s*$/;
+
+                                       $ok=PARSING_FAILED, warn qq(\n\n[Error] Invalid "format" setting "$options->{format}" in LOCALTOC tag, line $tagLine.\n)
+                                         if     exists $options->{format}
+                                            and $options->{format}!~/^(bullets|enumerated|numbers)$/;
+
+                                       $ok=PARSING_FAILED, warn qq(\n\n[Error] Invalid "type" setting "$options->{type}" in LOCALTOC tag, line $tagLine.\n)
+                                         if     exists $options->{type}
+                                            and $options->{type}!~/^(linked|plain)$/;
+
+                                       # check successfull?
+                                       return $ok unless $ok==PARSING_OK;
+
+                                       # set defaults, if necessary
+                                       if ($ok==PARSING_OK)
+                                         {
+                                          $options->{format}='bullets' unless exists $options->{format};
+                                          $options->{type}='plain'     unless exists $options->{type};
+                                         }
+
+                                       # note occurence
+                                       $index{idr}{$headlineIds}={};
+
+                                       # pass the headline id to the finish hook
+                                       $options->{__id}=$headlineIds;
+
+                                       # flag success
+                                       PARSING_OK;
+                                      },
+
+                          # finish hook - extract index data
+                          finish  => sub
+                                      {
+                                       # take parameters
+                                       my ($options)=@_;
+
+                                       # declarations
+                                       my @chapters;
+
+                                       # prepare the index for cross references unless done before
+                                       unless (exists $index{flags}{arranged})
+                                         {
+                                          # make a list of all entry points (to avoid multiple
+                                          # usage of "keys %..." later on)
+                                          my @collectors=keys %{$index{idr}};
+
+                                          # build a pattern to search for matching chapters
+                                          my $pattern=join('|', map {"($_)"} keys %{$index{idr}});
+
+                                          # now collect all relevant tags for their "parent" INDEXRELATIONs
+                                          foreach my $chapter (grep(/^($pattern)/o, keys %{$index{tags}}))
+                                            {
+                                             # make a list of index entries known for this chapter
+                                             my %entries;
+                                             @entries{keys %{$index{tags}{$chapter}}}=();
+
+                                             # store index entries for all entry points (collectors)
+                                             foreach my $collector (grep($chapter=~/^$_/, @collectors))
+                                               {
+                                                # Found in the collectors own chapter? Note this.
+                                                @{$index{idr}{$collector}{direct}}{keys %entries}=() if $chapter eq $collector;
+
+                                                # ALL occurences, including those in collectors subchapters, are stored in a second list.
+                                                @{$index{idr}{$collector}{full}}{keys %entries}=();
+                                               }
+                                            }
+
+                                          # mark that data were arranged
+                                          $index{flags}{arranged}=1;
+                                         }
+
+                                       # get chapter id (and delete it by the way)
+                                       my $headlineIds=delete($options->{__id});
+
+                                       # get all index entries of your own chapter, depending on the depth option
+                                       my %entries;
+                                       @entries{exists $index{idr}{$headlineIds} ? keys %{$index{idr}{$headlineIds}{(exists $options->{readdepth} and lc($options->{readdepth}) eq 'startpage') ? 'direct' : 'full'}} : ()}=();
+
+                                       # anything found?
+                                       if (%entries)
+                                         {
+                                          # collect data (skip all chapters in the same hierachy chain)
+                                          foreach my $id (sort grep {(not _checkHeadlineChain($_, $headlineIds))} keys %{$index{idr}})
+                                            {
+                                             # scopy
+                                             my @found;
+
+                                             # get all equal entries;
+                                             @found=map {exists $entries{$_} ? $_ : ()} keys %{$index{idr}{$id}{(exists $options->{reldepth} and lc($options->{reldepth}) eq 'startpage') ? 'direct' : 'full'}};
+
+                                             # calculate percentage, extract chapter id
+                                             my $percentage=100*@found/scalar(keys %entries);
+                                             my $chapter=(split(/-/, $id))[-1];
+
+                                             # validate results - can we use them?
+                                             if (@found)
+                                               {
+                                                # validate results - can we use them?
+                                                if (exists $options->{threshold})
+                                                  {
+                                                   # percentage calculation required?
+                                                   if ($options->{threshold}=~/^\s*((\d{1,2})|(100))\s*\%\s*$/)
+                                                     {
+                                                      # check percentage
+                                                      push(@chapters, [$chapter, $percentage]) if $percentage>=$1;
+                                                     }
+                                                   else
+                                                     {
+                                                      # check the number of results
+                                                      push(@chapters, [$chapter, $percentage]) if $options->{threshold}<=@found;
+                                                     }
+                                                  }
+                                                else
+                                                  {
+                                                   # no threshold - use results
+                                                   push(@chapters, [$chapter, $percentage]);
+                                                  }
+                                               }
+                                            }
+                                         }
+
+                                       # provide results via option, sort it by relevance
+                                       $options->{__data}=[sort {$a->[1]<=>$b->[1]} @chapters];
+
+                                       # flag success in the appropriate way
+                                       @chapters ? PARSING_OK : PARSING_IGNORE;
+                                      },
+            },
 
 
        # container of formatting switches
@@ -659,6 +967,39 @@ my (%seq);
 %sets=(
        basic => [qw(B C I FORMAT HIDE IMAGE LOCALTOC READY REF SEQ STOP)],
       );
+
+
+
+# INTERNAL HELPER FUNCTIONS ###########################################
+
+sub _checkHeadlineChain
+ {
+  # get parameters
+  my ($c1, $c2)=@_;
+
+  # quick check
+  return 1 if $c1 eq $c2;
+
+  # declare variable
+  my $rc=0;
+
+  # split the chain strings
+  $c1=[split('-', $c1)];
+  $c2=[split('-', $c2)];
+
+  # make $c1 pointing to the shorter array
+  ($c1, $c2)=($c2, $c1) if @$c1>@$c2;
+
+  # now compare all levels of @c1
+  for (my $i=0; $i<@$c1; $i++)
+    {
+     # if there is a different element, the chains differ
+     return $rc if $c1->[$i] ne $c2->[$i];
+    }
+
+  # ok, these are in the same chain
+  return 1;
+ }
 
 
 1;

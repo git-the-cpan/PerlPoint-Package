@@ -2,7 +2,103 @@
 // -- macro declarations: start reading with first headline
 +BC:\B<\C<__body__>>
 
++CX:\C<\X<__body__>>
+
 // -- end of "preface"
+
+=0.39
+
+This update moves a tag (\C<\\X>) from converter definitions to the basic tags.
+To make use of the new functionality, you need to update to adapted converters.
+
+Alternativelely and as a workaround, go to the definition lib, e.g.
+\C<PerlPoint::Tags::HTML>, and delete the definition of the \C<\\X> tag.
+(Please note that full support of the new index features \I<needs> updated
+converters.)
+
+As of the time of this writing, \CX<PerlPoint::Converters> was not adapted
+yet, but you can load an adapted (patched) version from our SourceForge
+project site.
+
+
+
+==Bugfixes
+
+* Guarded variables were \I<expanded> if set up. Oops. Fixed, test added.
+
+* \C<pp2sdf> did not print tables ...
+
+* The parser now automatically adds \I<all> composite anchors for a headline,
+  not only for the full headline path. This allows to use partial links like
+  \C<C|D|E> or \C<D|E> for a headline with the full path \C<A|B|C|D|E>.
+
+
+==Changes
+
+* \BC<\\X> became a base tag like it is in POD. Many thanks to
+  Lorenz who implanted it into PerlPoint with his converters. The
+  tag is defined in \C<PerlPoint::Tags::Basic> now. Converters still
+  defining it by their own should be adapted (unless they want to
+  overwrite the basic definition).
+
+* \BC<\\X> now checks if it is the innermost tag/macro.
+
+* New basic tag \BC<INDEX> provides a full index structure. See
+  \C<PerlPoint::Tags::Basic> for details.
+
+* Adapted perlpoint-hilit19.lisp to Emacs 21.x. Unfortunately it
+  enforces a warning, but nevertheless does what expected. Might
+  be someone with Emacs Lisp experience can fix this?
+
+* Parser change to run under perl 5.8 without errors: \C<no utf8>.
+  Does it work under older perls as well?
+
+
+==Features
+
+===Index based references
+
+Introducing new "index based references". What's this? Imagine
+a document collection by many authors. It would be nice to cross
+link related articles. This requires knowledge of all the document
+parts and would usually be arranged by an informed document manager,
+or by using technologies like Topic Maps or the like. In any case,
+it takes time.
+
+But what if the collection is frequently updated, or when it is
+impossible to instrument them for Topic Maps or similar technologies,
+or if there is neither person nor time to investigate all the stuff in
+detail? Then you could use this (still experimental) feature of
+\I<index based references>. 
+
+The idea is that index entries point to documents/chapters with
+substantial information about the index entry. Documents/chapters
+matching in their index entries are probably content related. In
+linking to other documents or chapters speaking about the same indexed
+issues, or to a relevant percentage of the base documents (indexed)
+issues, one can build cross references automatically.
+
+To do so, the package now provides a new base tag \BC<INDEXRELATIONS> which
+builds a list of related pages. Options specify if the keyword base
+should be filled with entries from the start chapter only, or shall include
+all subchapters. Likewise, one can specify if only the index entries
+at other \I<startup> pages should be taken into account, or if \I<all
+their subchapters> should be scanned, too. Finally, there's an option
+to configure a minimal match threshold (absolutely or by percentage).
+
+Converters can take the provided chapter list and present them as
+they like.
+
+The appropriate tests and docs were added.
+
+
+==Docs
+
+* The documentation now mentions explicitly that list indentation is
+  reset \I<automatically> by any subsequent non list paragraph. Thanks
+  to Marcus Holland-Moritz for suggesting this.
+
+
 
 =0.38
 

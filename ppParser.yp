@@ -14,6 +14,16 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.39    |01.02.2003| JSTENZEL | passing directive id chain of the current chapter
+#         |          |          | headline to tag hook functions now;
+#         |07.03.2003| JSTENZEL | several variable patterns were used explicitly instead
+#         |          |          | if the precompiled ones from %lexerPatterns;
+#         |          | JSTENZEL | bugfix: guarded variables were expanded;
+#         |          | JSTENZEL | now it is documented that list indentation is reset  
+#         |          |          | automatically by a subsequent non list paragraph;
+#         |26.04.2003| JSTENZEL | added "no utf8" to avoid errors under perl 5.8;
+#         |01.05.2003| JSTENZEL | adding *all* composite anchors for headlines, not only
+#         |          |          | for the full path;
 # 0.38    |07.06.2002| JSTENZEL | restoring doubled backslashes in filtered paragraphs,
 #         |          |          | restoring ">" characters as if they were guarded;
 #         |04.07.2002| JSTENZEL | simplified several array field access codes;
@@ -455,7 +465,7 @@ B<PerlPoint::Parser> - a PerlPoint Parser
 
 =head1 VERSION
 
-This manual describes version B<0.38>.
+This manual describes version B<0.39>.
 
 =head1 SYNOPSIS
 
@@ -609,7 +619,7 @@ text:
 
 All lists can be I<nested>. A new level is introduced by
 a special paragraph called I<"list indention"> which starts with a ">". A list level
-can be terminated by a I<"list indention stop"> paragraph containing of a "<"
+can be terminated by a I<"list indention stop"> paragraph starting with a "<"
 character. (These startup characters symbolize "level shifts".)
 
   * First level.
@@ -642,6 +652,9 @@ level shift character and the level number.
   * Back on first level.
 
 Level shifts are accepted between list items I<only>.
+
+I<Please note that there is no need to shift levels back if a list is completed.> Any non list
+paragraph will I<reset> list indentation, as well as the end of the source.
 
 
 =item Texts
@@ -1399,7 +1412,7 @@ B<Example:>
  require 5.00503;
 
  # declare module version
- $PerlPoint::Parser::VERSION=0.38;
+ $PerlPoint::Parser::VERSION=0.39;
  $PerlPoint::Parser::VERSION=$PerlPoint::Parser::VERSION; # to suppress a warning of exclusive usage only;
 
  # pragmata
@@ -1442,6 +1455,7 @@ B<Example:>
      @inLine,                      # current *real* input line (the unexpanded line read from a source file);
      @previousStackLines,          # buffer of the last lines gotten from input stack;
      @libraryPath,                 # a collection of pathes to find files for \INCLUDE in;
+     @headlineIds,                 # the hierarchical values of $directiveCounter pointing to the current chapter headline;
 
      $anchors,                     # anchor collector object;
      $safeObject,                  # an object of class Safe to evaluate Perl code embedded into PerlPoint;
@@ -1489,9 +1503,17 @@ B<Example:>
                     include          => qr/$patternNlbBackslash\\(INCLUDE)/,
                     nonWhitespace    => qr/$patternNlbBackslash(\S)/,
                     colon            => qr/$patternNlbBackslash(:)/,
-                    namedVar         => qr/$patternNlbBackslash\$($patternWUmlauts)/,
-                    symVar           => qr/$patternNlbBackslash\${($patternWUmlauts)}/,
+                    namedVarKernel   => qr/\$($patternWUmlauts)/,
+                    symVarKernel     => qr/\${($patternWUmlauts)}/,
                    );
+  @lexerPatterns{qw(
+                    namedVar
+                    symVar
+                   )
+                }=(
+                   qr/$patternNlbBackslash$lexerPatterns{namedVarKernel}/,
+                   qr/$patternNlbBackslash$lexerPatterns{symVarKernel}/,
+                  );
 
  # declare paragraphs which are embedded
  my %embeddedParagraphs;
@@ -1790,7 +1812,7 @@ headline : headline_level
              # switch to headline mode
              stateManager(STATE_HEADLINE);
 
-             # update headline level hint
+             # update headline level hints
              $flags{headlineLevel}=$_[1][0];
 
              # trace, if necessary
@@ -1820,6 +1842,10 @@ headline : headline_level
 
 	     # update related data
              @olistLevels=();
+
+             # update directive counter and the level hierarchy memory
+             $#headlineIds=$flags{headlineLevel}-1;
+             $headlineIds[$flags{headlineLevel}-1]=++$flags{headlinenr};
 
              # prepare result (data part and shortcut string)
              my %hints=(nr=>++$directiveCounter, shortcut=>$_[4][0], docstreams=>{});
@@ -2727,19 +2753,21 @@ elements : element        # default action works perfectly
 element : Word
            {
 	    # check string for variables (in boost mode only)
-	    if (
-                    !$flags{noboost}
-                and $parserState!=STATE_VERBATIM
-                and ($_[1][0]=~/(?<!\\)\$($patternWUmlauts)/ or $_[1][0]=~/(?<!\\)\${($patternWUmlauts)}/)
-               )
+	    unless ($flags{noboost} or $parserState==STATE_VERBATIM)
 	      {
-	       # flag that this paragraph uses variables (a cache hit will only be useful if variable settings will be unchanged)
-	       $flags{checksummed}[4]=1 unless exists $flags{checksummed} and not $flags{checksummed};
+               if ($_[1][0]=~/$lexerPatterns{namedVar}/o or $_[1][0]=~/$lexerPatterns{symVar}/o)
+                 {
+                  # flag that this paragraph uses variables (a cache hit will only be useful if variable settings will be unchanged)
+                  $flags{checksummed}[4]=1 unless exists $flags{checksummed} and not $flags{checksummed};
 
-	       # replace all variables by their values
-	       $_[1][0]=~s/(?<!\\)\$($patternWUmlauts)/exists $variables{$1} ? $variables{$1} : join('', '$', $1)/ge;
-	       $_[1][0]=~s/(?<!\\)\${($patternWUmlauts)}/exists $variables{$1} ? $variables{$1} : join('', '$', $1)/ge;
-	      }
+                  # replace all variables by their values
+                  $_[1][0]=~s/$lexerPatterns{namedVar}/exists $variables{$1} ? $variables{$1} : join('', '$', $1)/ge;
+	          $_[1][0]=~s/$lexerPatterns{symVar}/exists $variables{$1} ? $variables{$1} : join('', '$', $1)/ge;
+	         }
+
+               # remove backslashes before guarded variables (because in this special case, they were preserved)
+               $_[1][0]=~s/\\(?=(($lexerPatterns{namedVarKernel})|($lexerPatterns{symVarKernel})))//go;
+              }
 
             # start a new token list and reply it
             [[$_[1][0]], $_[1][1]];
@@ -2919,7 +2947,7 @@ tag : Tag_name
 
             # call hook function (use eval() to guard yourself)
             my $rc;
-            eval {$rc=&{$tagsRef->{$_[1][0]}{hook}}($_[1][1], $options, dclone($_[5][0]), $anchors)};
+            eval {$rc=&{$tagsRef->{$_[1][0]}{hook}}($_[1][1], $options, dclone($_[5][0]), $anchors, join('-', @headlineIds))};
 
             # check result
             unless ($@)
@@ -4613,11 +4641,12 @@ sub lexer
           and not (exists $flags{checksummed} and not $flags{checksummed});
 
      # remove guarding \\, if necessary
-     s/^\\// unless    $specials{heredoc}
-                    or $parserState==STATE_EMBEDDING
-                    or $parserState==STATE_PFILTER
-                    or $parserState==STATE_CONDITION
-                    or $parserState==STATE_DEFINITION;
+     s/^\\(?!($lexerPatterns{namedVarKernel})|($lexerPatterns{symVarKernel}))//
+       unless    $specials{heredoc}
+              or $parserState==STATE_EMBEDDING
+              or $parserState==STATE_PFILTER
+              or $parserState==STATE_CONDITION
+              or $parserState==STATE_DEFINITION;
 
      # reply next token: scan for numbers, if necessary
      $found=$1, s/^$1//,
@@ -5884,9 +5913,9 @@ EOC
         # update headline path and numbers
         $headlinePath[$level]=$title;
 
-        # store both plain and composite headline
+        # store both plain and composite headlines
         $anchors->add($title, $title);
-        $anchors->add(join('|', map {defined($_) ? $_ : ''} @headlinePath[1..$level]), $title);
+        $anchors->add(join('|', map {defined($_) ? $_ : ''} @headlinePath[$_..$level]), $title) for (1..$level-1);
        }
     }
 
@@ -5934,7 +5963,7 @@ EOC
 
          # call hook function (use eval() to guard yourself)
          my $rc;
-         eval {$rc=&{$tagsRef->{$token->[STREAM_DIR_DATA]}{finish}}($options, $anchors)};
+         eval {$rc=&{$tagsRef->{$token->[STREAM_DIR_DATA]}{finish}}($options, $anchors, join('-', @headlineIds))};
 
          # check result
          unless ($@)

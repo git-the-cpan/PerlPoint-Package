@@ -71,7 +71,7 @@
    ("^\\++.+$" nil defun)
 
    ;; tags (closing angle bracket definition is too common, but as a first trial ...)
-   ("\\\\[_A-Z0-9]+\\(\\{.+\\}\\)?<?" nil keyword)
+   ("\\\\[_A-Z0-9]+\\({.+}\\)?<?" nil keyword)
    (">" nil keyword)
   )
 )

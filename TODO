@@ -35,31 +35,9 @@ implement it yourself, this might be possible - please contact us.
 * improve the SourceForge project homepage, include areas for user provides macros, filters,
   code, examples etc.
 
-
-=Include file filters
-
-* add a "filtered" type to \C<\\INCLUDE>, to transform other formats on the fly
-  - for example, there could be a filter making POD files available directly
-
-  \\INCLUDE{type="filtered:pod2pp" ...}
-
-* the specified filter name would be the name of a function declared in an
-  \C<\\EMBED> section
-
-* the result is treated as PerlPoint
-
-* if active contents is disabled, such paragraphs would be skipped
-
-* like any other types of included files, filtered files need to be enabled by
-  the -filter option
-
-  pp2... -filter 'filtered:pod2pp'
-
-* this would be a flexible, cool and transparent way to embed existing files in other formats
-
-* it is already possible today by writing a macro that invokes Perl code to load and transform
-  a file, but providing it as a feature of \C<\\INCLUDE> makes usage more transparent and would
-  allow to combine it with other features of include like \C<headlinebase>
+* The Emacs 19.x lisp file does not work under Emacs 21.x. I made a workaround, but it
+  still produces an error message. Check if it still works with older Emacs versions, and
+  try to remove the error message.
 
 
 =List shifting
@@ -94,7 +72,10 @@ implement it yourself, this might be possible - please contact us.
 
 =pp2sdf
 
-* add index (supporting pp2html index tags as possible);
+* add index (based on \\INDEX);
 
 * add documentation in PerlPoint format;
+
+* include tests;
+
 

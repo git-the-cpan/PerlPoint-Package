@@ -199,6 +199,9 @@ is passed immediately after the directive character ("<" or ">", respectively):
 
 Level shifts are accepted between list items \I<only>.
 
+\I<Please note that there is no need to shift levels back if a list is completed.> Any non list
+paragraph will \I<reset> list indentation, as well as the end of the source.
+
 
 ==Tables
 
