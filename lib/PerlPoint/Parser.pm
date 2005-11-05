@@ -497,6 +497,61 @@ sub _Parse {
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.40    |12.06.2003| JSTENZEL | bugfix: delayed tokens were not reparsed when reinserted,
+#         |          |          | this could cause trouble when the paragraph (special
+#         |          |          | characters) context changed between the point the
+#         |          |          | token was detected first and delayed, and the point
+#         |          |          | the token is reinserted into the stream (especially
+#         |          |          | important after file inclusion, when the stacked token
+#         |          |          | is a newline, has to be evaluated in STATE_DEFAULT
+#         |          |          | but was stacked in a paragraph where newlines are not
+#         |          |          | ignored;
+#         |          | JSTENZEL | additionally, "empty paragraphs" (*skipped* paragraphs)
+#         |          |          | now are not only *really* empty paragraphs but all
+#         |          |          | paragraphs containing of whitespaces only;
+#         |21.06.2003| JSTENZEL | headlines provide additional data: their numerical, full
+#         |          |          | and shortcut pathes;
+#         |22.06.2003| JSTENZEL | normalizeTableRows() now supplies number of columns both
+#         |          |          | in title row and the maximum value;
+#         |          | JSTENZEL | new warning if the maximum columns number is detected
+#         |          |          | in another line than the first table line (which is the
+#         |          |          | base of normalization);
+#         |10.08.2003| JSTENZEL | new helper function semerr() to report semantic errors;
+#         |          | JSTENZEL | new option -criticalSemanticErrors;
+#         |14.08.2003| JSTENZEL | input filters can access the source file by a variable
+#         |          |          | $main::_ifilterFile now;
+#         |          | JSTENZEL | fixed an "undefined value" warning;
+#         |17.08.2003| JSTENZEL | bugfix: docstream "main" was ignored like any other docstream
+#         |          |          | if working in the "docstream ignore" mode;
+#         |10.09.2003| JSTENZEL | definition list explanations ("texts" now have an own
+#         |          |          | enveloping directive (DIRECTIVE_DPOINT_TEXT);
+#         |11.09.2003| JSTENZEL | LOCALTOC added to the list of standalone tags (which are
+#         |          |          | stripped of of an enveloping text paragraph if they are its
+#         |          |          | only contents);
+#         |05.05.2004| JSTENZEL | anchors now take the number of the page they are defined in;
+#         |          | JSTENZEL | tag hooks now take an additional parameter: the number of
+#         |          |          | the page the tag is used on;
+#         |          | JSTENZEL | bugfix: numerical pathes were built incorrectly: when entering
+#         |          |          | a new sublevel, the counter was not reset to 1;
+#         |          | JSTENZEL | added anchors();
+#         |11.07.2004| JSTENZEL | headlines now provide a path of absolute page numbers as well
+#         |          |          | and a variable snapshot;
+#         |          | JSTENZEL | a reset variable is removed now (as a side effect, it is no
+#         |          |          | longer possible to build variables containing spaces only);
+#         |24.07.2004| JSTENZEL | added -skipcomments;
+#         |10.09.2004| JSTENZEL | bugfix: words looking like symbolic variables (but not defined
+#         |          |          | as such) were restored without their braces ("{}");
+#         |27.12.2004| JSTENZEL | bugfix: skipped headline levels were filled with previous
+#         |          |          | headline strings of those levels;
+#         |28.12.2004| JSTENZEL | text paragraphs now have their own special character, but
+#         |          |          | optional: a dot;
+#         |24.02.2005| JSTENZEL | acceleration: the lexer built some data very often;
+#         |27.02.2005| JSTENZEL | bugfix: backslashes before variables were handled incorrectly,
+#         |          |          | now variables are no longer "boosted" but handled like macros
+#         |          |          | - which has a performance drawback, unfortunately ...;
+#         |16.05.2005| JSTENZEL | backslashes in tag options are no longer ignored but can be
+#         |          |          | used to guard characters;
+#         |23.08.2005| JSTENZEL | first chapter is checked for a headline now;
 # 0.39    |01.02.2003| JSTENZEL | passing directive id chain of the current chapter
 #         |          |          | headline to tag hook functions now;
 #         |07.03.2003| JSTENZEL | several variable patterns were used explicitly instead
@@ -948,7 +1003,7 @@ B<PerlPoint::Parser> - a PerlPoint Parser
 
 =head1 VERSION
 
-This manual describes version B<0.39>.
+This manual describes version B<0.40>.
 
 =head1 SYNOPSIS
 
@@ -1150,6 +1205,18 @@ character:
   In this new text paragraph,
   we demonstrate the multiline feature.
 
+I<Optionally>, a text paragraph can be started with a special character
+as well, which is a dot:
+
+  .This is a simple text with dot.
+
+  .In this new text paragraph,
+  we demonstrate the multiline feature.
+
+This is intended to be used by generators which translate other formats
+into PerlPoint, to make sure the first character of a paragraph has no
+special meaning to the PerlPoint parser.
+
 
 =item Blocks
 
@@ -1244,7 +1311,10 @@ so a converter to HTML can detect such cells because of normalization and handle
 appropriately.)
 
 Please note that normalization refers to the headline row. If another line contains
-I<more> columns than the headline, normalization does not care.
+I<more> columns than the headline, normalization does not care. If the maximum column
+number is detected in another row, a warning is issued. (As a help for converter authors,
+the title and maximum column number are made part of a table tag as internal options
+C<__titleColumns__> and C<__maxColumns__>.)
 
 In all tables, leading and trailing whitespaces of a cell are
 automatically removed, so you can use as many of them as you want to
@@ -1594,6 +1664,7 @@ included file. This is done via option I<ifilter>:
   
 An input filter is a snippet of user defined Perl code, taking the
 included file via C<@main::_ifilterText> and the target type via
+C<$main::_ifilterType>. The original filename can be accessed via
 C<$main::_ifilterType>. It should supply its result as an array
 of strings which will then be processed instead of the original file.
 
@@ -1695,7 +1766,9 @@ embedded text. This is done via option I<ifilter>:
 
 An input filter is a snippet of user defined Perl code, taking the
 embedded text via C<@main::_ifilterText> and the target language via
-C<$main::_ifilterType>. It should supply its result as an array of
+C<$main::_ifilterType>. The original filename can be accessed via
+C<$main::_ifilterType> (but please note that this is the source with
+the \EMBED tag). It should supply its result as an array of
 strings which will then be processed as usual.
 
 Input filters are Active Contents. If Active Contents is disabled,
@@ -1747,7 +1820,7 @@ Tables built by tag are normalized the same way as table paragraphs are.
 =head2 What about special formatting?
 
 Earlier versions of B<pp2html> supported special format hints like the HTML
-expression "&gt;" for the ">" character, or "&uuml;" for "√º". B<PerlPoint::Parser>
+expression "&gt;" for the ">" character, or "&uuml;" for "¸". B<PerlPoint::Parser>
 does I<not> support this directly because such hints are specific to the
 I<output format> - if someone wants to translate into TeX, it might be curious
 for him to use HTML syntax in his ASCII text. Further more, such hints can be
@@ -1895,7 +1968,7 @@ B<Example:>
  require 5.00503;
 
  # declare module version
- $PerlPoint::Parser::VERSION=0.39;
+ $PerlPoint::Parser::VERSION=0.40;
  $PerlPoint::Parser::VERSION=$PerlPoint::Parser::VERSION; # to suppress a warning of exclusive usage only;
 
  # pragmata
@@ -1903,16 +1976,19 @@ B<Example:>
 
  # load modules
  use Carp;
+ # use Memoize;
  use IO::File;
  use File::Basename;
  use File::Spec::Functions;
  use File::Temp qw(tempfile);
- use PerlPoint::Anchors 0.02;
+ use PerlPoint::Anchors 0.03;
  use PerlPoint::Backend 0.10;
  use Cwd qw(:DEFAULT abs_path);
  use Digest::SHA1 qw(sha1_base64);
  use Storable qw(:DEFAULT dclone nfreeze);
  use PerlPoint::Constants 0.16 qw(:DEFAULT :parsing :stream :tags);
+
+ # memoizations
 
  # startup declarations
  my (
@@ -1921,11 +1997,11 @@ B<Example:>
      %specials,                    # special character control (may be active or not);
      %lexerFlags,                  # lexer state flags;
      %lexerFlagsOfPreviousState,   # buffered lexer state flags of previous state;
-     %statistics,                  # statitics data;
+     %statistics,                  # statistics data;
      %variables,                   # user managed variables;
      %flags,                       # various flags;
      %macros,                      # macros / aliases;
-     %openedSourcefiles,           # a hash of all already opened source files (to enable smart inclusion);
+     %openedSourcefiles,           # a hash of all source files already opened (to enable smart inclusion);
      %paragraphTypeStrings,        # paragraph type to string translation table;
 
      @nestedSourcefiles,           # a list of current source file nesting (to avoid circular inclusions);
@@ -1971,7 +2047,7 @@ B<Example:>
  $readCompletely=0;
 
  # prepare a common pattern
- my $patternWUmlauts=qr/[\w√§√∂√º√Ñ√ñ√ú√ü]+/;
+ my $patternWUmlauts=qr/[\w‰ˆ¸ƒ÷‹ﬂ]+/;
 
  # prepare lexer patterns
  my $patternNlbBackslash=qr/(?<!\\)/;
@@ -1987,7 +2063,7 @@ B<Example:>
                     nonWhitespace    => qr/$patternNlbBackslash(\S)/,
                     colon            => qr/$patternNlbBackslash(:)/,
                     namedVarKernel   => qr/\$($patternWUmlauts)/,
-                    symVarKernel     => qr/\${($patternWUmlauts)}/,
+                    symVarKernel     => qr/\$({($patternWUmlauts)})/,
                    );
   @lexerPatterns{qw(
                     namedVar
@@ -2038,22 +2114,22 @@ sub new {
 [
 	{#State 0
 		ACTIONS => {
+			'Paragraph_cache_hit' => 11,
+			"||" => 4,
 			'Empty_line' => 3,
 			"+" => 5,
-			'Paragraph_cache_hit' => 11,
-			"?" => 2,
-			"||" => 4
+			"?" => 2
 		},
 		DEFAULT => -3,
 		GOTOS => {
 			'non_filterable_paragraph' => 1,
-			'built_paragraph' => 9,
 			'document' => 6,
-			'optional_paragraph_filter' => 10,
 			'restored_paragraph' => 7,
-			'condition' => 13,
-			'paragraph' => 12,
-			'alias_definition' => 8
+			'alias_definition' => 8,
+			'built_paragraph' => 9,
+			'optional_paragraph_filter' => 10,
+			'condition' => 12,
+			'paragraph' => 13
 		}
 	},
 	{#State 1
@@ -2075,9 +2151,9 @@ sub new {
 		}
 	},
 	{#State 5
-		DEFAULT => -148,
+		DEFAULT => -152,
 		GOTOS => {
-			'@30-1' => 16
+			'@31-1' => 16
 		}
 	},
 	{#State 6
@@ -2096,7 +2172,7 @@ sub new {
 			'optional_paragraph_filter' => 10,
 			'restored_paragraph' => 7,
 			'paragraph' => 18,
-			'condition' => 13,
+			'condition' => 12,
 			'alias_definition' => 8
 		}
 	},
@@ -2119,33 +2195,33 @@ sub new {
 		DEFAULT => -25
 	},
 	{#State 12
-		DEFAULT => -1
+		DEFAULT => -23
 	},
 	{#State 13
-		DEFAULT => -23
+		DEFAULT => -1
 	},
 	{#State 14
 		ACTIONS => {
+			'Embed' => 30,
+			'Named_variable' => 21,
+			'Table_separator' => 32,
+			'Tag_name' => 34,
+			'Symbolic_variable' => 33,
 			'Table' => 37,
 			'Include' => 36,
 			'Space' => 23,
-			'Embed' => 29,
-			'Named_variable' => 21,
-			'Table_separator' => 32,
 			'Word' => 27,
-			'Tag_name' => 34,
-			'Symbolic_variable' => 33,
 			'StreamedPart' => 28
 		},
 		GOTOS => {
 			'basic' => 20,
-			'basics' => 30,
+			'basics' => 29,
 			'embedded' => 31,
-			'table' => 22,
-			'element' => 35,
-			'included' => 24,
 			'table_separator' => 25,
-			'tag' => 26
+			'included' => 24,
+			'table' => 22,
+			'tag' => 26,
+			'element' => 35
 		}
 	},
 	{#State 15
@@ -2170,100 +2246,97 @@ sub new {
 	{#State 19
 		ACTIONS => {
 			'Colon' => 41,
-			'Named_variable' => 59,
+			'Named_variable' => 61,
 			"\@" => 42,
-			'Upoint_cache_hit' => 60,
+			'Upoint_cache_hit' => 62,
 			"~" => 43,
 			'Dpoint_cache_hit' => 44,
 			'Space' => 23,
 			"*" => 47,
 			'Word' => 27,
-			'EOL' => 65,
+			'EOL' => 67,
 			'StreamedPart' => 28,
-			'Opoint_cache_hit' => 67,
-			'Embed' => 29,
+			'Opoint_cache_hit' => 70,
+			'Embed' => 30,
 			'Table_separator' => 32,
 			'Ils' => 52,
-			'Block_cache_hit' => 70,
-			"/" => 68,
+			'Block_cache_hit' => 73,
+			"/" => 71,
 			'Symbolic_variable' => 33,
 			'Tag_name' => 34,
-			"=" => 71,
+			"=" => 74,
 			'Headline_cache_hit' => 53,
 			'Table' => 37,
 			'Include' => 36,
-			"#" => 75,
-			'Heredoc_open' => 78
+			"#" => 78,
+			'Heredoc_open' => 81,
+			"." => 57
 		},
 		GOTOS => {
-			'basic' => 56,
-			'dlist' => 58,
-			'verbatim' => 57,
+			'basic' => 58,
+			'dlist' => 60,
+			'verbatim' => 59,
 			'table' => 22,
-			'dlist_opener' => 61,
+			'dlist_opener' => 63,
 			'upoint' => 45,
 			'literal' => 46,
-			'olist' => 62,
-			'ulist' => 63,
-			'text' => 64,
+			'olist' => 64,
+			'ulist' => 65,
+			'text' => 66,
 			'opoint_opener' => 48,
 			'included' => 24,
 			'table_separator' => 25,
 			'tag' => 26,
+			'optionally_dotted_text' => 68,
 			'headline_level' => 49,
 			'list' => 50,
-			'dstream_entrypoint' => 66,
+			'dstream_entrypoint' => 69,
 			'compound_block' => 51,
 			'embedded' => 31,
-			'variable_assignment' => 69,
+			'variable_assignment' => 72,
 			'element' => 35,
-			'opoint' => 54,
-			'table_paragraph' => 72,
-			'comment' => 73,
-			'dpoint' => 55,
-			'original_paragraph' => 74,
-			'list_part' => 76,
-			'block' => 77,
-			'headline' => 79
+			'dotted_text' => 54,
+			'opoint' => 55,
+			'table_paragraph' => 75,
+			'comment' => 76,
+			'dpoint' => 56,
+			'original_paragraph' => 77,
+			'list_part' => 79,
+			'block' => 80,
+			'headline' => 82
 		}
 	},
 	{#State 20
-		DEFAULT => -97
-	},
-	{#State 21
-		DEFAULT => -106
-	},
-	{#State 22
-		DEFAULT => -100
-	},
-	{#State 23
-		DEFAULT => -105
-	},
-	{#State 24
-		DEFAULT => -111
-	},
-	{#State 25
 		DEFAULT => -101
 	},
-	{#State 26
-		DEFAULT => -109
+	{#State 21
+		DEFAULT => -110
 	},
-	{#State 27
+	{#State 22
 		DEFAULT => -104
 	},
-	{#State 28
+	{#State 23
+		DEFAULT => -109
+	},
+	{#State 24
+		DEFAULT => -115
+	},
+	{#State 25
+		DEFAULT => -105
+	},
+	{#State 26
+		DEFAULT => -113
+	},
+	{#State 27
 		DEFAULT => -108
 	},
-	{#State 29
-		DEFAULT => -143,
-		GOTOS => {
-			'@27-1' => 80
-		}
+	{#State 28
+		DEFAULT => -112
 	},
-	{#State 30
+	{#State 29
 		ACTIONS => {
-			'Embed' => 29,
-			'Empty_line' => 82,
+			'Embed' => 30,
+			'Empty_line' => 84,
 			'Named_variable' => 21,
 			'Table_separator' => 32,
 			'Symbolic_variable' => 33,
@@ -2275,7 +2348,7 @@ sub new {
 			'StreamedPart' => 28
 		},
 		GOTOS => {
-			'basic' => 81,
+			'basic' => 83,
 			'embedded' => 31,
 			'included' => 24,
 			'table_separator' => 25,
@@ -2284,34 +2357,40 @@ sub new {
 			'element' => 35
 		}
 	},
+	{#State 30
+		DEFAULT => -147,
+		GOTOS => {
+			'@28-1' => 85
+		}
+	},
 	{#State 31
-		DEFAULT => -110
+		DEFAULT => -114
 	},
 	{#State 32
-		DEFAULT => -139
+		DEFAULT => -143
 	},
 	{#State 33
-		DEFAULT => -107
+		DEFAULT => -111
 	},
 	{#State 34
-		DEFAULT => -120,
+		DEFAULT => -124,
 		GOTOS => {
-			'@18-1' => 83
+			'@19-1' => 86
 		}
 	},
 	{#State 35
-		DEFAULT => -99
+		DEFAULT => -103
 	},
 	{#State 36
-		DEFAULT => -146,
+		DEFAULT => -150,
 		GOTOS => {
-			'@29-1' => 84
+			'@30-1' => 87
 		}
 	},
 	{#State 37
-		DEFAULT => -136,
+		DEFAULT => -140,
 		GOTOS => {
-			'@23-1' => 85
+			'@24-1' => 88
 		}
 	},
 	{#State 38
@@ -2319,32 +2398,32 @@ sub new {
 	},
 	{#State 39
 		ACTIONS => {
-			"|" => 87,
-			"||" => 86
+			"|" => 90,
+			"||" => 89
 		}
 	},
 	{#State 40
-		DEFAULT => -149,
+		DEFAULT => -153,
 		GOTOS => {
-			'@31-3' => 88
+			'@32-3' => 91
 		}
 	},
 	{#State 41
 		DEFAULT => -58,
 		GOTOS => {
-			'@8-1' => 89
+			'@8-1' => 92
 		}
 	},
 	{#State 42
-		DEFAULT => -140,
+		DEFAULT => -144,
 		GOTOS => {
-			'@25-1' => 90
+			'@26-1' => 93
 		}
 	},
 	{#State 43
-		DEFAULT => -76,
+		DEFAULT => -80,
 		GOTOS => {
-			'@15-1' => 91
+			'@16-1' => 94
 		}
 	},
 	{#State 44
@@ -2354,487 +2433,464 @@ sub new {
 		DEFAULT => -43
 	},
 	{#State 46
-		DEFAULT => -68,
+		DEFAULT => -70,
 		GOTOS => {
-			'@11-1' => 92
+			'@11-1' => 95
 		}
 	},
 	{#State 47
 		DEFAULT => -52,
 		GOTOS => {
-			'@6-1' => 93
+			'@6-1' => 96
 		}
 	},
 	{#State 48
 		DEFAULT => -47,
 		GOTOS => {
-			'@5-1' => 94
+			'@5-1' => 97
 		}
 	},
 	{#State 49
 		ACTIONS => {
-			"=" => 96
+			"=" => 99
 		},
 		DEFAULT => -26,
 		GOTOS => {
-			'@3-1' => 95
+			'@3-1' => 98
 		}
 	},
 	{#State 50
 		ACTIONS => {
 			'Colon' => 41,
-			"<" => 97,
+			"<" => 100,
 			'Dpoint_cache_hit' => 44,
 			"*" => 47,
-			">" => 99,
-			'Upoint_cache_hit' => 60,
-			'Opoint_cache_hit' => 67,
-			"#" => 75
+			">" => 102,
+			'Upoint_cache_hit' => 62,
+			'Opoint_cache_hit' => 70,
+			"#" => 78
 		},
 		DEFAULT => -20,
 		GOTOS => {
-			'list_shifter' => 100,
-			'dlist' => 58,
-			'list_shift' => 98,
-			'dlist_opener' => 61,
+			'list_shifter' => 103,
+			'dlist' => 60,
+			'list_shift' => 101,
+			'dlist_opener' => 63,
 			'upoint' => 45,
-			'opoint' => 54,
-			'olist' => 62,
-			'dpoint' => 55,
-			'ulist' => 63,
+			'opoint' => 55,
+			'olist' => 64,
+			'ulist' => 65,
+			'dpoint' => 56,
 			'opoint_opener' => 48,
-			'list_part' => 101
+			'list_part' => 104
 		}
 	},
 	{#State 51
 		ACTIONS => {
-			"-" => 102,
+			"-" => 105,
 			'Ils' => 52,
-			'Block_cache_hit' => 70
+			'Block_cache_hit' => 73
 		},
 		DEFAULT => -19,
 		GOTOS => {
-			'block_flagnew' => 103,
-			'block' => 104
+			'block_flagnew' => 106,
+			'block' => 107
 		}
 	},
 	{#State 52
 		DEFAULT => -65,
 		GOTOS => {
-			'@10-1' => 105
+			'@10-1' => 108
 		}
 	},
 	{#State 53
 		DEFAULT => -28
 	},
 	{#State 54
-		DEFAULT => -41
+		DEFAULT => -69
 	},
 	{#State 55
-		DEFAULT => -45
+		DEFAULT => -41
 	},
 	{#State 56
-		DEFAULT => -93
+		DEFAULT => -45
 	},
 	{#State 57
-		DEFAULT => -15
+		DEFAULT => -72,
+		GOTOS => {
+			'@12-1' => 109
+		}
 	},
 	{#State 58
+		DEFAULT => -97
+	},
+	{#State 59
+		DEFAULT => -15
+	},
+	{#State 60
 		ACTIONS => {
 			'Colon' => 41,
 			'Dpoint_cache_hit' => 44
 		},
 		DEFAULT => -40,
 		GOTOS => {
-			'dpoint' => 106,
-			'dlist_opener' => 61
+			'dpoint' => 110,
+			'dlist_opener' => 63
 		}
-	},
-	{#State 59
-		ACTIONS => {
-			"=" => 107
-		},
-		DEFAULT => -106
-	},
-	{#State 60
-		DEFAULT => -54
 	},
 	{#State 61
-		DEFAULT => -55,
-		GOTOS => {
-			'@7-1' => 108
-		}
+		ACTIONS => {
+			"=" => 111
+		},
+		DEFAULT => -110
 	},
 	{#State 62
-		ACTIONS => {
-			'Opoint_cache_hit' => 67,
-			"#" => 75
-		},
-		DEFAULT => -38,
-		GOTOS => {
-			'opoint' => 109,
-			'opoint_opener' => 48
-		}
+		DEFAULT => -54
 	},
 	{#State 63
-		ACTIONS => {
-			"*" => 47,
-			'Upoint_cache_hit' => 60
-		},
-		DEFAULT => -39,
+		DEFAULT => -55,
 		GOTOS => {
-			'upoint' => 110
+			'@7-1' => 112
 		}
 	},
 	{#State 64
-		DEFAULT => -14
-	},
-	{#State 65
-		DEFAULT => -94
-	},
-	{#State 66
-		DEFAULT => -17
-	},
-	{#State 67
-		DEFAULT => -49
-	},
-	{#State 68
 		ACTIONS => {
-			"/" => 111
+			'Opoint_cache_hit' => 70,
+			"#" => 78
+		},
+		DEFAULT => -38,
+		GOTOS => {
+			'opoint' => 113,
+			'opoint_opener' => 48
 		}
 	},
+	{#State 65
+		ACTIONS => {
+			"*" => 47,
+			'Upoint_cache_hit' => 62
+		},
+		DEFAULT => -39,
+		GOTOS => {
+			'upoint' => 114
+		}
+	},
+	{#State 66
+		DEFAULT => -68
+	},
+	{#State 67
+		DEFAULT => -98
+	},
+	{#State 68
+		DEFAULT => -14
+	},
 	{#State 69
-		DEFAULT => -21
+		DEFAULT => -17
 	},
 	{#State 70
-		DEFAULT => -67
+		DEFAULT => -49
 	},
 	{#State 71
-		DEFAULT => -29
+		ACTIONS => {
+			"/" => 115
+		}
 	},
 	{#State 72
-		DEFAULT => -18
+		DEFAULT => -21
 	},
 	{#State 73
-		DEFAULT => -16
+		DEFAULT => -67
 	},
 	{#State 74
-		DEFAULT => -11
+		DEFAULT => -29
 	},
 	{#State 75
+		DEFAULT => -18
+	},
+	{#State 76
+		DEFAULT => -16
+	},
+	{#State 77
+		DEFAULT => -11
+	},
+	{#State 78
 		ACTIONS => {
-			"#" => 112
+			"#" => 116
 		},
 		DEFAULT => -50
 	},
-	{#State 76
+	{#State 79
 		DEFAULT => -35
 	},
-	{#State 77
+	{#State 80
 		DEFAULT => -60
 	},
-	{#State 78
-		DEFAULT => -70,
-		GOTOS => {
-			'@12-1' => 113
-		}
-	},
-	{#State 79
-		DEFAULT => -13
-	},
-	{#State 80
-		ACTIONS => {
-			"{" => 115
-		},
-		GOTOS => {
-			'used_tagpars' => 114
-		}
-	},
 	{#State 81
-		DEFAULT => -98
+		DEFAULT => -74,
+		GOTOS => {
+			'@13-1' => 117
+		}
 	},
 	{#State 82
-		DEFAULT => -34
+		DEFAULT => -13
 	},
 	{#State 83
-		ACTIONS => {
-			"{" => 115
-		},
-		DEFAULT => -123,
-		GOTOS => {
-			'used_tagpars' => 116,
-			'optional_tagpars' => 117
-		}
+		DEFAULT => -102
 	},
 	{#State 84
+		DEFAULT => -34
+	},
+	{#State 85
 		ACTIONS => {
-			"{" => 115
+			"{" => 119
 		},
 		GOTOS => {
 			'used_tagpars' => 118
 		}
 	},
-	{#State 85
-		ACTIONS => {
-			"{" => 115
-		},
-		GOTOS => {
-			'used_tagpars' => 119
-		}
-	},
 	{#State 86
-		DEFAULT => -5
+		ACTIONS => {
+			"{" => 119
+		},
+		DEFAULT => -127,
+		GOTOS => {
+			'used_tagpars' => 120,
+			'optional_tagpars' => 121
+		}
 	},
 	{#State 87
 		ACTIONS => {
-			'Word' => 120
+			"{" => 119
+		},
+		GOTOS => {
+			'used_tagpars' => 122
 		}
 	},
 	{#State 88
 		ACTIONS => {
-			"{" => 115
+			"{" => 119
 		},
-		DEFAULT => -123,
 		GOTOS => {
-			'used_tagpars' => 116,
-			'optional_tagpars' => 121
+			'used_tagpars' => 123
 		}
 	},
 	{#State 89
-		ACTIONS => {
-			'Include' => 36,
-			'Space' => 23,
-			'Embed' => 29,
-			'Named_variable' => 21,
-			'Word' => 27,
-			'Symbolic_variable' => 33,
-			'Tag_name' => 34,
-			'StreamedPart' => 28
-		},
-		GOTOS => {
-			'elements' => 122,
-			'embedded' => 31,
-			'included' => 24,
-			'tag' => 26,
-			'element' => 123
-		}
+		DEFAULT => -5
 	},
 	{#State 90
 		ACTIONS => {
 			'Word' => 124
-		},
-		GOTOS => {
-			'words' => 125
 		}
 	},
 	{#State 91
 		ACTIONS => {
-			'Word' => 124
+			"{" => 119
 		},
+		DEFAULT => -127,
 		GOTOS => {
-			'words' => 126
+			'used_tagpars' => 120,
+			'optional_tagpars' => 125
 		}
 	},
 	{#State 92
 		ACTIONS => {
-			'Embed' => 29,
+			'Embed' => 30,
 			'Named_variable' => 21,
-			'Table_separator' => 32,
 			'Symbolic_variable' => 33,
 			'Tag_name' => 34,
-			'Table' => 37,
-			'Include' => 36,
 			'Space' => 23,
+			'Include' => 36,
 			'Word' => 27,
-			'EOL' => 65,
 			'StreamedPart' => 28
 		},
-		DEFAULT => -83,
 		GOTOS => {
-			'basic' => 56,
+			'elements' => 126,
 			'embedded' => 31,
-			'table' => 22,
-			'literals' => 127,
-			'element' => 35,
-			'literal' => 128,
-			'table_separator' => 25,
 			'included' => 24,
 			'tag' => 26,
-			'optional_literals' => 129
+			'element' => 127
 		}
 	},
 	{#State 93
 		ACTIONS => {
-			'Embed' => 29,
-			'Named_variable' => 21,
-			'Table_separator' => 32,
-			'Symbolic_variable' => 33,
-			'Tag_name' => 34,
-			'Table' => 37,
-			'Include' => 36,
-			'Space' => 23,
-			'Word' => 27,
-			'EOL' => 65,
-			'StreamedPart' => 28
+			'Word' => 128
 		},
 		GOTOS => {
-			'basic' => 56,
-			'embedded' => 31,
-			'table' => 22,
-			'element' => 35,
-			'literal' => 46,
-			'text' => 130,
-			'included' => 24,
-			'table_separator' => 25,
-			'tag' => 26
+			'words' => 129
 		}
 	},
 	{#State 94
 		ACTIONS => {
-			'Embed' => 29,
-			'Named_variable' => 21,
-			'Table_separator' => 32,
-			'Symbolic_variable' => 33,
-			'Tag_name' => 34,
-			'Table' => 37,
-			'Include' => 36,
-			'Space' => 23,
-			'Word' => 27,
-			'EOL' => 65,
-			'StreamedPart' => 28
+			'Word' => 128
 		},
 		GOTOS => {
-			'basic' => 56,
-			'embedded' => 31,
-			'table' => 22,
-			'element' => 35,
-			'literal' => 46,
-			'text' => 131,
-			'included' => 24,
-			'table_separator' => 25,
-			'tag' => 26
+			'words' => 130
 		}
 	},
 	{#State 95
 		ACTIONS => {
+			'Embed' => 30,
+			'Named_variable' => 21,
+			'Table_separator' => 32,
+			'Symbolic_variable' => 33,
+			'Tag_name' => 34,
 			'Table' => 37,
 			'Include' => 36,
 			'Space' => 23,
-			'Embed' => 29,
+			'Word' => 27,
+			'EOL' => 67,
+			'StreamedPart' => 28
+		},
+		DEFAULT => -87,
+		GOTOS => {
+			'basic' => 58,
+			'embedded' => 31,
+			'table' => 22,
+			'literals' => 131,
+			'element' => 35,
+			'literal' => 132,
+			'included' => 24,
+			'table_separator' => 25,
+			'tag' => 26,
+			'optional_literals' => 133
+		}
+	},
+	{#State 96
+		ACTIONS => {
+			'Embed' => 30,
 			'Named_variable' => 21,
 			'Table_separator' => 32,
-			'Word' => 27,
 			'Symbolic_variable' => 33,
 			'Tag_name' => 34,
+			'Table' => 37,
+			'Include' => 36,
+			'Space' => 23,
+			'Word' => 27,
+			'EOL' => 67,
+			'StreamedPart' => 28
+		},
+		GOTOS => {
+			'basic' => 58,
+			'embedded' => 31,
+			'table' => 22,
+			'element' => 35,
+			'literal' => 46,
+			'text' => 134,
+			'table_separator' => 25,
+			'included' => 24,
+			'tag' => 26
+		}
+	},
+	{#State 97
+		ACTIONS => {
+			'Embed' => 30,
+			'Named_variable' => 21,
+			'Table_separator' => 32,
+			'Symbolic_variable' => 33,
+			'Tag_name' => 34,
+			'Table' => 37,
+			'Include' => 36,
+			'Space' => 23,
+			'Word' => 27,
+			'EOL' => 67,
+			'StreamedPart' => 28
+		},
+		GOTOS => {
+			'basic' => 58,
+			'embedded' => 31,
+			'table' => 22,
+			'element' => 35,
+			'literal' => 46,
+			'text' => 135,
+			'table_separator' => 25,
+			'included' => 24,
+			'tag' => 26
+		}
+	},
+	{#State 98
+		ACTIONS => {
+			'Embed' => 30,
+			'Named_variable' => 21,
+			'Table_separator' => 32,
+			'Symbolic_variable' => 33,
+			'Tag_name' => 34,
+			'Table' => 37,
+			'Include' => 36,
+			'Space' => 23,
+			'Word' => 27,
 			'StreamedPart' => 28
 		},
 		GOTOS => {
 			'basic' => 20,
-			'basics' => 132,
-			'embedded' => 31,
-			'included' => 24,
-			'table_separator' => 25,
-			'table' => 22,
-			'tag' => 26,
-			'element' => 35
-		}
-	},
-	{#State 96
-		DEFAULT => -30
-	},
-	{#State 97
-		DEFAULT => -82
-	},
-	{#State 98
-		ACTIONS => {
-			'Opoint_cache_hit' => 67,
-			'Colon' => 41,
-			"*" => 47,
-			"#" => 75,
-			'Upoint_cache_hit' => 60,
-			'Dpoint_cache_hit' => 44
-		},
-		GOTOS => {
-			'dlist' => 58,
-			'dlist_opener' => 61,
-			'upoint' => 45,
-			'opoint' => 54,
-			'olist' => 62,
-			'dpoint' => 55,
-			'ulist' => 63,
-			'opoint_opener' => 48,
-			'list_part' => 133
-		}
-	},
-	{#State 99
-		DEFAULT => -81
-	},
-	{#State 100
-		DEFAULT => -78,
-		GOTOS => {
-			'@16-1' => 134
-		}
-	},
-	{#State 101
-		DEFAULT => -36
-	},
-	{#State 102
-		DEFAULT => -63,
-		GOTOS => {
-			'@9-1' => 135
-		}
-	},
-	{#State 103
-		ACTIONS => {
-			'Ils' => 52,
-			'Block_cache_hit' => 70
-		},
-		GOTOS => {
-			'compound_block' => 136,
-			'block' => 77
-		}
-	},
-	{#State 104
-		DEFAULT => -61
-	},
-	{#State 105
-		ACTIONS => {
-			'Embed' => 29,
-			'Named_variable' => 21,
-			'Table_separator' => 32,
-			'Symbolic_variable' => 33,
-			'Tag_name' => 34,
-			'Table' => 37,
-			'Include' => 36,
-			'Space' => 23,
-			'Word' => 27,
-			'EOL' => 65,
-			'StreamedPart' => 28
-		},
-		GOTOS => {
-			'basic' => 56,
+			'basics' => 136,
 			'embedded' => 31,
 			'table' => 22,
 			'element' => 35,
-			'literal' => 46,
-			'text' => 137,
-			'included' => 24,
 			'table_separator' => 25,
+			'included' => 24,
 			'tag' => 26
 		}
 	},
+	{#State 99
+		DEFAULT => -30
+	},
+	{#State 100
+		DEFAULT => -86
+	},
+	{#State 101
+		ACTIONS => {
+			'Opoint_cache_hit' => 70,
+			'Colon' => 41,
+			"*" => 47,
+			"#" => 78,
+			'Upoint_cache_hit' => 62,
+			'Dpoint_cache_hit' => 44
+		},
+		GOTOS => {
+			'dlist' => 60,
+			'dlist_opener' => 63,
+			'upoint' => 45,
+			'opoint' => 55,
+			'olist' => 64,
+			'dpoint' => 56,
+			'ulist' => 65,
+			'opoint_opener' => 48,
+			'list_part' => 137
+		}
+	},
+	{#State 102
+		DEFAULT => -85
+	},
+	{#State 103
+		DEFAULT => -82,
+		GOTOS => {
+			'@17-1' => 138
+		}
+	},
+	{#State 104
+		DEFAULT => -36
+	},
+	{#State 105
+		DEFAULT => -63,
+		GOTOS => {
+			'@9-1' => 139
+		}
+	},
 	{#State 106
-		DEFAULT => -46
+		ACTIONS => {
+			'Ils' => 52,
+			'Block_cache_hit' => 73
+		},
+		GOTOS => {
+			'compound_block' => 140,
+			'block' => 80
+		}
 	},
 	{#State 107
-		DEFAULT => -72,
-		GOTOS => {
-			'@13-2' => 138
-		}
+		DEFAULT => -61
 	},
 	{#State 108
 		ACTIONS => {
-			'Embed' => 29,
+			'Embed' => 30,
 			'Named_variable' => 21,
 			'Table_separator' => 32,
 			'Symbolic_variable' => 33,
@@ -2843,40 +2899,24 @@ sub new {
 			'Include' => 36,
 			'Space' => 23,
 			'Word' => 27,
-			'EOL' => 65,
+			'EOL' => 67,
 			'StreamedPart' => 28
 		},
 		GOTOS => {
-			'basic' => 56,
+			'basic' => 58,
 			'embedded' => 31,
 			'table' => 22,
 			'element' => 35,
 			'literal' => 46,
-			'text' => 139,
-			'included' => 24,
+			'text' => 141,
 			'table_separator' => 25,
+			'included' => 24,
 			'tag' => 26
 		}
 	},
 	{#State 109
-		DEFAULT => -42
-	},
-	{#State 110
-		DEFAULT => -44
-	},
-	{#State 111
-		DEFAULT => -74,
-		GOTOS => {
-			'@14-2' => 140
-		}
-	},
-	{#State 112
-		DEFAULT => -51
-	},
-	{#State 113
 		ACTIONS => {
-			'Embed' => 29,
-			'Empty_line' => 143,
+			'Embed' => 30,
 			'Named_variable' => 21,
 			'Table_separator' => 32,
 			'Symbolic_variable' => 33,
@@ -2885,104 +2925,181 @@ sub new {
 			'Include' => 36,
 			'Space' => 23,
 			'Word' => 27,
-			'EOL' => 65,
+			'EOL' => 67,
 			'StreamedPart' => 28
 		},
 		GOTOS => {
-			'basic' => 56,
-			'literal' => 141,
-			'literals_and_empty_lines' => 144,
+			'basic' => 58,
 			'embedded' => 31,
-			'included' => 24,
-			'table_separator' => 25,
 			'table' => 22,
-			'tag' => 26,
-			'literal_or_empty_line' => 142,
-			'element' => 35
+			'element' => 35,
+			'literal' => 46,
+			'text' => 142,
+			'table_separator' => 25,
+			'included' => 24,
+			'tag' => 26
 		}
 	},
-	{#State 114
-		DEFAULT => -144,
+	{#State 110
+		DEFAULT => -46
+	},
+	{#State 111
+		DEFAULT => -76,
 		GOTOS => {
-			'@28-3' => 145
+			'@14-2' => 143
 		}
 	},
-	{#State 115
+	{#State 112
 		ACTIONS => {
-			'Word' => 147
+			'Embed' => 30,
+			'Named_variable' => 21,
+			'Table_separator' => 32,
+			'Symbolic_variable' => 33,
+			'Tag_name' => 34,
+			'Table' => 37,
+			'Include' => 36,
+			'Space' => 23,
+			'Word' => 27,
+			'EOL' => 67,
+			'StreamedPart' => 28
 		},
 		GOTOS => {
-			'tagpars' => 146,
-			'tagpar' => 148
+			'basic' => 58,
+			'embedded' => 31,
+			'table' => 22,
+			'element' => 35,
+			'literal' => 46,
+			'text' => 144,
+			'table_separator' => 25,
+			'included' => 24,
+			'tag' => 26
+		}
+	},
+	{#State 113
+		DEFAULT => -42
+	},
+	{#State 114
+		DEFAULT => -44
+	},
+	{#State 115
+		DEFAULT => -78,
+		GOTOS => {
+			'@15-2' => 145
 		}
 	},
 	{#State 116
-		DEFAULT => -124
+		DEFAULT => -51
 	},
 	{#State 117
-		DEFAULT => -121,
-		GOTOS => {
-			'@19-3' => 149
-		}
-	},
-	{#State 118
-		DEFAULT => -147
-	},
-	{#State 119
-		DEFAULT => -137,
-		GOTOS => {
-			'@24-3' => 150
-		}
-	},
-	{#State 120
-		DEFAULT => -7
-	},
-	{#State 121
-		DEFAULT => -150,
-		GOTOS => {
-			'@32-5' => 151
-		}
-	},
-	{#State 122
 		ACTIONS => {
-			'Include' => 36,
-			'Space' => 23,
-			'Colon' => 152,
-			'Embed' => 29,
+			'Embed' => 30,
+			'Empty_line' => 148,
 			'Named_variable' => 21,
-			'Word' => 27,
+			'Table_separator' => 32,
 			'Symbolic_variable' => 33,
 			'Tag_name' => 34,
+			'Table' => 37,
+			'Include' => 36,
+			'Space' => 23,
+			'Word' => 27,
+			'EOL' => 67,
 			'StreamedPart' => 28
 		},
 		GOTOS => {
+			'basic' => 58,
 			'embedded' => 31,
+			'table' => 22,
+			'literal_or_empty_line' => 147,
+			'element' => 35,
+			'literal' => 146,
+			'literals_and_empty_lines' => 149,
 			'included' => 24,
-			'tag' => 26,
-			'element' => 153
+			'table_separator' => 25,
+			'tag' => 26
 		}
 	},
+	{#State 118
+		DEFAULT => -148,
+		GOTOS => {
+			'@29-3' => 150
+		}
+	},
+	{#State 119
+		ACTIONS => {
+			'Word' => 152
+		},
+		GOTOS => {
+			'tagpars' => 151,
+			'tagpar' => 153
+		}
+	},
+	{#State 120
+		DEFAULT => -128
+	},
+	{#State 121
+		DEFAULT => -125,
+		GOTOS => {
+			'@20-3' => 154
+		}
+	},
+	{#State 122
+		DEFAULT => -151
+	},
 	{#State 123
-		DEFAULT => -102
+		DEFAULT => -141,
+		GOTOS => {
+			'@25-3' => 155
+		}
 	},
 	{#State 124
-		DEFAULT => -114
+		DEFAULT => -7
 	},
 	{#State 125
-		ACTIONS => {
-			'Word' => 154,
-			'EOL' => 155
+		DEFAULT => -154,
+		GOTOS => {
+			'@33-5' => 156
 		}
 	},
 	{#State 126
 		ACTIONS => {
-			'Empty_line' => 156,
-			'Word' => 154
+			'Colon' => 157,
+			'Embed' => 30,
+			'Named_variable' => 21,
+			'Symbolic_variable' => 33,
+			'Tag_name' => 34,
+			'Include' => 36,
+			'Space' => 23,
+			'Word' => 27,
+			'StreamedPart' => 28
+		},
+		GOTOS => {
+			'embedded' => 31,
+			'included' => 24,
+			'tag' => 26,
+			'element' => 158
 		}
 	},
 	{#State 127
+		DEFAULT => -106
+	},
+	{#State 128
+		DEFAULT => -118
+	},
+	{#State 129
 		ACTIONS => {
-			'Embed' => 29,
+			'Word' => 159,
+			'EOL' => 160
+		}
+	},
+	{#State 130
+		ACTIONS => {
+			'Empty_line' => 161,
+			'Word' => 159
+		}
+	},
+	{#State 131
+		ACTIONS => {
+			'Embed' => 30,
 			'Named_variable' => 21,
 			'Table_separator' => 32,
 			'Symbolic_variable' => 33,
@@ -2991,41 +3108,41 @@ sub new {
 			'Include' => 36,
 			'Space' => 23,
 			'Word' => 27,
-			'EOL' => 65,
+			'EOL' => 67,
 			'StreamedPart' => 28
 		},
-		DEFAULT => -84,
+		DEFAULT => -88,
 		GOTOS => {
-			'basic' => 56,
-			'literal' => 157,
+			'basic' => 58,
 			'embedded' => 31,
-			'included' => 24,
-			'table_separator' => 25,
 			'table' => 22,
-			'tag' => 26,
-			'element' => 35
+			'element' => 35,
+			'literal' => 162,
+			'table_separator' => 25,
+			'included' => 24,
+			'tag' => 26
 		}
-	},
-	{#State 128
-		DEFAULT => -85
-	},
-	{#State 129
-		ACTIONS => {
-			'Empty_line' => 158
-		}
-	},
-	{#State 130
-		DEFAULT => -53
-	},
-	{#State 131
-		DEFAULT => -48
 	},
 	{#State 132
+		DEFAULT => -89
+	},
+	{#State 133
 		ACTIONS => {
-			'Embed' => 29,
+			'Empty_line' => 163
+		}
+	},
+	{#State 134
+		DEFAULT => -53
+	},
+	{#State 135
+		DEFAULT => -48
+	},
+	{#State 136
+		ACTIONS => {
+			'Embed' => 30,
 			'Named_variable' => 21,
 			'Table_separator' => 32,
-			"~" => 159,
+			"~" => 164,
 			'Symbolic_variable' => 33,
 			'Tag_name' => 34,
 			'Table' => 37,
@@ -3036,51 +3153,54 @@ sub new {
 		},
 		DEFAULT => -31,
 		GOTOS => {
-			'basic' => 81,
+			'basic' => 83,
 			'embedded' => 31,
-			'optional_headline_shortcut' => 160,
-			'included' => 24,
-			'table_separator' => 25,
 			'table' => 22,
-			'tag' => 26,
-			'element' => 35
-		}
-	},
-	{#State 133
-		DEFAULT => -37
-	},
-	{#State 134
-		ACTIONS => {
-			'Number' => 161
-		},
-		DEFAULT => -112,
-		GOTOS => {
-			'optional_number' => 162
-		}
-	},
-	{#State 135
-		ACTIONS => {
-			'Empty_line' => 163
-		}
-	},
-	{#State 136
-		ACTIONS => {
-			"-" => 102,
-			'Ils' => 52,
-			'Block_cache_hit' => 70
-		},
-		DEFAULT => -62,
-		GOTOS => {
-			'block_flagnew' => 103,
-			'block' => 104
+			'element' => 35,
+			'table_separator' => 25,
+			'included' => 24,
+			'optional_headline_shortcut' => 165,
+			'tag' => 26
 		}
 	},
 	{#State 137
-		DEFAULT => -66
+		DEFAULT => -37
 	},
 	{#State 138
 		ACTIONS => {
-			'Embed' => 29,
+			'Number' => 166
+		},
+		DEFAULT => -116,
+		GOTOS => {
+			'optional_number' => 167
+		}
+	},
+	{#State 139
+		ACTIONS => {
+			'Empty_line' => 168
+		}
+	},
+	{#State 140
+		ACTIONS => {
+			"-" => 105,
+			'Ils' => 52,
+			'Block_cache_hit' => 73
+		},
+		DEFAULT => -62,
+		GOTOS => {
+			'block_flagnew' => 106,
+			'block' => 107
+		}
+	},
+	{#State 141
+		DEFAULT => -66
+	},
+	{#State 142
+		DEFAULT => -73
+	},
+	{#State 143
+		ACTIONS => {
+			'Embed' => 30,
 			'Named_variable' => 21,
 			'Table_separator' => 32,
 			'Symbolic_variable' => 33,
@@ -3089,91 +3209,27 @@ sub new {
 			'Include' => 36,
 			'Space' => 23,
 			'Word' => 27,
-			'EOL' => 65,
+			'EOL' => 67,
 			'StreamedPart' => 28
 		},
 		GOTOS => {
-			'basic' => 56,
+			'basic' => 58,
 			'embedded' => 31,
 			'table' => 22,
 			'element' => 35,
 			'literal' => 46,
-			'text' => 164,
-			'included' => 24,
+			'text' => 169,
 			'table_separator' => 25,
+			'included' => 24,
 			'tag' => 26
 		}
 	},
-	{#State 139
-		DEFAULT => -56
-	},
-	{#State 140
-		ACTIONS => {
-			'Embed' => 29,
-			'Named_variable' => 21,
-			'Table_separator' => 32,
-			'Symbolic_variable' => 33,
-			'Tag_name' => 34,
-			'Table' => 37,
-			'Include' => 36,
-			'Space' => 23,
-			'Word' => 27,
-			'StreamedPart' => 28
-		},
-		DEFAULT => -95,
-		GOTOS => {
-			'basic' => 20,
-			'basics' => 165,
-			'embedded' => 31,
-			'table' => 22,
-			'element' => 35,
-			'included' => 24,
-			'table_separator' => 25,
-			'tag' => 26,
-			'optional_basics' => 166
-		}
-	},
-	{#State 141
-		DEFAULT => -91
-	},
-	{#State 142
-		DEFAULT => -89
-	},
-	{#State 143
-		DEFAULT => -92
-	},
 	{#State 144
-		ACTIONS => {
-			'Embed' => 29,
-			'Empty_line' => 143,
-			'Named_variable' => 21,
-			'Table_separator' => 32,
-			'Symbolic_variable' => 33,
-			'Tag_name' => 34,
-			'Table' => 37,
-			'Include' => 36,
-			'Space' => 23,
-			'Word' => 27,
-			'Heredoc_close' => 168,
-			'EOL' => 65,
-			'StreamedPart' => 28
-		},
-		GOTOS => {
-			'basic' => 56,
-			'literal' => 141,
-			'embedded' => 31,
-			'included' => 24,
-			'table_separator' => 25,
-			'table' => 22,
-			'tag' => 26,
-			'literal_or_empty_line' => 167,
-			'element' => 35
-		}
+		DEFAULT => -56
 	},
 	{#State 145
 		ACTIONS => {
-			'Embed' => 29,
-			'Empty_line' => 143,
+			'Embed' => 30,
 			'Named_variable' => 21,
 			'Table_separator' => 32,
 			'Symbolic_variable' => 33,
@@ -3182,52 +3238,62 @@ sub new {
 			'Include' => 36,
 			'Space' => 23,
 			'Word' => 27,
-			'EOL' => 65,
 			'StreamedPart' => 28
 		},
-		DEFAULT => -87,
+		DEFAULT => -99,
 		GOTOS => {
-			'basic' => 56,
+			'basic' => 20,
+			'basics' => 170,
 			'embedded' => 31,
-			'optional_literals_and_empty_lines' => 170,
 			'table' => 22,
-			'literal_or_empty_line' => 142,
 			'element' => 35,
-			'literal' => 141,
-			'literals_and_empty_lines' => 169,
 			'table_separator' => 25,
 			'included' => 24,
-			'tag' => 26
+			'tag' => 26,
+			'optional_basics' => 171
 		}
 	},
 	{#State 146
-		ACTIONS => {
-			'Space' => 172,
-			"}" => 171
-		}
+		DEFAULT => -95
 	},
 	{#State 147
-		DEFAULT => -128,
-		GOTOS => {
-			'@20-1' => 173
-		}
+		DEFAULT => -93
 	},
 	{#State 148
-		DEFAULT => -126
+		DEFAULT => -96
 	},
 	{#State 149
 		ACTIONS => {
-			"<" => 174
+			'Embed' => 30,
+			'Empty_line' => 148,
+			'Named_variable' => 21,
+			'Table_separator' => 32,
+			'Symbolic_variable' => 33,
+			'Tag_name' => 34,
+			'Table' => 37,
+			'Include' => 36,
+			'Space' => 23,
+			'Word' => 27,
+			'Heredoc_close' => 173,
+			'EOL' => 67,
+			'StreamedPart' => 28
 		},
-		DEFAULT => -133,
 		GOTOS => {
-			'optional_tagbody' => 175
+			'basic' => 58,
+			'embedded' => 31,
+			'table' => 22,
+			'literal_or_empty_line' => 172,
+			'element' => 35,
+			'literal' => 146,
+			'included' => 24,
+			'table_separator' => 25,
+			'tag' => 26
 		}
 	},
 	{#State 150
 		ACTIONS => {
-			'Embed' => 29,
-			'Empty_line' => 143,
+			'Embed' => 30,
+			'Empty_line' => 148,
 			'Named_variable' => 21,
 			'Table_separator' => 32,
 			'Symbolic_variable' => 33,
@@ -3236,86 +3302,52 @@ sub new {
 			'Include' => 36,
 			'Space' => 23,
 			'Word' => 27,
-			'EOL' => 65,
+			'EOL' => 67,
 			'StreamedPart' => 28
 		},
-		DEFAULT => -87,
+		DEFAULT => -91,
 		GOTOS => {
-			'basic' => 56,
+			'basic' => 58,
 			'embedded' => 31,
-			'optional_literals_and_empty_lines' => 176,
+			'optional_literals_and_empty_lines' => 175,
 			'table' => 22,
-			'literal_or_empty_line' => 142,
+			'literal_or_empty_line' => 147,
 			'element' => 35,
-			'literal' => 141,
-			'literals_and_empty_lines' => 169,
-			'table_separator' => 25,
+			'literal' => 146,
+			'literals_and_empty_lines' => 174,
 			'included' => 24,
+			'table_separator' => 25,
 			'tag' => 26
 		}
 	},
 	{#State 151
 		ACTIONS => {
-			'Colon' => 177
+			'Space' => 177,
+			"}" => 176
 		}
 	},
 	{#State 152
-		DEFAULT => -59
+		DEFAULT => -132,
+		GOTOS => {
+			'@21-1' => 178
+		}
 	},
 	{#State 153
-		DEFAULT => -103
+		DEFAULT => -130
 	},
 	{#State 154
-		DEFAULT => -115
+		ACTIONS => {
+			"<" => 179
+		},
+		DEFAULT => -137,
+		GOTOS => {
+			'optional_tagbody' => 180
+		}
 	},
 	{#State 155
-		DEFAULT => -141,
-		GOTOS => {
-			'@26-4' => 178
-		}
-	},
-	{#State 156
-		DEFAULT => -77
-	},
-	{#State 157
-		DEFAULT => -86
-	},
-	{#State 158
-		DEFAULT => -69
-	},
-	{#State 159
 		ACTIONS => {
-			'Space' => 180,
-			'Word' => 182
-		},
-		GOTOS => {
-			'words_or_spaces' => 181,
-			'word_or_space' => 179
-		}
-	},
-	{#State 160
-		ACTIONS => {
-			'Empty_line' => 183
-		}
-	},
-	{#State 161
-		DEFAULT => -113
-	},
-	{#State 162
-		DEFAULT => -79,
-		GOTOS => {
-			'@17-3' => 184
-		}
-	},
-	{#State 163
-		DEFAULT => -64
-	},
-	{#State 164
-		DEFAULT => -73
-	},
-	{#State 165
-		ACTIONS => {
-			'Embed' => 29,
+			'Embed' => 30,
+			'Empty_line' => 148,
 			'Named_variable' => 21,
 			'Table_separator' => 32,
 			'Symbolic_variable' => 33,
@@ -3324,262 +3356,99 @@ sub new {
 			'Include' => 36,
 			'Space' => 23,
 			'Word' => 27,
+			'EOL' => 67,
 			'StreamedPart' => 28
 		},
-		DEFAULT => -96,
+		DEFAULT => -91,
 		GOTOS => {
-			'basic' => 81,
+			'basic' => 58,
 			'embedded' => 31,
-			'included' => 24,
-			'table_separator' => 25,
+			'optional_literals_and_empty_lines' => 181,
 			'table' => 22,
-			'tag' => 26,
-			'element' => 35
-		}
-	},
-	{#State 166
-		ACTIONS => {
-			'Empty_line' => 185
-		}
-	},
-	{#State 167
-		DEFAULT => -90
-	},
-	{#State 168
-		DEFAULT => -71
-	},
-	{#State 169
-		ACTIONS => {
-			'Embed' => 29,
-			'Empty_line' => 143,
-			'Named_variable' => 21,
-			'Table_separator' => 32,
-			'Symbolic_variable' => 33,
-			'Tag_name' => 34,
-			'Table' => 37,
-			'Include' => 36,
-			'Space' => 23,
-			'Word' => 27,
-			'EOL' => 65,
-			'StreamedPart' => 28
-		},
-		DEFAULT => -88,
-		GOTOS => {
-			'basic' => 56,
-			'literal' => 141,
-			'embedded' => 31,
-			'included' => 24,
-			'table_separator' => 25,
-			'table' => 22,
-			'tag' => 26,
-			'literal_or_empty_line' => 167,
-			'element' => 35
-		}
-	},
-	{#State 170
-		ACTIONS => {
-			'Embedded' => 186
-		}
-	},
-	{#State 171
-		DEFAULT => -125
-	},
-	{#State 172
-		ACTIONS => {
-			'Word' => 147
-		},
-		GOTOS => {
-			'tagpar' => 187
-		}
-	},
-	{#State 173
-		ACTIONS => {
-			"=" => 188
-		}
-	},
-	{#State 174
-		DEFAULT => -134,
-		GOTOS => {
-			'@22-1' => 189
-		}
-	},
-	{#State 175
-		DEFAULT => -122
-	},
-	{#State 176
-		ACTIONS => {
-			'Tabled' => 190
-		}
-	},
-	{#State 177
-		DEFAULT => -151,
-		GOTOS => {
-			'@33-7' => 191
-		}
-	},
-	{#State 178
-		ACTIONS => {
-			'Embed' => 29,
-			'Named_variable' => 21,
-			'Table_separator' => 32,
-			'Symbolic_variable' => 33,
-			'Tag_name' => 34,
-			'Table' => 37,
-			'Include' => 36,
-			'Space' => 23,
-			'Word' => 27,
-			'EOL' => 65,
-			'StreamedPart' => 28
-		},
-		DEFAULT => -83,
-		GOTOS => {
-			'basic' => 56,
-			'embedded' => 31,
-			'table' => 22,
-			'literals' => 127,
+			'literal_or_empty_line' => 147,
 			'element' => 35,
-			'literal' => 128,
-			'table_separator' => 25,
-			'included' => 24,
-			'tag' => 26,
-			'optional_literals' => 192
-		}
-	},
-	{#State 179
-		DEFAULT => -116
-	},
-	{#State 180
-		DEFAULT => -119
-	},
-	{#State 181
-		ACTIONS => {
-			'Space' => 180,
-			'Word' => 182
-		},
-		DEFAULT => -32,
-		GOTOS => {
-			'word_or_space' => 193
-		}
-	},
-	{#State 182
-		DEFAULT => -118
-	},
-	{#State 183
-		DEFAULT => -27
-	},
-	{#State 184
-		ACTIONS => {
-			'Empty_line' => 194
-		}
-	},
-	{#State 185
-		DEFAULT => -75
-	},
-	{#State 186
-		DEFAULT => -145
-	},
-	{#State 187
-		DEFAULT => -127
-	},
-	{#State 188
-		DEFAULT => -129,
-		GOTOS => {
-			'@21-3' => 195
-		}
-	},
-	{#State 189
-		ACTIONS => {
-			'Embed' => 29,
-			'Named_variable' => 21,
-			'Table_separator' => 32,
-			'Symbolic_variable' => 33,
-			'Tag_name' => 34,
-			'Table' => 37,
-			'Include' => 36,
-			'Space' => 23,
-			'Word' => 27,
-			'EOL' => 65,
-			'StreamedPart' => 28
-		},
-		GOTOS => {
-			'basic' => 56,
-			'literal' => 128,
-			'embedded' => 31,
-			'included' => 24,
-			'table_separator' => 25,
-			'table' => 22,
-			'tag' => 26,
-			'literals' => 196,
-			'element' => 35
-		}
-	},
-	{#State 190
-		DEFAULT => -138
-	},
-	{#State 191
-		ACTIONS => {
-			'Embed' => 29,
-			'Named_variable' => 21,
-			'Table_separator' => 32,
-			'Symbolic_variable' => 33,
-			'Tag_name' => 34,
-			'Table' => 37,
-			'Include' => 36,
-			'Space' => 23,
-			'Word' => 27,
-			'EOL' => 65,
-			'StreamedPart' => 28
-		},
-		GOTOS => {
-			'basic' => 56,
-			'embedded' => 31,
-			'table' => 22,
-			'element' => 35,
-			'literal' => 46,
-			'text' => 197,
+			'literal' => 146,
+			'literals_and_empty_lines' => 174,
 			'included' => 24,
 			'table_separator' => 25,
 			'tag' => 26
 		}
 	},
-	{#State 192
+	{#State 156
 		ACTIONS => {
-			'Empty_line' => 198
+			'Colon' => 182
 		}
 	},
-	{#State 193
-		DEFAULT => -117
+	{#State 157
+		DEFAULT => -59
 	},
-	{#State 194
-		DEFAULT => -80
+	{#State 158
+		DEFAULT => -107
 	},
-	{#State 195
+	{#State 159
+		DEFAULT => -119
+	},
+	{#State 160
+		DEFAULT => -145,
+		GOTOS => {
+			'@27-4' => 183
+		}
+	},
+	{#State 161
+		DEFAULT => -81
+	},
+	{#State 162
+		DEFAULT => -90
+	},
+	{#State 163
+		DEFAULT => -71
+	},
+	{#State 164
 		ACTIONS => {
-			"\"" => 201,
-			'Word' => 199
+			'Space' => 185,
+			'Word' => 187
 		},
 		GOTOS => {
-			'tagvalue' => 200
+			'words_or_spaces' => 186,
+			'word_or_space' => 184
 		}
 	},
-	{#State 196
+	{#State 165
 		ACTIONS => {
+			'Empty_line' => 188
+		}
+	},
+	{#State 166
+		DEFAULT => -117
+	},
+	{#State 167
+		DEFAULT => -83,
+		GOTOS => {
+			'@18-3' => 189
+		}
+	},
+	{#State 168
+		DEFAULT => -64
+	},
+	{#State 169
+		DEFAULT => -77
+	},
+	{#State 170
+		ACTIONS => {
+			'Embed' => 30,
+			'Named_variable' => 21,
+			'Table_separator' => 32,
+			'Symbolic_variable' => 33,
+			'Tag_name' => 34,
 			'Table' => 37,
 			'Include' => 36,
 			'Space' => 23,
-			'Embed' => 29,
-			'Named_variable' => 21,
-			'Table_separator' => 32,
 			'Word' => 27,
-			'Symbolic_variable' => 33,
-			'EOL' => 65,
-			'Tag_name' => 34,
-			'StreamedPart' => 28,
-			">" => 202
+			'StreamedPart' => 28
 		},
+		DEFAULT => -100,
 		GOTOS => {
-			'basic' => 56,
-			'literal' => 157,
+			'basic' => 83,
 			'embedded' => 31,
 			'included' => 24,
 			'table_separator' => 25,
@@ -3588,48 +3457,299 @@ sub new {
 			'element' => 35
 		}
 	},
-	{#State 197
-		DEFAULT => -152
-	},
-	{#State 198
-		DEFAULT => -142
-	},
-	{#State 199
-		DEFAULT => -131
-	},
-	{#State 200
-		DEFAULT => -130
-	},
-	{#State 201
+	{#State 171
 		ACTIONS => {
+			'Empty_line' => 190
+		}
+	},
+	{#State 172
+		DEFAULT => -94
+	},
+	{#State 173
+		DEFAULT => -75
+	},
+	{#State 174
+		ACTIONS => {
+			'Embed' => 30,
+			'Empty_line' => 148,
+			'Named_variable' => 21,
+			'Table_separator' => 32,
+			'Symbolic_variable' => 33,
+			'Tag_name' => 34,
 			'Table' => 37,
 			'Include' => 36,
 			'Space' => 23,
-			'Embed' => 29,
+			'Word' => 27,
+			'EOL' => 67,
+			'StreamedPart' => 28
+		},
+		DEFAULT => -92,
+		GOTOS => {
+			'basic' => 58,
+			'embedded' => 31,
+			'table' => 22,
+			'literal_or_empty_line' => 172,
+			'element' => 35,
+			'literal' => 146,
+			'included' => 24,
+			'table_separator' => 25,
+			'tag' => 26
+		}
+	},
+	{#State 175
+		ACTIONS => {
+			'Embedded' => 191
+		}
+	},
+	{#State 176
+		DEFAULT => -129
+	},
+	{#State 177
+		ACTIONS => {
+			'Word' => 152
+		},
+		GOTOS => {
+			'tagpar' => 192
+		}
+	},
+	{#State 178
+		ACTIONS => {
+			"=" => 193
+		}
+	},
+	{#State 179
+		DEFAULT => -138,
+		GOTOS => {
+			'@23-1' => 194
+		}
+	},
+	{#State 180
+		DEFAULT => -126
+	},
+	{#State 181
+		ACTIONS => {
+			'Tabled' => 195
+		}
+	},
+	{#State 182
+		DEFAULT => -155,
+		GOTOS => {
+			'@34-7' => 196
+		}
+	},
+	{#State 183
+		ACTIONS => {
+			'Embed' => 30,
 			'Named_variable' => 21,
 			'Table_separator' => 32,
-			'Word' => 27,
 			'Symbolic_variable' => 33,
 			'Tag_name' => 34,
+			'Table' => 37,
+			'Include' => 36,
+			'Space' => 23,
+			'Word' => 27,
+			'EOL' => 67,
+			'StreamedPart' => 28
+		},
+		DEFAULT => -87,
+		GOTOS => {
+			'basic' => 58,
+			'embedded' => 31,
+			'table' => 22,
+			'literals' => 131,
+			'element' => 35,
+			'literal' => 132,
+			'included' => 24,
+			'table_separator' => 25,
+			'tag' => 26,
+			'optional_literals' => 197
+		}
+	},
+	{#State 184
+		DEFAULT => -120
+	},
+	{#State 185
+		DEFAULT => -123
+	},
+	{#State 186
+		ACTIONS => {
+			'Space' => 185,
+			'Word' => 187
+		},
+		DEFAULT => -32,
+		GOTOS => {
+			'word_or_space' => 198
+		}
+	},
+	{#State 187
+		DEFAULT => -122
+	},
+	{#State 188
+		DEFAULT => -27
+	},
+	{#State 189
+		ACTIONS => {
+			'Empty_line' => 199
+		}
+	},
+	{#State 190
+		DEFAULT => -79
+	},
+	{#State 191
+		DEFAULT => -149
+	},
+	{#State 192
+		DEFAULT => -131
+	},
+	{#State 193
+		DEFAULT => -133,
+		GOTOS => {
+			'@22-3' => 200
+		}
+	},
+	{#State 194
+		ACTIONS => {
+			'Embed' => 30,
+			'Named_variable' => 21,
+			'Table_separator' => 32,
+			'Symbolic_variable' => 33,
+			'Tag_name' => 34,
+			'Table' => 37,
+			'Include' => 36,
+			'Space' => 23,
+			'Word' => 27,
+			'EOL' => 67,
+			'StreamedPart' => 28
+		},
+		GOTOS => {
+			'basic' => 58,
+			'embedded' => 31,
+			'table' => 22,
+			'literals' => 201,
+			'element' => 35,
+			'literal' => 132,
+			'included' => 24,
+			'table_separator' => 25,
+			'tag' => 26
+		}
+	},
+	{#State 195
+		DEFAULT => -142
+	},
+	{#State 196
+		ACTIONS => {
+			'Embed' => 30,
+			'Named_variable' => 21,
+			'Table_separator' => 32,
+			'Symbolic_variable' => 33,
+			'Tag_name' => 34,
+			'Table' => 37,
+			'Include' => 36,
+			'Space' => 23,
+			'Word' => 27,
+			'EOL' => 67,
+			'StreamedPart' => 28
+		},
+		GOTOS => {
+			'basic' => 58,
+			'embedded' => 31,
+			'table' => 22,
+			'element' => 35,
+			'literal' => 46,
+			'text' => 202,
+			'table_separator' => 25,
+			'included' => 24,
+			'tag' => 26
+		}
+	},
+	{#State 197
+		ACTIONS => {
+			'Empty_line' => 203
+		}
+	},
+	{#State 198
+		DEFAULT => -121
+	},
+	{#State 199
+		DEFAULT => -84
+	},
+	{#State 200
+		ACTIONS => {
+			"\"" => 206,
+			'Word' => 204
+		},
+		GOTOS => {
+			'tagvalue' => 205
+		}
+	},
+	{#State 201
+		ACTIONS => {
+			'Embed' => 30,
+			'Named_variable' => 21,
+			'Table_separator' => 32,
+			'Symbolic_variable' => 33,
+			'Tag_name' => 34,
+			'Table' => 37,
+			'Include' => 36,
+			'Space' => 23,
+			'Word' => 27,
+			'EOL' => 67,
+			'StreamedPart' => 28,
+			">" => 207
+		},
+		GOTOS => {
+			'basic' => 58,
+			'embedded' => 31,
+			'table' => 22,
+			'element' => 35,
+			'literal' => 162,
+			'table_separator' => 25,
+			'included' => 24,
+			'tag' => 26
+		}
+	},
+	{#State 202
+		DEFAULT => -156
+	},
+	{#State 203
+		DEFAULT => -146
+	},
+	{#State 204
+		DEFAULT => -135
+	},
+	{#State 205
+		DEFAULT => -134
+	},
+	{#State 206
+		ACTIONS => {
+			'Embed' => 30,
+			'Named_variable' => 21,
+			'Table_separator' => 32,
+			'Symbolic_variable' => 33,
+			'Tag_name' => 34,
+			'Table' => 37,
+			'Include' => 36,
+			'Space' => 23,
+			'Word' => 27,
 			'StreamedPart' => 28
 		},
 		GOTOS => {
 			'basic' => 20,
-			'basics' => 203,
+			'basics' => 208,
 			'embedded' => 31,
-			'included' => 24,
-			'table_separator' => 25,
 			'table' => 22,
-			'tag' => 26,
-			'element' => 35
+			'element' => 35,
+			'table_separator' => 25,
+			'included' => 24,
+			'tag' => 26
 		}
 	},
-	{#State 202
-		DEFAULT => -135
+	{#State 207
+		DEFAULT => -139
 	},
-	{#State 203
+	{#State 208
 		ACTIONS => {
-			'Embed' => 29,
+			'Embed' => 30,
 			'Named_variable' => 21,
 			'Table_separator' => 32,
 			'Symbolic_variable' => 33,
@@ -3637,12 +3757,12 @@ sub new {
 			'Table' => 37,
 			'Include' => 36,
 			'Space' => 23,
-			"\"" => 204,
+			"\"" => 209,
 			'Word' => 27,
 			'StreamedPart' => 28
 		},
 		GOTOS => {
-			'basic' => 81,
+			'basic' => 83,
 			'embedded' => 31,
 			'included' => 24,
 			'table_separator' => 25,
@@ -3651,8 +3771,8 @@ sub new {
 			'element' => 35
 		}
 	},
-	{#State 204
-		DEFAULT => -132
+	{#State 209
+		DEFAULT => -136
 	}
 ],
                                   yyrules  =>
@@ -3663,10 +3783,10 @@ sub new {
 	[#Rule 1
 		 'document', 1,
 sub
-#line 1573 "ppParser.yp"
+#line 1649 "ppParser.yp"
 {
              # skip empty "paragraphs"
-             unless ($_[1][0] eq '' or not @{$_[1][0]})
+             unless ($_[1][0]=~/^\s*$/ or not @{$_[1][0]})
               {
                # add data to the output stream
                push(@{$resultStreamRef->[STREAM_TOKENS]}, @{$_[1][0]});
@@ -3690,10 +3810,20 @@ sub
                   # update headline stream by adding the token index of the headline
                   push(@{$resultStreamRef->[STREAM_HEADLINES]}, @{$resultStreamRef->[STREAM_TOKENS]}-@{$_[1][0]});
 
+                  # add a copy of the variables valid at the end of the page
+                  $_[1][0][0][STREAM_DIR_HINTS]{vars}=dclone(\%variables);
+
                   # let the user know that something is going on
                   print STDERR "\r", ' ' x length('[Info] '), '... ', $statistics{&DIRECTIVE_HEADLINE}, " chapters read."
                     if     $flags{vis}
                        and not $statistics{&DIRECTIVE_HEADLINE} % $flags{vis};
+                 }
+                elsif ($_[1][0][0][STREAM_DIR_TYPE]!=DIRECTIVE_COMMENT)
+                 {
+                  # the document starts with streamed content before the first headline,
+                  # this is considered an error
+                  semerr($_[0], "$sourceFile, line $_[1][1]: the first chapter needs a headline, please add one.") unless exists $flags{complainedAbout1stHeadline};
+                  $flags{complainedAbout1stHeadline}=1;
                  }
 
                # this is for the parser to flag success
@@ -3704,10 +3834,10 @@ sub
 	[#Rule 2
 		 'document', 2,
 sub
-#line 1610 "ppParser.yp"
+#line 1696 "ppParser.yp"
 {
              # skip empty "paragraphs"
-             unless ($_[2][0] eq '' or not @{$_[2][0]})
+             unless ($_[2][0]=~/^\s*$/ or not @{$_[2][0]})
               {
                # add data to the output stream, if necessary
                push(@{$resultStreamRef->[STREAM_TOKENS]}, @{$_[2][0]});
@@ -3734,10 +3864,20 @@ sub
                   # update headline stream by adding the token index of the headline
                   push(@{$resultStreamRef->[STREAM_HEADLINES]}, @{$resultStreamRef->[STREAM_TOKENS]}-@{$_[2][0]});
 
+                  # add a copy of the variables valid at the end of the page
+                  $_[2][0][0][STREAM_DIR_HINTS]{vars}=dclone(\%variables);
+
                   # let the user know that something is going on, if necessary
                   print STDERR "\r", ' ' x length('[Info] '), '... ', $statistics{&DIRECTIVE_HEADLINE}, " chapters read."
                     if     $flags{vis}
                        and not $statistics{&DIRECTIVE_HEADLINE} % $flags{vis};
+                 }
+               elsif ($_[2][0][0][STREAM_DIR_TYPE]!=DIRECTIVE_COMMENT and not @{$resultStreamRef->[STREAM_HEADLINES]} and not exists $flags{complainedAbout1stHeadline})
+                 {
+                  # the document starts with streamed content before the first headline,
+                  # this is considered an error
+                  semerr($_[0], "$sourceFile, line $_[2][1]: the first chapter needs a headline, please add one.");
+                  $flags{complainedAbout1stHeadline}=1;
                  }
 
                # this is for the parser to flag success
@@ -3751,7 +3891,7 @@ sub
 	[#Rule 4
 		 '@1-1', 0,
 sub
-#line 1655 "ppParser.yp"
+#line 1751 "ppParser.yp"
 {
                               # switch to pfiltered mode
                               stateManager(STATE_PFILTER);
@@ -3760,7 +3900,7 @@ sub
 	[#Rule 5
 		 'optional_paragraph_filter', 4,
 sub
-#line 1660 "ppParser.yp"
+#line 1756 "ppParser.yp"
 {
                               # back to default mode
                               stateManager(STATE_PFILTERED);
@@ -3772,7 +3912,7 @@ sub
 	[#Rule 6
 		 'paragraph_filters', 1,
 sub
-#line 1672 "ppParser.yp"
+#line 1768 "ppParser.yp"
 {
                       # start a new filter list
                       [[$_[1][0]], $_[1][1]];
@@ -3781,7 +3921,7 @@ sub
 	[#Rule 7
 		 'paragraph_filters', 3,
 sub
-#line 1677 "ppParser.yp"
+#line 1773 "ppParser.yp"
 {
                       # append to filter list and reply updated list
                       push(@{$_[1][0]}, $_[3][0]);
@@ -3797,7 +3937,7 @@ sub
 	[#Rule 10
 		 '@2-1', 0,
 sub
-#line 1694 "ppParser.yp"
+#line 1790 "ppParser.yp"
 {
                     # filter set?
                     if ($_[1])
@@ -3814,7 +3954,7 @@ sub
 	[#Rule 11
 		 'built_paragraph', 3,
 sub
-#line 1707 "ppParser.yp"
+#line 1803 "ppParser.yp"
 {
                     # reset the "extra token" flag (it already worked when the parser
                     # reaches this point)
@@ -3834,7 +3974,7 @@ sub
                             }
 
                           # peform filter call(s)
-                          my $result=pfilterCall($_[1][0], $_[3][0], $_[3][1]);
+                          my $result=pfilterCall($_[0], $_[1][0], $_[3][0], $_[3][1]);
 
                           # reply unmodified paragraph in case of an error
                           return $_[3] unless defined $result;
@@ -3873,25 +4013,28 @@ sub
 	[#Rule 14
 		 'original_paragraph', 1,
 sub
-#line 1761 "ppParser.yp"
+#line 1857 "ppParser.yp"
 {
                       # check if this paragraph consists of exactly one table only
+                      # or exactly one tag which is allowed to exists standalone
                       if (
-                           # starting with a table tag?
-                               ref($_[1][0][1]) eq 'ARRAY'
-                           and $_[1][0][1][STREAM_DIR_TYPE]==DIRECTIVE_TAG
-                           and $_[1][0][1][STREAM_DIR_DATA]=~/^(IMAGE|TABLE)$/
+                             (
+                              # starting with a table tag?
+                                  ref($_[1][0][1]) eq 'ARRAY'
+                              and $_[1][0][1][STREAM_DIR_TYPE]==DIRECTIVE_TAG
+                              and $_[1][0][1][STREAM_DIR_DATA]=~/^(IMAGE|LOCALTOC|TABLE)$/
 
-                           # ending with a table tag?
-                           and ref($_[1][0][-2]) eq 'ARRAY'
-                           and $_[1][0][-2][STREAM_DIR_TYPE]==DIRECTIVE_TAG
-                           and $_[1][0][-2][STREAM_DIR_DATA] eq $1
+                              # ending with a table tag?
+                              and ref($_[1][0][-2]) eq 'ARRAY'
+                              and $_[1][0][-2][STREAM_DIR_TYPE]==DIRECTIVE_TAG
+                              and $_[1][0][-2][STREAM_DIR_DATA] eq $1
 
-                           # both covering the same table?
-                           and $_[1][0][-2][STREAM_DIR_DATA+1] eq $_[1][0][1][STREAM_DIR_DATA+1]
+                              # both covering the same table (if we are looking at a table)?
+                              and $_[1][0][-2][STREAM_DIR_DATA+1] eq $_[1][0][1][STREAM_DIR_DATA+1]
+                             )
                          )
                        {
-                        # remove the enclosing paragraph stuff - just return the table
+                        # remove the enclosing paragraph stuff - just return the contents (table / tag)
                         shift(@{$_[1][0]});         # text paragraph opener
                         pop(@{$_[1][0]});           # text paragraph trailer
                        }
@@ -3936,7 +4079,7 @@ sub
 	[#Rule 26
 		 '@3-1', 0,
 sub
-#line 1811 "ppParser.yp"
+#line 1910 "ppParser.yp"
 {
              # switch to headline mode
              stateManager(STATE_HEADLINE);
@@ -3951,7 +4094,7 @@ sub
 	[#Rule 27
 		 'headline', 5,
 sub
-#line 1822 "ppParser.yp"
+#line 1921 "ppParser.yp"
 {
              # back to default mode
              stateManager(STATE_DEFAULT);
@@ -3981,7 +4124,11 @@ sub
              $headlineIds[$flags{headlineLevel}-1]=++$flags{headlinenr};
 
              # prepare result (data part and shortcut string)
-             my %hints=(nr=>++$directiveCounter, shortcut=>$_[4][0], docstreams=>{});
+             my %hints=(
+                        nr         => ++$directiveCounter,
+                        shortcut   => $_[4][0],
+                        docstreams => {},
+                       );
              my $data=[
                        # opener directive (including headline level)
                        [\%hints, DIRECTIVE_HEADLINE, DIRECTIVE_START, $_[1][0]],
@@ -4004,7 +4151,7 @@ sub
 	[#Rule 28
 		 'headline', 1,
 sub
-#line 1871 "ppParser.yp"
+#line 1974 "ppParser.yp"
 {
              # update headline level hint
              $flags{headlineLevel}=$_[1][0][0][STREAM_DIR_DATA];
@@ -4019,7 +4166,7 @@ sub
 	[#Rule 29
 		 'headline_level', 1,
 sub
-#line 1885 "ppParser.yp"
+#line 1988 "ppParser.yp"
 {
                    # switch to headline intro mode
                    stateManager(STATE_HEADLINE_LEVEL);
@@ -4031,7 +4178,7 @@ sub
 	[#Rule 30
 		 'headline_level', 2,
 sub
-#line 1893 "ppParser.yp"
+#line 1996 "ppParser.yp"
 {
                    # update counter and reply it
                    [$_[1][0]+1, $_[1][1]];
@@ -4040,7 +4187,7 @@ sub
 	[#Rule 31
 		 'optional_headline_shortcut', 0,
 sub
-#line 1901 "ppParser.yp"
+#line 2004 "ppParser.yp"
 {
                               # nothing declared: supply an empty shortcut string
                               ['', $lineNrs{$inHandle}];
@@ -4049,7 +4196,7 @@ sub
 	[#Rule 32
 		 'optional_headline_shortcut', 2,
 sub
-#line 1906 "ppParser.yp"
+#line 2009 "ppParser.yp"
 {
                               # reply the shortcut string
                               [join('', @{$_[2][0]}), $lineNrs{$inHandle}];
@@ -4058,7 +4205,7 @@ sub
 	[#Rule 33
 		 '@4-1', 0,
 sub
-#line 1914 "ppParser.yp"
+#line 2017 "ppParser.yp"
 {
                # switch to condition mode
                stateManager(STATE_CONDITION);
@@ -4070,7 +4217,7 @@ sub
 	[#Rule 34
 		 'condition', 4,
 sub
-#line 1922 "ppParser.yp"
+#line 2025 "ppParser.yp"
 {
                # back to default mode
                stateManager(STATE_DEFAULT);
@@ -4095,17 +4242,17 @@ sub
                    # make the Perl code a string and evaluate it
                    my $perl=join('', @{$_[3][0]});
                    $^W=0;
-                   warn "[Trace] $sourceFile, line $_[6][1]: Evaluating condition code:\n\n$perl\n\n\n" if $flags{trace} & TRACE_ACTIVE;
+                   warn "[Trace] $sourceFile, line $_[3][1]: Evaluating condition code:\n\n$perl\n\n\n" if $flags{trace} & TRACE_ACTIVE;
                    my $result=ref($safeObject) ? $safeObject->reval($perl) : eval(join(' ', '{package main; no strict;', $perl, '}'));
                    $^W=1;
 
                    # check result
                    if ($@)
-                     {warn "[Error ", ++$semErr, "] $sourceFile, line $_[3][1]: condition code could not be evaluated: $@.\n";}
+                     {semerr($_[0], "$sourceFile, line $_[3][1]: condition code could not be evaluated: $@.");}
                    else
                      {
                       # trace, if necessary
-                      warn "[Trace] Condition is ", (defined $result and $result) ? 'true, parsing continues' : 'false, parsing is temporarily suspended', ".\n" if $flags{trace} & TRACE_SEMANTIC;
+                      warn "[Trace] Condition is ", (defined $result and $result) ? 'true, parsing continues' : 'false, parsing is temporarily suspended', ".\n" if $flags{trace} & TRACE_ACTIVE or $flags{trace} & TRACE_SEMANTIC;
 
                       # success - configure parser behaviour according to result
                       $flags{skipInput}=1 unless (defined $result and $result);
@@ -4127,7 +4274,7 @@ sub
 	[#Rule 36
 		 'list', 2,
 sub
-#line 1976 "ppParser.yp"
+#line 2079 "ppParser.yp"
 {
          # update token list and reply it
          push(@{$_[1][0]}, @{$_[2][0]});
@@ -4137,7 +4284,7 @@ sub
 	[#Rule 37
 		 'list', 3,
 sub
-#line 1982 "ppParser.yp"
+#line 2085 "ppParser.yp"
 {
          # update statistics, if necessary (shifters are not passed as standalone paragraphs, so ...)
          $statistics{$_[2][0][0][0]}++;
@@ -4149,7 +4296,6 @@ sub
          =@{$_[3][0][ 0]}[STREAM_DIR_DATA+1, STREAM_DIR_DATA+2]
          =@{$_[2][0][ 0]}[STREAM_DIR_TYPE, STREAM_DIR_DATA];
 
-
          # update token list and reply it
          push(@{$_[1][0]}, @{$_[2][0]}, @{$_[3][0]});
          [$_[1][0], $_[3][1]];
@@ -4158,7 +4304,7 @@ sub
 	[#Rule 38
 		 'list_part', 1,
 sub
-#line 2002 "ppParser.yp"
+#line 2104 "ppParser.yp"
 {
               # the first point may start by a certain number, check this
               my $start=(defined $_[1][0][0][STREAM_DIR_DATA] and $_[1][0][0][STREAM_DIR_DATA]>1) ? $_[1][0][0][STREAM_DIR_DATA] : 1;
@@ -4181,7 +4327,7 @@ sub
 	[#Rule 39
 		 'list_part', 1,
 sub
-#line 2021 "ppParser.yp"
+#line 2123 "ppParser.yp"
 {
               # reset ordered list flag
               $flags{olist}=0;
@@ -4204,7 +4350,7 @@ sub
 	[#Rule 40
 		 'list_part', 1,
 sub
-#line 2040 "ppParser.yp"
+#line 2142 "ppParser.yp"
 {
               # reset ordered list flag
               $flags{olist}=0;
@@ -4230,7 +4376,7 @@ sub
 	[#Rule 42
 		 'olist', 2,
 sub
-#line 2063 "ppParser.yp"
+#line 2165 "ppParser.yp"
 {
           # update token list and reply it
           push(@{$_[1][0]}, @{$_[2][0]});
@@ -4243,7 +4389,7 @@ sub
 	[#Rule 44
 		 'ulist', 2,
 sub
-#line 2073 "ppParser.yp"
+#line 2175 "ppParser.yp"
 {
           # update token list and reply it
           push(@{$_[1][0]}, @{$_[2][0]});
@@ -4256,7 +4402,7 @@ sub
 	[#Rule 46
 		 'dlist', 2,
 sub
-#line 2083 "ppParser.yp"
+#line 2185 "ppParser.yp"
 {
           # update token list and reply it
           push(@{$_[1][0]}, @{$_[2][0]});
@@ -4266,7 +4412,7 @@ sub
 	[#Rule 47
 		 '@5-1', 0,
 sub
-#line 2092 "ppParser.yp"
+#line 2194 "ppParser.yp"
 {
            # switch to opoint mode
            stateManager(STATE_OPOINT);
@@ -4278,7 +4424,7 @@ sub
 	[#Rule 48
 		 'opoint', 3,
 sub
-#line 2100 "ppParser.yp"
+#line 2202 "ppParser.yp"
 {
            # update statistics (list points are not passed as standalone paragraphs, so ...)
            $statistics{&DIRECTIVE_OPOINT}++;
@@ -4316,7 +4462,7 @@ sub
 	[#Rule 49
 		 'opoint', 1,
 sub
-#line 2134 "ppParser.yp"
+#line 2236 "ppParser.yp"
 {
            # update list level hints as necessary
            $olistLevels[0]=($flags{olist} and @olistLevels) ? $olistLevels[0]+1 : 1;
@@ -4334,19 +4480,19 @@ sub
 	[#Rule 50
 		 'opoint_opener', 1,
 sub
-#line 2152 "ppParser.yp"
+#line 2254 "ppParser.yp"
 {[0, $_[1][1]];}
 	],
 	[#Rule 51
 		 'opoint_opener', 2,
 sub
-#line 2154 "ppParser.yp"
+#line 2256 "ppParser.yp"
 {[1, $_[1][1]];}
 	],
 	[#Rule 52
 		 '@6-1', 0,
 sub
-#line 2159 "ppParser.yp"
+#line 2261 "ppParser.yp"
 {
            # switch to upoint mode
            stateManager(STATE_UPOINT);
@@ -4358,7 +4504,7 @@ sub
 	[#Rule 53
 		 'upoint', 3,
 sub
-#line 2167 "ppParser.yp"
+#line 2269 "ppParser.yp"
 {
            # update statistics (list points are not passed as standalone paragraphs, so ...)
            $statistics{&DIRECTIVE_UPOINT}++;
@@ -4389,14 +4535,14 @@ sub
 	[#Rule 55
 		 '@7-1', 0,
 sub
-#line 2196 "ppParser.yp"
+#line 2298 "ppParser.yp"
 {
           }
 	],
 	[#Rule 56
 		 'dpoint', 3,
 sub
-#line 2199 "ppParser.yp"
+#line 2301 "ppParser.yp"
 {
            # update statistics (list points are not passed as standalone paragraphs, so ...)
            $statistics{&DIRECTIVE_DPOINT}++;
@@ -4408,16 +4554,18 @@ sub
            splice(@{$_[3][0]}, 1, 1) while not ref($_[3][0][1]) and $_[3][0][1]=~/^\s*$/;
 
            # reply data (they are already well prepared except that they are marked as text, and that the definition item stream needs to be added)
-           my ($hints1, $hints2)=({nr=>++$directiveCounter}, {nr=>++$directiveCounter});
+           my ($hints1, $hints2, $hints3)=({nr=>++$directiveCounter}, {nr=>++$directiveCounter}, {nr=>++$directiveCounter});
            $_[3][0][0]=[$hints1, DIRECTIVE_DPOINT, DIRECTIVE_START];
            $_[3][0][-1]=[$hints1, DIRECTIVE_DPOINT, DIRECTIVE_COMPLETE];
 
-           # insert the definition item stream
+           # insert the definition item stream and an envelope for the explanation part
            splice(@{$_[3][0]}, 1, 0,
                   [$hints2, DIRECTIVE_DPOINT_ITEM, DIRECTIVE_START],
                   @{$_[1][0]},
                   [$hints2, DIRECTIVE_DPOINT_ITEM, DIRECTIVE_COMPLETE],
+                  [$hints3, DIRECTIVE_DPOINT_TEXT, DIRECTIVE_START],
                  );
+           splice(@{$_[3][0]}, -1, 0, [$hints3, DIRECTIVE_DPOINT_TEXT, DIRECTIVE_COMPLETE]);
 
 	   # update checksums, if possible
            $flags{checksummed}=0 unless $flags{virtualParagraphStart};
@@ -4433,7 +4581,7 @@ sub
 	[#Rule 58
 		 '@8-1', 0,
 sub
-#line 2234 "ppParser.yp"
+#line 2338 "ppParser.yp"
 {
                  # switch to dlist item mode
                  stateManager(STATE_DPOINT_ITEM);
@@ -4445,7 +4593,7 @@ sub
 	[#Rule 59
 		 'dlist_opener', 4,
 sub
-#line 2242 "ppParser.yp"
+#line 2346 "ppParser.yp"
 {
                  # switch to dlist body mode
                  stateManager(STATE_DPOINT);
@@ -4460,7 +4608,7 @@ sub
 	[#Rule 61
 		 'compound_block', 2,
 sub
-#line 2255 "ppParser.yp"
+#line 2359 "ppParser.yp"
 {
                    # this is tricky - to combine both blocks, we have to remove the already
                    # embedded stop/start directives and to supply the ...
@@ -4480,7 +4628,7 @@ sub
 	[#Rule 62
 		 'compound_block', 3,
 sub
-#line 2271 "ppParser.yp"
+#line 2375 "ppParser.yp"
 {
                    # update statistics (for the first part which is completed by the intermediate flag paragraph)
                    $statistics{&DIRECTIVE_BLOCK}++;
@@ -4500,7 +4648,7 @@ sub
 	[#Rule 63
 		 '@9-1', 0,
 sub
-#line 2290 "ppParser.yp"
+#line 2394 "ppParser.yp"
 {
                   # switch to control mode
                   stateManager(STATE_CONTROL);
@@ -4512,7 +4660,7 @@ sub
 	[#Rule 64
 		 'block_flagnew', 3,
 sub
-#line 2298 "ppParser.yp"
+#line 2402 "ppParser.yp"
 {
                   # back to default mode
                   stateManager(STATE_DEFAULT);
@@ -4527,7 +4675,7 @@ sub
 	[#Rule 65
 		 '@10-1', 0,
 sub
-#line 2312 "ppParser.yp"
+#line 2416 "ppParser.yp"
 {
           # switch to block mode
           stateManager(STATE_BLOCK);
@@ -4539,7 +4687,7 @@ sub
 	[#Rule 66
 		 'block', 3,
 sub
-#line 2320 "ppParser.yp"
+#line 2424 "ppParser.yp"
 {
           # trace, if necessary
           warn "[Trace] $sourceFile, line $_[3][1]: Block completed.\n" if $flags{trace} & TRACE_PARAGRAPHS;
@@ -4564,9 +4712,15 @@ sub
 		 'block', 1, undef
 	],
 	[#Rule 68
+		 'optionally_dotted_text', 1, undef
+	],
+	[#Rule 69
+		 'optionally_dotted_text', 1, undef
+	],
+	[#Rule 70
 		 '@11-1', 0,
 sub
-#line 2344 "ppParser.yp"
+#line 2453 "ppParser.yp"
 {
          # enter text mode - unless we are in a block (or point (which already set this mode itself))
          unless (   $parserState==STATE_BLOCK
@@ -4575,6 +4729,7 @@ sub
                  or $parserState==STATE_DPOINT
                  or $parserState==STATE_DPOINT_ITEM
                  or $parserState==STATE_DEFINITION
+                 or $parserState==STATE_TEXT
                 )
           {
            # switch to new mode
@@ -4585,10 +4740,10 @@ sub
           }
         }
 	],
-	[#Rule 69
+	[#Rule 71
 		 'text', 4,
 sub
-#line 2363 "ppParser.yp"
+#line 2473 "ppParser.yp"
 {
          # trace, if necessary
          warn "[Trace] $sourceFile, line $_[4][1]: Text completed.\n" unless    not $flags{trace} & TRACE_PARAGRAPHS
@@ -4630,10 +4785,28 @@ sub
           }
         }
 	],
-	[#Rule 70
+	[#Rule 72
 		 '@12-1', 0,
 sub
-#line 2407 "ppParser.yp"
+#line 2517 "ppParser.yp"
+{
+                # switch to new mode (to stop special handling of dots)
+                stateManager(STATE_TEXT);
+               }
+	],
+	[#Rule 73
+		 'dotted_text', 3,
+sub
+#line 2522 "ppParser.yp"
+{
+                # supply the text
+                $_[3];
+               }
+	],
+	[#Rule 74
+		 '@13-1', 0,
+sub
+#line 2530 "ppParser.yp"
 {
              # switch to verbatim mode
              stateManager(STATE_VERBATIM);
@@ -4642,16 +4815,16 @@ sub
              warn "[Trace] $sourceFile, line $_[1][1]: Verbatim block starts.\n" if $flags{trace} & TRACE_PARAGRAPHS;
 
              # check close hint: should be different from "1"
-             warn "[Error ", ++$semErr, "] A heredoc close hint should be different from \"1\".\n" if $_[1][0] eq '1';
+             semerr($_[0], "A heredoc close hint should be different from \"1\".") if $_[1][0] eq '1';
 
              # store close hint
              $specials{heredoc}=$_[1][0];
             }
 	],
-	[#Rule 71
+	[#Rule 75
 		 'verbatim', 4,
 sub
-#line 2422 "ppParser.yp"
+#line 2545 "ppParser.yp"
 {
              # trace, if necessary
              warn "[Trace] $sourceFile, line $_[4][1]: Verbatim block completed.\n" if $flags{trace} & TRACE_PARAGRAPHS;
@@ -4677,10 +4850,10 @@ sub
              ];
             }
 	],
-	[#Rule 72
-		 '@13-2', 0,
+	[#Rule 76
+		 '@14-2', 0,
 sub
-#line 2450 "ppParser.yp"
+#line 2573 "ppParser.yp"
 {
                         # switch to text mode to allow *all* characters starting a variable value!
                         stateManager(STATE_TEXT);
@@ -4689,10 +4862,10 @@ sub
                         warn "[Trace] $sourceFile, line $_[1][1]: Variable assignment starts.\n" if $flags{trace} & TRACE_PARAGRAPHS;
                        }
 	],
-	[#Rule 73
+	[#Rule 77
 		 'variable_assignment', 4,
 sub
-#line 2458 "ppParser.yp"
+#line 2581 "ppParser.yp"
 {
                         # remove text directives and the final space (made from the final EOL)
                         shift(@{$_[4][0]});
@@ -4700,6 +4873,9 @@ sub
 
                         # make the text contents a string and store it
                         $variables{$_[1][0]}=join('', @{$_[4][0]});
+
+                        # the variable might have been reset
+                        delete($variables{$_[1][0]}) if $variables{$_[1][0]}=~/^\s*$/;
 
                         # update variable checksum
                         $varChecksum=sha1_base64(nfreeze(\%variables));
@@ -4727,10 +4903,10 @@ sub
                         ['', $_[4][1]];
                        }
 	],
-	[#Rule 74
-		 '@14-2', 0,
+	[#Rule 78
+		 '@15-2', 0,
 sub
-#line 2495 "ppParser.yp"
+#line 2621 "ppParser.yp"
 {
             # switch to comment mode
             stateManager(STATE_COMMENT);
@@ -4739,10 +4915,10 @@ sub
             warn "[Trace] $sourceFile, line $_[1][1]: Comment starts.\n" if $flags{trace} & TRACE_PARAGRAPHS;
            }
 	],
-	[#Rule 75
+	[#Rule 79
 		 'comment', 5,
 sub
-#line 2503 "ppParser.yp"
+#line 2629 "ppParser.yp"
 {
             # back to default mode
             stateManager(STATE_DEFAULT);
@@ -4750,25 +4926,26 @@ sub
             # trace, if necessary
             warn "[Trace] $sourceFile, line $_[5][1]: Comment completed.\n" if $flags{trace} & TRACE_PARAGRAPHS;
 
-            # reply data
+            # reply data, if necessary
             my %hints=(nr=>++$directiveCounter);
-            [
-             [
-              # opener directive
-              [\%hints, DIRECTIVE_COMMENT, DIRECTIVE_START],
-              # the list of enclosed literals
-              @{$_[4][0]},
-              # final directive
-              [\%hints, DIRECTIVE_COMMENT, DIRECTIVE_COMPLETE]
-             ],
-             $_[5][1]
-            ];
+            $flags{skipcomments} ? [[()], $_[5][1]]
+                                 : [
+                                    [
+                                     # opener directive
+                                     [\%hints, DIRECTIVE_COMMENT, DIRECTIVE_START],
+                                     # the list of enclosed literals
+                                     @{$_[4][0]},
+                                     # final directive
+                                     [\%hints, DIRECTIVE_COMMENT, DIRECTIVE_COMPLETE]
+                                    ],
+                                    $_[5][1]
+                                   ];
            }
 	],
-	[#Rule 76
-		 '@15-1', 0,
+	[#Rule 80
+		 '@16-1', 0,
 sub
-#line 2528 "ppParser.yp"
+#line 2655 "ppParser.yp"
 {
                        # no mode switch necessary
 
@@ -4776,10 +4953,10 @@ sub
                        warn "[Trace] $sourceFile, line $_[1][1]: Stream entry point starts.\n" if $flags{trace} & TRACE_PARAGRAPHS;
                       }
 	],
-	[#Rule 77
+	[#Rule 81
 		 'dstream_entrypoint', 4,
 sub
-#line 2535 "ppParser.yp"
+#line 2662 "ppParser.yp"
 {
                        # no mode switch necessary
 
@@ -4836,27 +5013,28 @@ sub
                        else
                          {
                           # configure parser to ignore eveything till the next stream entry point or headline
-                          $flags{skipInput}=2;
+                          # ... unless this is the *main* stream
+                          $flags{skipInput}=2 unless $streamTitle eq 'main';
 
                           # we have to supply something, but it should be nothing (note that this is a *paragraph*, so reply a *string*)
                           ['', $_[5][1]];
                          }
                       }
 	],
-	[#Rule 78
-		 '@16-1', 0,
+	[#Rule 82
+		 '@17-1', 0,
 sub
-#line 2601 "ppParser.yp"
+#line 2729 "ppParser.yp"
 {
                 # temporarily activate number detection
                 push(@specialStack, $specials{number});
                 $specials{number}=1;
                }
 	],
-	[#Rule 79
-		 '@17-3', 0,
+	[#Rule 83
+		 '@18-3', 0,
 sub
-#line 2607 "ppParser.yp"
+#line 2735 "ppParser.yp"
 {
                 # restore previous number detection mode
                 $specials{number}=pop(@specialStack);
@@ -4868,10 +5046,10 @@ sub
                 warn "[Trace] $sourceFile, line $_[3][1]: List shift ", $_[1][0]==LIST_SHIFT_RIGHT ? 'right' : 'left', " starts.\n" if $flags{trace} & TRACE_PARAGRAPHS;
                }
 	],
-	[#Rule 80
+	[#Rule 84
 		 'list_shift', 5,
 sub
-#line 2618 "ppParser.yp"
+#line 2746 "ppParser.yp"
 {
                 # back to default mode
                 stateManager(STATE_DEFAULT);
@@ -4898,184 +5076,167 @@ sub
                 ];
                }
 	],
-	[#Rule 81
+	[#Rule 85
 		 'list_shifter', 1,
 sub
-#line 2647 "ppParser.yp"
+#line 2775 "ppParser.yp"
 {
                  # reply a flag
                  [LIST_SHIFT_RIGHT, $_[1][1]];
                 }
 	],
-	[#Rule 82
+	[#Rule 86
 		 'list_shifter', 1,
 sub
-#line 2652 "ppParser.yp"
+#line 2780 "ppParser.yp"
 {
                  # reply a flag
                  [LIST_SHIFT_LEFT, $_[1][1]];
                 }
 	],
-	[#Rule 83
+	[#Rule 87
 		 'optional_literals', 0,
 sub
-#line 2660 "ppParser.yp"
+#line 2788 "ppParser.yp"
 {
                       # start a new, empty list and reply it
                       [[], $lineNrs{$inHandle}];
                      }
 	],
-	[#Rule 84
+	[#Rule 88
 		 'optional_literals', 1, undef
 	],
-	[#Rule 85
+	[#Rule 89
 		 'literals', 1, undef
 	],
-	[#Rule 86
+	[#Rule 90
 		 'literals', 2,
 sub
-#line 2670 "ppParser.yp"
+#line 2798 "ppParser.yp"
 {
              # update token list and reply it
              push(@{$_[1][0]}, @{$_[2][0]});
              [$_[1][0], $_[2][1]];
             }
 	],
-	[#Rule 87
+	[#Rule 91
 		 'optional_literals_and_empty_lines', 0,
 sub
-#line 2679 "ppParser.yp"
+#line 2807 "ppParser.yp"
 {
                                       # start a new, empty list and reply it
                                       [[], $lineNrs{$inHandle}];
                                      }
 	],
-	[#Rule 88
+	[#Rule 92
 		 'optional_literals_and_empty_lines', 1, undef
 	],
-	[#Rule 89
+	[#Rule 93
 		 'literals_and_empty_lines', 1, undef
 	],
-	[#Rule 90
+	[#Rule 94
 		 'literals_and_empty_lines', 2,
 sub
-#line 2689 "ppParser.yp"
+#line 2817 "ppParser.yp"
 {
                              # update token list and reply it
                              push(@{$_[1][0]}, @{$_[2][0]});
                              [$_[1][0], $_[2][1]];
                             }
 	],
-	[#Rule 91
+	[#Rule 95
 		 'literal_or_empty_line', 1, undef
 	],
-	[#Rule 92
+	[#Rule 96
 		 'literal_or_empty_line', 1,
 sub
-#line 2699 "ppParser.yp"
+#line 2827 "ppParser.yp"
 {
                           # start a new token list and reply it
                           [[$_[1][0]], $_[1][1]];
                          }
 	],
-	[#Rule 93
+	[#Rule 97
 		 'literal', 1, undef
 	],
-	[#Rule 94
+	[#Rule 98
 		 'literal', 1,
 sub
-#line 2708 "ppParser.yp"
+#line 2836 "ppParser.yp"
 {
             # start a new token list and reply it
             [[$_[1][0]], $_[1][1]];
            }
 	],
-	[#Rule 95
+	[#Rule 99
 		 'optional_basics', 0,
 sub
-#line 2716 "ppParser.yp"
+#line 2844 "ppParser.yp"
 {
                    # start a new, empty list and reply it
                    [[], $lineNrs{$inHandle}];
                   }
 	],
-	[#Rule 96
+	[#Rule 100
 		 'optional_basics', 1, undef
 	],
-	[#Rule 97
+	[#Rule 101
 		 'basics', 1, undef
 	],
-	[#Rule 98
+	[#Rule 102
 		 'basics', 2,
 sub
-#line 2726 "ppParser.yp"
+#line 2854 "ppParser.yp"
 {
            # update token list and reply it
            push(@{$_[1][0]}, @{$_[2][0]});
            [$_[1][0], $_[2][1]];
           }
 	],
-	[#Rule 99
+	[#Rule 103
 		 'basic', 1, undef
 	],
-	[#Rule 100
+	[#Rule 104
 		 'basic', 1, undef
 	],
-	[#Rule 101
+	[#Rule 105
 		 'basic', 1, undef
 	],
-	[#Rule 102
+	[#Rule 106
 		 'elements', 1, undef
 	],
-	[#Rule 103
+	[#Rule 107
 		 'elements', 2,
 sub
-#line 2744 "ppParser.yp"
+#line 2872 "ppParser.yp"
 {
              # update token list and reply it
              push(@{$_[1][0]}, @{$_[2][0]});
              [$_[1][0], $_[2][1]];
             }
 	],
-	[#Rule 104
+	[#Rule 108
 		 'element', 1,
 sub
-#line 2754 "ppParser.yp"
-{
-	    # check string for variables (in boost mode only)
-	    unless ($flags{noboost} or $parserState==STATE_VERBATIM)
-	      {
-               if ($_[1][0]=~/$lexerPatterns{namedVar}/o or $_[1][0]=~/$lexerPatterns{symVar}/o)
-                 {
-                  # flag that this paragraph uses variables (a cache hit will only be useful if variable settings will be unchanged)
-                  $flags{checksummed}[4]=1 unless exists $flags{checksummed} and not $flags{checksummed};
-
-                  # replace all variables by their values
-                  $_[1][0]=~s/$lexerPatterns{namedVar}/exists $variables{$1} ? $variables{$1} : join('', '$', $1)/ge;
-	          $_[1][0]=~s/$lexerPatterns{symVar}/exists $variables{$1} ? $variables{$1} : join('', '$', $1)/ge;
-	         }
-
-               # remove backslashes before guarded variables (because in this special case, they were preserved)
-               $_[1][0]=~s/\\(?=(($lexerPatterns{namedVarKernel})|($lexerPatterns{symVarKernel})))//go;
-              }
-
-            # start a new token list and reply it
-            [[$_[1][0]], $_[1][1]];
-           }
-	],
-	[#Rule 105
-		 'element', 1,
-sub
-#line 2776 "ppParser.yp"
+#line 2882 "ppParser.yp"
 {
             # start a new token list and reply it
             [[$_[1][0]], $_[1][1]];
            }
 	],
-	[#Rule 106
+	[#Rule 109
 		 'element', 1,
 sub
-#line 2781 "ppParser.yp"
+#line 2887 "ppParser.yp"
+{
+            # start a new token list and reply it
+            [[$_[1][0]], $_[1][1]];
+           }
+	],
+	[#Rule 110
+		 'element', 1,
+sub
+#line 2892 "ppParser.yp"
 {
             # flag that this paragraph uses variables (a cache hit will only be useful if variable settings will be unchanged)
             $flags{checksummed}[4]=1 unless exists $flags{checksummed} and not $flags{checksummed};
@@ -5084,10 +5245,10 @@ sub
             [[exists $variables{$_[1][0]} ? $variables{$_[1][0]} : join('', '$', $_[1][0])], $_[1][1]];
            }
 	],
-	[#Rule 107
+	[#Rule 111
 		 'element', 1,
 sub
-#line 2789 "ppParser.yp"
+#line 2900 "ppParser.yp"
 {
             # flag that this paragraph uses variables (a cache hit will only be useful if variable settings will be unchanged)
             $flags{checksummed}[4]=1 unless exists $flags{checksummed} and not $flags{checksummed};
@@ -5096,82 +5257,82 @@ sub
             [[exists $variables{$_[1][0]} ? $variables{$_[1][0]} : join('', '$', "{$_[1][0]}")], $_[1][1]];
            }
 	],
-	[#Rule 108
+	[#Rule 112
 		 'element', 1,
 sub
-#line 2797 "ppParser.yp"
+#line 2908 "ppParser.yp"
 {
             # start a new token list and reply it
             # (the passed stream is already a reference)
             [$_[1][0], $_[1][1]];
            }
 	],
-	[#Rule 109
-		 'element', 1, undef
-	],
-	[#Rule 110
-		 'element', 1, undef
-	],
-	[#Rule 111
-		 'element', 1, undef
-	],
-	[#Rule 112
-		 'optional_number', 0,
-sub
-#line 2810 "ppParser.yp"
-{[undef, $lineNrs{$inHandle}];}
-	],
 	[#Rule 113
-		 'optional_number', 1, undef
+		 'element', 1, undef
 	],
 	[#Rule 114
+		 'element', 1, undef
+	],
+	[#Rule 115
+		 'element', 1, undef
+	],
+	[#Rule 116
+		 'optional_number', 0,
+sub
+#line 2921 "ppParser.yp"
+{[undef, $lineNrs{$inHandle}];}
+	],
+	[#Rule 117
+		 'optional_number', 1, undef
+	],
+	[#Rule 118
 		 'words', 1,
 sub
-#line 2817 "ppParser.yp"
+#line 2928 "ppParser.yp"
 {
           # start a new token list and reply it
           [[$_[1][0]], $_[1][1]];
          }
 	],
-	[#Rule 115
+	[#Rule 119
 		 'words', 2,
 sub
-#line 2822 "ppParser.yp"
+#line 2933 "ppParser.yp"
 {
           # update token list and reply it
           push(@{$_[1][0]}, $_[2][0]);
           [$_[1][0], $_[2][1]];
          }
 	],
-	[#Rule 116
+	[#Rule 120
 		 'words_or_spaces', 1,
 sub
-#line 2831 "ppParser.yp"
+#line 2942 "ppParser.yp"
 {
                     # start a new token list and reply it
                     [[$_[1][0]], $_[1][1]];
                    }
 	],
-	[#Rule 117
+	[#Rule 121
 		 'words_or_spaces', 2,
 sub
-#line 2836 "ppParser.yp"
+#line 2947 "ppParser.yp"
 {
                     # update token list and reply it
                     push(@{$_[1][0]}, $_[2][0]);
                     [$_[1][0], $_[2][1]];
                    }
 	],
-	[#Rule 118
+	[#Rule 122
 		 'word_or_space', 1, undef
 	],
-	[#Rule 119
+	[#Rule 123
 		 'word_or_space', 1, undef
 	],
-	[#Rule 120
-		 '@18-1', 0,
+	[#Rule 124
+		 '@19-1', 0,
 sub
-#line 2851 "ppParser.yp"
+#line 2962 "ppParser.yp"
 {
         # trace, if necessary
         warn "[Trace] $sourceFile, line $_[1][1]: Tag $_[1][0] starts.\n" if $flags{trace} & TRACE_PARAGRAPHS;
@@ -5191,10 +5352,10 @@ sub
 	$flags{noboost}=1;
        }
 	],
-	[#Rule 121
-		 '@19-3', 0,
+	[#Rule 125
+		 '@20-3', 0,
 sub
-#line 2870 "ppParser.yp"
+#line 2981 "ppParser.yp"
 {
 	# reactivate boost
 	$flags{noboost}=0;
@@ -5220,10 +5381,10 @@ sub
          }
        }
 	],
-	[#Rule 122
+	[#Rule 126
 		 'tag', 5,
 sub
-#line 2895 "ppParser.yp"
+#line 3006 "ppParser.yp"
 {
         # scopy
         my $ignore;
@@ -5279,7 +5440,7 @@ sub
 
             # call hook function (use eval() to guard yourself)
             my $rc;
-            eval {$rc=&{$tagsRef->{$_[1][0]}{hook}}($_[1][1], $options, dclone($_[5][0]), $anchors, join('-', @headlineIds))};
+            eval {$rc=&{$tagsRef->{$_[1][0]}{hook}}($_[1][1], $options, dclone($_[5][0]), $anchors, join('-', @headlineIds), $flags{headlinenr})};
 
             # check result
             unless ($@)
@@ -5427,31 +5588,31 @@ sub
           }
        }
 	],
-	[#Rule 123
+	[#Rule 127
 		 'optional_tagpars', 0,
 sub
-#line 3101 "ppParser.yp"
+#line 3212 "ppParser.yp"
 {[[], $lineNrs{$inHandle}];}
 	],
-	[#Rule 124
+	[#Rule 128
 		 'optional_tagpars', 1, undef
 	],
-	[#Rule 125
+	[#Rule 129
 		 'used_tagpars', 3,
 sub
-#line 3107 "ppParser.yp"
+#line 3218 "ppParser.yp"
 {
                  # supply the parameters
                  [$_[2][0], $_[3][1]];
                 }
 	],
-	[#Rule 126
+	[#Rule 130
 		 'tagpars', 1, undef
 	],
-	[#Rule 127
+	[#Rule 131
 		 'tagpars', 3,
 sub
-#line 3116 "ppParser.yp"
+#line 3227 "ppParser.yp"
 {
             # update parameter list
             push(@{$_[1][0]}, @{$_[3][0]});
@@ -5460,11 +5621,15 @@ sub
             [$_[1][0], $_[3][1]];
            }
 	],
-	[#Rule 128
-		 '@20-1', 0,
+	[#Rule 132
+		 '@21-1', 0,
 sub
-#line 3127 "ppParser.yp"
+#line 3238 "ppParser.yp"
 {
+           # backslashes should pass in tag options
+           push(@specialStack, $lexerFlags{backsl});
+           $lexerFlags{backsl}=LEXER_TOKEN;
+
            # temporarily make "=" and quotes the only specials,
            # but take care to reset the remaining settings defined
            push(@specialStack, [(%specials)], $specials{'='});
@@ -5472,43 +5637,46 @@ sub
            @specials{('=', '"')}=(1, 1);
           }
 	],
-	[#Rule 129
-		 '@21-3', 0,
+	[#Rule 133
+		 '@22-3', 0,
 sub
-#line 3135 "ppParser.yp"
+#line 3250 "ppParser.yp"
 {
            # restore special "=" setting
            $specials{'='}=pop(@specialStack);
           }
 	],
-	[#Rule 130
+	[#Rule 134
 		 'tagpar', 5,
 sub
-#line 3140 "ppParser.yp"
+#line 3255 "ppParser.yp"
 {
            # restore special settings
            %specials=@{pop(@specialStack)};
+
+           # restore backslash flag
+           $lexerFlags{backsl}=pop(@specialStack);
 
            # supply flag and value
            [[$_[1][0], $_[5][0]], $_[5][1]];
           }
 	],
-	[#Rule 131
+	[#Rule 135
 		 'tagvalue', 1, undef
 	],
-	[#Rule 132
+	[#Rule 136
 		 'tagvalue', 3,
 sub
-#line 3151 "ppParser.yp"
+#line 3269 "ppParser.yp"
 {
              # build a string and supply it
              [join('', @{$_[2][0]}), $_[3][1]];
             }
 	],
-	[#Rule 133
+	[#Rule 137
 		 'optional_tagbody', 0,
 sub
-#line 3159 "ppParser.yp"
+#line 3277 "ppParser.yp"
 {
                      # if we are here, "<" *possibly* was marked to be a special - now it becomes what is was before
                      # (take care the stack is filled correctly!)
@@ -5519,10 +5687,10 @@ sub
                      [[], $lineNrs{$inHandle}];
                     }
 	],
-	[#Rule 134
-		 '@22-1', 0,
+	[#Rule 138
+		 '@23-1', 0,
 sub
-#line 3169 "ppParser.yp"
+#line 3287 "ppParser.yp"
 {
                      # if we are here, "<" was marked to be a special - now it becomes what is was before
                      # (take care the stack is filled correctly!)
@@ -5534,10 +5702,10 @@ sub
                      @specials{('>')}=1;
                     }
 	],
-	[#Rule 135
+	[#Rule 139
 		 'optional_tagbody', 4,
 sub
-#line 3180 "ppParser.yp"
+#line 3298 "ppParser.yp"
 {
                      # reset ">" setting
                      @specials{('>')}=pop(@specialStack);
@@ -5546,16 +5714,16 @@ sub
                      [$_[3][0], $_[4][1]];
                     }
 	],
-	[#Rule 136
-		 '@23-1', 0,
+	[#Rule 140
+		 '@24-1', 0,
 sub
-#line 3191 "ppParser.yp"
+#line 3309 "ppParser.yp"
 {
           # trace, if necessary
           warn "[Trace] $sourceFile, line $_[1][1]: Table starts.\n" if $flags{trace} & TRACE_PARAGRAPHS;
 
           # check nesting
-          warn "[Error ", ++$semErr, "] $sourceFile, line $_[3][1]: Nested tables are not supported by this parser version.\n"
+          semerr($_[0], "$sourceFile, line $_[3][1]: Nested tables are not supported by this parser version.")
             if @tableSeparatorStack and not $flags{nestedTables};
 
           # temporarily activate specials "{" and "}"
@@ -5570,10 +5738,10 @@ sub
           $flags{noboost}=1;
          }
 	],
-	[#Rule 137
-		 '@24-3', 0,
+	[#Rule 141
+		 '@25-3', 0,
 sub
-#line 3211 "ppParser.yp"
+#line 3329 "ppParser.yp"
 {
           # reactivate boost
           $flags{noboost}=0;
@@ -5607,10 +5775,10 @@ sub
 					]);
          }
 	],
-	[#Rule 138
+	[#Rule 142
 		 'table', 6,
 sub
-#line 3244 "ppParser.yp"
+#line 3362 "ppParser.yp"
 {
           # build parameter hash, if necessary
           my %pars;
@@ -5655,7 +5823,10 @@ sub
                                         and $_[5][0][-1][STREAM_DIR_DATA]  eq 'TABLE_COL';
 
           # normalize table rows (no need of auto format)
-          normalizeTableRows($_[5][0], 0);
+          ($pars{__titleColumns__}, $pars{__maxColumns__})=normalizeTableRows($_[5][0], 0);
+
+          # warn user in case of potential row width conflicts
+          warn qq([Warn] $sourceFile, line $_[1][1]: The maximum cell number per row ($pars{__maxColumns__}) was not detected in the first row (which has $pars{__titleColumns__} columns).\n) if $pars{__titleColumns__}<$pars{__maxColumns__} and not ($flags{display} & DISPLAY_NOWARN);
 
           # reset column separator memory, mark table completed
           shift(@tableSeparatorStack);
@@ -5680,10 +5851,10 @@ sub
           ];
          }
 	],
-	[#Rule 139
+	[#Rule 143
 		 'table_separator', 1,
 sub
-#line 3316 "ppParser.yp"
+#line 3437 "ppParser.yp"
 {
                     # update counter of completed table columns
                     $tableColumns++;
@@ -5704,10 +5875,10 @@ sub
                     ];
                    }
 	],
-	[#Rule 140
-		 '@25-1', 0,
+	[#Rule 144
+		 '@26-1', 0,
 sub
-#line 3339 "ppParser.yp"
+#line 3460 "ppParser.yp"
 {
                     # switch to condition mode
                     stateManager(STATE_TABLE);
@@ -5716,19 +5887,19 @@ sub
                     warn "[Trace] $sourceFile, line $_[1][1]: Table paragraph starts.\n" if $flags{trace} & TRACE_PARAGRAPHS;
                    }
 	],
-	[#Rule 141
-		 '@26-4', 0,
+	[#Rule 145
+		 '@27-4', 0,
 sub
-#line 3347 "ppParser.yp"
+#line 3468 "ppParser.yp"
 {
                     # store specified column separator
                     unshift(@tableSeparatorStack, [quotemeta(join('', @{$_[3][0]})), "\n"]);
                    }
 	],
-	[#Rule 142
+	[#Rule 146
 		 'table_paragraph', 7,
 sub
-#line 3352 "ppParser.yp"
+#line 3473 "ppParser.yp"
 {
                     # back to default mode
                     stateManager(STATE_DEFAULT);
@@ -5758,7 +5929,10 @@ sub
                        splice(@{$_[6][0]}, -2, 2);
 
                        # normalize table rows and autoformat headline fields
-                       normalizeTableRows($_[6][0], 1);
+                       ($pars{__titleColumns__}, $pars{__maxColumns__})=normalizeTableRows($_[6][0], 1);
+
+                       # warn user in case of potential row width conflicts
+                       warn qq([Warn] $sourceFile, line $_[1][1]: The maximum cell number per row ($pars{__maxColumns__}) was not detected in the first row (which has $pars{__titleColumns__} columns).\n) if $pars{__titleColumns__}<$pars{__maxColumns__} and not ($flags{display} & DISPLAY_NOWARN);
 
                        # reply data in a "tag envelope" (for backends)
                        my %hints=(nr=>++$directiveCounter);
@@ -5783,10 +5957,10 @@ sub
                       }
                    }
 	],
-	[#Rule 143
-		 '@27-1', 0,
+	[#Rule 147
+		 '@28-1', 0,
 sub
-#line 3409 "ppParser.yp"
+#line 3533 "ppParser.yp"
 {
              # switch to embedding mode saving the former state (including *all* special settings)
              push(@stateStack, $parserState);
@@ -5808,10 +5982,10 @@ sub
              $flags{noboost}=1;
             }
 	],
-	[#Rule 144
-		 '@28-3', 0,
+	[#Rule 148
+		 '@29-3', 0,
 sub
-#line 3430 "ppParser.yp"
+#line 3554 "ppParser.yp"
 {
              # reactivate boost
              $flags{noboost}=0;
@@ -5821,13 +5995,13 @@ sub
 
              # check parameters: language should be set at least
              my %tagpars=@{$_[3][0]};
-             warn "[Error ", ++$semErr, "] $sourceFile, line $_[3][1]: You forgot to specify the language of embedded text.\n" unless exists $tagpars{lang};
+             semerr($_[0], "$sourceFile, line $_[3][1]: You forgot to specify the language of embedded text.") unless exists $tagpars{lang};
             }
 	],
-	[#Rule 145
+	[#Rule 149
 		 'embedded', 6,
 sub
-#line 3442 "ppParser.yp"
+#line 3566 "ppParser.yp"
 {
              # restore former parser state (including *all* special settings)
              stateManager(pop(@stateStack));
@@ -5888,11 +6062,13 @@ sub
                      }
 
                    # We provide the text in a special variable @main::_ifilterText,
-                   # and the target type in a special variable $main::_ifilterType.
+                   # and the target type in a special variable $main::_ifilterType,
+                   # as well as the filename in a special var. $main::_ifilterFile.
                    {
                     no strict 'refs';
                     @{join('::', ref($safeObject) ? $safeObject->root : 'main', '_ifilterText')}=@{$_[5][0]};
                     ${join('::', ref($safeObject) ? $safeObject->root : 'main', '_ifilterType')}=$pars{lang};
+                    ${join('::', ref($safeObject) ? $safeObject->root : 'main', '_ifilterFile')}=$sourceFile;
                    }
 
                    # run the filter and catch what it supplies
@@ -5902,7 +6078,7 @@ sub
                    if ($@)
                      {
                       # inform user, if necessary
-                      warn "[Error ", ++$semErr, qq(] $sourceFile, line $_[1][1]: input filter failed: $@.\n);
+                      semerr($_[0], qq($sourceFile, line $_[1][1]: input filter failed: $@.));
 
                       # ignore this part
                       return([[()], $_[6][1]]);
@@ -5957,7 +6133,7 @@ sub
 
                       # check result
                       if ($@)
-                        {warn "[Error ", ++$semErr, "] $sourceFile, line $_[6][1]: embedded Perl code could not be evaluated: $@.\n";}
+                        {semerr($_[0], "$sourceFile, line $_[6][1]: embedded Perl code could not be evaluated: $@.");}
                       else
                         {
                          # success - make the result part of the input stream, if any
@@ -5990,10 +6166,10 @@ sub
                }
             }
 	],
-	[#Rule 146
-		 '@29-1', 0,
+	[#Rule 150
+		 '@30-1', 0,
 sub
-#line 3607 "ppParser.yp"
+#line 3733 "ppParser.yp"
 {
              # trace, if necessary
              warn "[Trace] $sourceFile, line $_[1][1]: Inclusion starts.\n" if $flags{trace} & TRACE_PARAGRAPHS;
@@ -6012,10 +6188,10 @@ sub
              $flags{noboost}=1;
             }
 	],
-	[#Rule 147
+	[#Rule 151
 		 'included', 3,
 sub
-#line 3625 "ppParser.yp"
+#line 3751 "ppParser.yp"
 {
              # scopies
              my ($errors, $originalPath);
@@ -6028,8 +6204,8 @@ sub
 
              # check parameters: type and filename should be set at least
              my %tagpars=@{$_[3][0]};
-             $errors++, warn "[Error ", ++$semErr, "] $sourceFile, line $_[3][1]: You forgot to specify the type of your included file.\n" unless exists $tagpars{type};
-             $errors++, warn "[Error ", ++$semErr, "] $sourceFile, line $_[3][1]: You forgot to specify the name of your included file.\n" unless exists $tagpars{file};
+             $errors++, semerr($_[0], "$sourceFile, line $_[3][1]: You forgot to specify the type of your included file.") unless exists $tagpars{type};
+             $errors++, semerr($_[0], "$sourceFile, line $_[3][1]: You forgot to specify the name of your included file.") unless exists $tagpars{file};
 
              # Tag condition set?
              if (exists $tagpars{_cnd_})
@@ -6059,7 +6235,7 @@ sub
 
              # expand filename to avoid trouble by various names for the same file
                 $tagpars{file}=catfile(abs_path(dirname($originalPath=$tagpars{file})), basename($tagpars{file}))
-             or $errors++, warn "[Error ", ++$semErr, "] $sourceFile, line $_[3][1]: File name $tagpars{file} cannot be resolved.\n";
+             or $errors++, semmerr("$sourceFile, line $_[3][1]: File name $tagpars{file} cannot be resolved.\n");
 
              # smart inclusion?
              my $smart=1 if     $tagpars{type}=~/^pp$/
@@ -6067,13 +6243,13 @@ sub
                             and exists $openedSourcefiles{$tagpars{file}};
 
              # avoid circular source inclusion
-             $errors++, warn "[Error ", ++$semErr, "] $sourceFile, line $_[3][1]: Source file $originalPath was already opened before (full path: $tagpars{file}).\n" if     $tagpars{type}=~/^pp$/
+             $errors++, semerr($_[0], "$sourceFile, line $_[3][1]: Source file $originalPath was already opened before (full path: $tagpars{file}).") if     $tagpars{type}=~/^pp$/
                                                                                                                                                                          and not $smart
                                                                                                                                                                          and grep($_ eq $tagpars{file}, @nestedSourcefiles);
 
 
              # PerlPoint headline offsets have to be positive numbers or certain strings
-             $errors++, warn "[Error ", ++$semErr, "] $sourceFile, line $_[3][1]: Invalid headline level offset $tagpars{headlinebase}, positive number or keywords BASE_LEVEL/CURRENT_LEVEL expected.\n" if $tagpars{type}=~/^pp$/i and exists $tagpars{headlinebase} and $tagpars{headlinebase}!~/^\d+$/ and $tagpars{headlinebase}!~/^(base|current)_level$/i;
+             $errors++, semerr($_[0], "$sourceFile, line $_[3][1]: Invalid headline level offset $tagpars{headlinebase}, positive number or keywords BASE_LEVEL/CURRENT_LEVEL expected.") if $tagpars{type}=~/^pp$/i and exists $tagpars{headlinebase} and $tagpars{headlinebase}!~/^\d+$/ and $tagpars{headlinebase}!~/^(base|current)_level$/i;
              $tagpars{headlinebase}=$flags{headlineLevel} if exists $tagpars{headlinebase} and $tagpars{headlinebase}=~/^current_level$/i;
              $tagpars{headlinebase}=$flags{headlineLevel}-1 if exists $tagpars{headlinebase} and $tagpars{headlinebase}=~/^base_level$/i;
 
@@ -6126,11 +6302,13 @@ sub
                          binmode($orgHandle);
 
                          # We provide the text in a special variable @main::_ifilterText,
-                         # and the target type in a special variable $main::_ifilterType.
+                         # and the target type in a special variable $main::_ifilterType,
+                         # as well as the filename in a special var. $main::_ifilterFile.
                          {
                           no strict 'refs';
                           @{join('::', ref($safeObject) ? $safeObject->root : 'main', '_ifilterText')}=<$orgHandle>;
                           ${join('::', ref($safeObject) ? $safeObject->root : 'main', '_ifilterType')}=$tagpars{type};
+                          ${join('::', ref($safeObject) ? $safeObject->root : 'main', '_ifilterFile')}=$tagpars{file};
                          }
 
                          # close original file
@@ -6146,7 +6324,7 @@ sub
                          if ($@)
                            {
                             # inform user, if necessary
-                            warn "[Error ", ++$semErr, qq(] $sourceFile, line $_[1][1]: input filter failed: $@.\n);
+                            semerr($_[0], qq($sourceFile, line $_[1][1]: input filter failed: $@.));
 
                             # ignore this part
                             return([[()], $_[3][1]]);
@@ -6264,11 +6442,11 @@ sub
 
                          # check result
                          if ($@)
-                           {warn "[Error ", ++$semErr, "] $sourceFile, line $_[3][1]: included Perl code could not be evaluated: $@.\n";}
+                           {semerr($_[0], "$sourceFile, line $_[3][1]: included Perl code could not be evaluated: $@.");}
                          else
                            {
                             # success - make the result part of the input stream (by stack)
-                            stackInput($_[0], split(/(\n)/, $result));
+                            stackInput($_[0], split(/(\n)/, $result)) if defined $result;
 
                             # reset the "end of input reached" flag if necessary
                             $readCompletely=0 if $readCompletely;
@@ -6297,7 +6475,7 @@ sub
                            {
                             # check parameter
                             unless ($tagpars{indent}=~/^\d+$/)
-                              {$errors++, warn "[Error ", ++$semErr, "] $sourceFile, line $_[3][1]: Invalid indentation value of \"$tagpars{indent}\", please set up a number.\n";}
+                              {$errors++, semerr($_[0], "$sourceFile, line $_[3][1]: Invalid indentation value of \"$tagpars{indent}\", please set up a number.");}
                             else
                               {
                                # all right, indent
@@ -6339,7 +6517,7 @@ sub
                 else
                   {
                    # simply inform user
-                   $errors++, warn "[Error ", ++$semErr, "] $sourceFile, line $_[3][1]: File $tagpars{file} does not exist or cannot be read (current directory: ", cwd(), ").\n";
+                   $errors++, semerr($_[0], "$sourceFile, line $_[3][1]: File $tagpars{file} does not exist or cannot be read (current directory: ", cwd(), ").");
 
                    # we have to supply something, but it should be nothing
                    [[()], $_[3][1]];
@@ -6352,10 +6530,10 @@ sub
                }
             }
 	],
-	[#Rule 148
-		 '@30-1', 0,
+	[#Rule 152
+		 '@31-1', 0,
 sub
-#line 3965 "ppParser.yp"
+#line 4093 "ppParser.yp"
 {
                      # switch to definition mode
                      stateManager(STATE_DEFINITION);
@@ -6364,37 +6542,37 @@ sub
                      warn "[Trace] $sourceFile, line $_[1][1]: Macro definition starts.\n" if $flags{trace} & TRACE_PARAGRAPHS;
                     }
 	],
-	[#Rule 149
-		 '@31-3', 0,
+	[#Rule 153
+		 '@32-3', 0,
 sub
-#line 3973 "ppParser.yp"
+#line 4101 "ppParser.yp"
 {
                      # deactivate boost
                      $flags{noboost}=1;
                     }
 	],
-	[#Rule 150
-		 '@32-5', 0,
+	[#Rule 154
+		 '@33-5', 0,
 sub
-#line 3978 "ppParser.yp"
+#line 4106 "ppParser.yp"
 {
                      # reactivate boost
                      $flags{noboost}=0;
                     }
 	],
-	[#Rule 151
-		 '@33-7', 0,
+	[#Rule 155
+		 '@34-7', 0,
 sub
-#line 3983 "ppParser.yp"
+#line 4111 "ppParser.yp"
 {
                      # disable all specials to get the body as a plain text
                      @specials{keys %specials}=(0) x scalar(keys %specials);
                     }
 	],
-	[#Rule 152
+	[#Rule 156
 		 'alias_definition', 9,
 sub
-#line 3988 "ppParser.yp"
+#line 4116 "ppParser.yp"
 {
                      # "text" already switched back to default mode (and disabled specials [{}:])
 
@@ -6472,7 +6650,7 @@ sub
     bless($self,$class);
 }
 
-#line 4063 "ppParser.yp"
+#line 4191 "ppParser.yp"
 
 
 
@@ -6533,6 +6711,13 @@ sub stackInput
  }
 
 
+
+# a pattern lookup table for certain specials, used by the lexer (should be scoped to it
+# but indentation of a long function takes time ...)
+my %specials2patterns;
+@specials2patterns{'colon', 'number', '-'}=(':', '0-9', '\-');
+
+
 # -----------------------------
 # Internal function: the lexer.
 # -----------------------------
@@ -6541,7 +6726,7 @@ sub lexer
   # get parameters
   my ($parser)=@_;
 
-  # scan for unlexed EOL¬¥s which should be ignored
+  # scan for unlexed EOL¥s which should be ignored
   while (
 	     $parser->{USER}->{INPUT}
 	 and $parser->{USER}->{INPUT}=~/^\n/
@@ -6682,7 +6867,21 @@ sub lexer
          }
 
        # reference found on stack?
-       return _refLexed($parser) if $lineFromStack and ref($parser->{USER}->{INPUT});
+       if ($lineFromStack and ref($parser->{USER}->{INPUT}))
+         {
+          # get the reference
+          my @refLexed=_refLexed($parser);
+
+          # unless the item was a newline, we can use it directly
+          # (but the context for newline evaluation might have changed between the
+          # point of delaying and now)
+          return @refLexed unless $refLexed[0] eq 'Empty_line';
+
+          # ok, this has to be parsed *again* (because the paragraph/special characters
+          # context *now* might be different from that that was present when we stacked
+          # the item)
+          ($parser->{USER}->{INPUT}, $lineNrs{$inHandle})=@{$refLexed[1]};
+         }
 
        # update line counter, if necessary
        $lineNrs{$inHandle}++ unless $lineFromStack;
@@ -6824,7 +7023,7 @@ sub lexer
                    # warn "----> New line: $lineNrs{$inHandle}\n";
 
                    # update anchors
-                   $anchors->add($_, $checksums->{$sourceFile}{$checksum}[5]{$_})
+                   $anchors->add($_, $checksums->{$sourceFile}{$checksum}[5]{$_}, $flags{headlinenr})
                      foreach keys %{$checksums->{$sourceFile}{$checksum}[5]};
 
                    # The next steps depend - follow the provided hint. We may have to reinvoke
@@ -7036,15 +7235,23 @@ sub lexer
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Colon in line $lineNrs{$inHandle}.\n")),
      return('Colon', [$found, $lineNrs{$inHandle}]) if $specials{colon} and /^$lexerPatterns{colon}/;
 
-     # reply next token: search for named variables
+     # reply next token: search for named variables (which need to be defined except at the
+     # beginning of a new assignment paragraph)
      $found=$1, s/^\$$1//,
      (($flags{trace} & TRACE_LEXER) and warn(qq([Trace] Lexer: Named variable "$found" in line $lineNrs{$inHandle}.\n))),
-     return('Named_variable', [$found, $lineNrs{$inHandle}]) if /^$lexerPatterns{namedVar}/;
+     return('Named_variable', [$found, $lineNrs{$inHandle}])
+       if     /^$lexerPatterns{namedVar}(=?)/
+          and (
+                  ($parserState==STATE_DEFAULT and defined($2))
+               or exists $variables{$1}
+              );
 
-     # reply next token: search for symbolic variables
-     $found=$1, s/^\${$1}//,
+     # reply next token: search for symbolic variables (these cannot be used in assignments,
+     # so handling is easier)
+     $found=$2, s/^\$$1//,
      (($flags{trace} & TRACE_LEXER) and warn(qq([Trace] Lexer: Symbolic variable "$found" in line $lineNrs{$inHandle}.\n))),
-     return('Symbolic_variable', [$found, $lineNrs{$inHandle}]) if /^$lexerPatterns{symVar}/;
+     return('Symbolic_variable', [$found, $lineNrs{$inHandle}])
+       if /^$lexerPatterns{symVar}/ and exists $variables{$2};
 
      # flag that this paragraph *might* use macros someday, if there is still something being no tag and no
      # macro, but looking like a tag or a macro (somebody could *later* declare it a real macro, so the cache
@@ -7053,13 +7260,20 @@ sub lexer
        if     $specials{tag} and /^$lexerPatterns{tag}/
           and not (exists $flags{checksummed} and not $flags{checksummed});
 
+     # likewise, flag that this paragraph *might* use variables someday, if there is still something being no variable,
+     # but looking like a variable (somebody could *later* declare it a real var, so the cache
+     # needs to check variable definitions)
+     $flags{checksummed}[4]=1
+       if     /($lexerPatterns{namedVarKernel})|($lexerPatterns{symVarKernel})/
+          and not (exists $flags{checksummed} and not $flags{checksummed});
+
      # remove guarding \\, if necessary
-     s/^\\(?!($lexerPatterns{namedVarKernel})|($lexerPatterns{symVarKernel}))//
-       unless    $specials{heredoc}
-              or $parserState==STATE_EMBEDDING
-              or $parserState==STATE_PFILTER
-              or $parserState==STATE_CONDITION
-              or $parserState==STATE_DEFINITION;
+     s/^\\// unless    $specials{heredoc}
+                    or (defined $lexerFlags{backsl} and $lexerFlags{backsl}==LEXER_TOKEN)
+                    or $parserState==STATE_EMBEDDING
+                    or $parserState==STATE_PFILTER
+                    or $parserState==STATE_CONDITION
+                    or $parserState==STATE_DEFINITION;
 
      # reply next token: scan for numbers, if necessary
      $found=$1, s/^$1//,
@@ -7069,19 +7283,19 @@ sub lexer
      unless ($flags{noboost})
        {
         # build set of characters to be special
-        my %translator;
-        @translator{'colon', 'number', '-'}=(':', '0-9', '\-');
-        my $special=join('', '([', (map {exists $translator{$_} ? $translator{$_} : $_} grep(($specials{$_} and (length==1 or exists $translator{$_})), keys %specials)), '\n\\\\', '])');
-        $special=join('', $special, '|(\|{1,2})') if $specials{pfilter};
-        $special=join('', $special, '|(', $tableSeparatorStack[0][0], ')|(', $tableSeparatorStack[0][1], ')') if @tableSeparatorStack;
+        my $special=join('', '([', (map {exists $specials2patterns{$_} ? $specials2patterns{$_} : $_} grep(($specials{$_} and (length==1 or exists $specials2patterns{$_})), keys %specials)), '\n\\\\', '])');
+        $special=qr($special|(\|{1,2})) if $specials{pfilter};
+        $special=qr($special|($tableSeparatorStack[0][0])|($tableSeparatorStack[0][1])) if @tableSeparatorStack;
+        $special=qr($special|(($lexerPatterns{namedVar})|($lexerPatterns{symVar})));
 
         # reply next token: scan for word or single character (declared as "Word" as well)
-        # warn("~~~~~~~~~> $special\n");
-        # warn("---------> $_\n");
+        #warn("~~~~~~~~~> $special\n");
+        #warn("---------> $_");
         $found=$1, s/^\Q$1//,
-        # warn("=====> $found\n"),
-        (($flags{trace} & TRACE_LEXER) and warn(qq([Trace] Lexer: Word "$found" in line $lineNrs{$inHandle}.\n))),
-        return('Word', [$found, $lineNrs{$inHandle}]) if /^(.+?)($special|($))/;
+        #warn("=====> $found\n\n"),
+        (($flags{trace} & TRACE_LEXER) and warn(qq([Trace] Lexer: (Boosted) word "$found" in line $lineNrs{$inHandle}.\n))),
+        return('Word', [$found, $lineNrs{$inHandle}])
+          if $_!~/^$special/ and /^(.+?)($special|($))/;
        }
 
      # reply next token: scan for word or single character (declared as "Word" as well)
@@ -7094,11 +7308,15 @@ sub lexer
     }
  }
 
+
 # evaluate a tag condition (can possibly be generalized: this is just a piece of code)
 sub _evalTagCondition
  {
   # get parameters
   my ($code, $file, $line)=@_;
+  confess "[BUG] Missing code parameter.\n" unless $code;
+  confess "[BUG] Missing file parameter.\n" unless $file;
+  confess "[BUG] Missing line parameter.\n" unless $line;
 
   # declare variables
   my ($rc);
@@ -7114,13 +7332,13 @@ sub _evalTagCondition
        }
 
      # make the code a string and evaluate it
-     warn "[Trace] $sourceFile, line $_[5][1]: Evaluating this code:\n\n$code\n\n\n" if $flags{trace} & TRACE_ACTIVE;
+     warn "[Trace] $sourceFile, line $line: Evaluating this code:\n\n$code\n\n\n" if $flags{trace} & TRACE_ACTIVE;
 
      # invoke perl to compute the result
      $rc=ref($safeObject) ? $safeObject->reval($code) : eval(join(' ', '{package main; no strict;', $code, '}'));
 
      # check result
-     warn "[Error ", ++$semErr, "] $file, line $line: tag condition could not be evaluated: $@.\n" if $@;
+     semerr($_[0], "$file, line $line: tag condition could not be evaluated: $@.") if $@;
     }
 
   # supply result
@@ -7277,7 +7495,7 @@ sub stateManager
      @lexerFlags{qw(ils eol el cbell)}=(LEXER_TOKEN, LEXER_EMPTYLINE, LEXER_IGNORE, LEXER_IGNORE);
 
      # activate special characters as necessary
-     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', '~', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1);
+     @specials{('.', '/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', '~', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1);
 
      # trace, if necessary
      warn "[Trace] Entered default state.\n" if $flags{trace} & TRACE_SEMANTIC;
@@ -7293,7 +7511,7 @@ sub stateManager
      @lexerFlags{qw(ils eol el cbell)}=(LEXER_TOKEN, LEXER_EMPTYLINE, LEXER_IGNORE, LEXER_IGNORE);
 
      # activate special characters as necessary
-     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', '~', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 0, 1);
+     @specials{('.', '/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', '~', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 0, 1);
 
      # trace, if necessary
      warn "[Trace] Entered pfilter installation state.\n" if $flags{trace} & TRACE_SEMANTIC;
@@ -7309,7 +7527,7 @@ sub stateManager
      @lexerFlags{qw(ils eol el cbell)}=(LEXER_TOKEN, LEXER_EMPTYLINE, LEXER_IGNORE, LEXER_IGNORE);
 
      # activate special characters as necessary
-     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', '~', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 0, 1);
+     @specials{('.', '/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', '~', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 0, 1);
 
      # trace, if necessary
      warn "[Trace] Entered postfilter default state.\n" if $flags{trace} & TRACE_SEMANTIC;
@@ -7327,7 +7545,7 @@ sub stateManager
      @lexerFlags{qw(ils eol el cbell)}=(LEXER_TOKEN, LEXER_EMPTYLINE, LEXER_IGNORE, LEXER_IGNORE);
 
      # activate special characters as necessary
-     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', '~', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0);
+     @specials{('.', '/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', '~', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0);
 
      # trace, if necessary
      warn "[Trace] Entered default state in tag mode.\n" if $flags{trace} & TRACE_SEMANTIC;
@@ -7343,7 +7561,7 @@ sub stateManager
      @lexerFlags{qw(ils eol el cbell)}=(LEXER_IGNORE, LEXER_SPACE, LEXER_TOKEN, LEXER_IGNORE);
 
      # activate special characters as necessary
-     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', '~', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(0, 0, 0, $newState==STATE_HEADLINE ? 0 : 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0);
+     @specials{('.', '/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', '~', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(0, 0, 0, 0, $newState==STATE_HEADLINE ? 0 : 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0);
 
      # trace, if necessary
      warn "[Trace] Entered headline ", $newState==STATE_HEADLINE ? 'body' : 'level', " state.\n" if $flags{trace} & TRACE_SEMANTIC;
@@ -7359,7 +7577,7 @@ sub stateManager
      @lexerFlags{qw(ils eol el cbell)}=(LEXER_IGNORE, LEXER_EMPTYLINE, LEXER_IGNORE, LEXER_IGNORE);
 
      # activate special characters as necessary
-     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', '~', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+     @specials{('.', '/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', '~', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
      # trace, if necessary
      warn "[Trace] Entered comment state.\n" if $flags{trace} & TRACE_SEMANTIC;
@@ -7375,7 +7593,7 @@ sub stateManager
      @lexerFlags{qw(ils eol el cbell)}=(LEXER_IGNORE, LEXER_SPACE, LEXER_TOKEN, LEXER_IGNORE);
 
      # activate special characters as necessary
-     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', '~', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0);
+     @specials{('.', '/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', '~', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0);
 
      # trace, if necessary
      warn "[Trace] Entered text state.\n" if $flags{trace} & TRACE_SEMANTIC;
@@ -7391,7 +7609,7 @@ sub stateManager
      @lexerFlags{qw(ils eol el cbell)}=(LEXER_SPACE, LEXER_TOKEN, LEXER_TOKEN, LEXER_IGNORE);
 
      # activate special characters as necessary
-     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', '~', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0);
+     @specials{('.', '/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', '~', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0);
 
      # trace, if necessary
      warn "[Trace] Entered table paragraph state.\n" if $flags{trace} & TRACE_SEMANTIC;
@@ -7407,7 +7625,7 @@ sub stateManager
      @lexerFlags{qw(ils eol el cbell)}=(LEXER_IGNORE, LEXER_SPACE, LEXER_TOKEN, LEXER_IGNORE);
 
      # activate special characters as necessary
-     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', '~', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0);
+     @specials{('.', '/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', '~', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(0, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0);
 
      # trace, if necessary
      warn "[Trace] Entered macro definition state.\n" if $flags{trace} & TRACE_SEMANTIC;
@@ -7423,7 +7641,7 @@ sub stateManager
      @lexerFlags{qw(ils eol el cbell)}=(LEXER_IGNORE, LEXER_SPACE, LEXER_TOKEN, LEXER_TOKEN);
 
      # activate special characters as necessary
-     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', '~', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0);
+     @specials{('.', '/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', '~', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0);
 
      # trace, if necessary
      warn "[Trace] Entered definition item state.\n" if $flags{trace} & TRACE_SEMANTIC;
@@ -7439,7 +7657,7 @@ sub stateManager
      @lexerFlags{qw(ils eol el cbell)}=(LEXER_IGNORE, LEXER_SPACE, LEXER_TOKEN, qr([*#:]));
 
      # activate special characters as necessary
-     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', '~', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0);
+     @specials{('.', '/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', '~', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0);
 
      # trace, if necessary
      warn "[Trace] Entered point state.\n" if $flags{trace} & TRACE_SEMANTIC;
@@ -7455,7 +7673,7 @@ sub stateManager
      @lexerFlags{qw(ils eol el cbell)}=(LEXER_SPACE, LEXER_TOKEN, LEXER_TOKEN, 'Ils');
 
      # activate special characters as necessary
-     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', '~', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0);
+     @specials{('.', '/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', '~', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0);
 
      # trace, if necessary
      warn "[Trace] Entered block state.\n" if $flags{trace} & TRACE_SEMANTIC;
@@ -7471,7 +7689,7 @@ sub stateManager
      @lexerFlags{qw(ils eol el cbell)}=(LEXER_SPACE, LEXER_TOKEN, LEXER_TOKEN, LEXER_IGNORE);
 
      # activate special characters as necessary
-     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', '~', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0);
+     @specials{('.', '/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', '~', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0);
 
      # trace, if necessary
      warn "[Trace] Entered verbatim state.\n" if $flags{trace} & TRACE_SEMANTIC;
@@ -7487,7 +7705,7 @@ sub stateManager
      @lexerFlags{qw(ils eol el cbell)}=(LEXER_SPACE, LEXER_TOKEN, LEXER_TOKEN, LEXER_IGNORE);
 
      # activate special characters as necessary
-     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', '~', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0);
+     @specials{('.', '/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', '~', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0);
 
      # trace, if necessary
      warn "[Trace] Entered embedding state.\n" if $flags{trace} & TRACE_SEMANTIC;
@@ -7503,7 +7721,7 @@ sub stateManager
      @lexerFlags{qw(ils eol el cbell)}=(LEXER_SPACE, LEXER_SPACE, LEXER_TOKEN, LEXER_IGNORE);
 
      # activate special characters as necessary
-     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', '~', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+     @specials{('.', '/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', '~', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
      # trace, if necessary
      warn "[Trace] Entered condition state.\n" if $flags{trace} & TRACE_SEMANTIC;
@@ -7519,7 +7737,7 @@ sub stateManager
      @lexerFlags{qw(ils eol el cbell)}=(LEXER_IGNORE, LEXER_IGNORE, LEXER_TOKEN, LEXER_IGNORE);
 
      # activate special characters as necessary
-     @specials{('/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', '~', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+     @specials{('.', '/', '*', '#', '=', '<', '>', '{', '}' , '-', '?', '@', '+', '~', 'heredoc', 'colon', 'tag', 'embedded', 'number', 'pfilter')}=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
      # trace, if necessary
      warn "[Trace] Entered control state.\n" if $flags{trace} & TRACE_SEMANTIC;
@@ -7694,6 +7912,12 @@ caches are automatically rebuilt.
 
 I<Final cache note:> cache files are not locked while they are used.
 If you need this feature please let me know.
+
+=item criticalSemanticErrors
+
+If set to a true value, semantic errors will cause the parser to terminate
+immediately. This defaults to false: errors are accumulated and finally
+reported.
 
 =item display
 
@@ -7913,6 +8137,16 @@ path of the startup directory, as reported by C<Cwd::cdw()>).
 C<predeclaredVars> needs C<var2stream> to take effect.
 
 
+=item skipcomments
+
+By default comments are streamed and can be converted into comments of the target language.
+But often they are of limited use in generated files: especially if they are intended to
+help the author of a document, not the reader of the source of generated results. So with
+this option one can suppress comments from being streamed.
+
+It is suggested to get this setting via user option,
+which by convention should be named C<-skipcomments>.
+
 =item stream
 
 A reference to an array where the generated output stream should be stored in.
@@ -8017,25 +8251,27 @@ sub run
 
   # init internal data
   (
-   $resultStreamRef,         #  1
-   $safeObject,              #  2
-   $flags{trace},            #  3
-   $flags{display},          #  4
-   $flags{filter},           #  5
-   $flags{linehints},        #  6
-   $flags{var2stream},       #  7
-   $flags{cache},            #  8
-   $flags{cached},           #  9
-   $flags{vis},              # 10
-   $flags{activeBaseData},   # 11
-   $flags{activeDataInit},   # 12
-   $flags{nestedTables},     # 13
-   $flags{headlineLinks},    # 14
-   $flags{docstreams2skip},  # 15
-   $flags{docstreaming},     # 16
-   $macroChecksum,           # 17
-   $varChecksum,             # 18
-   $anchors,                 # 19
+   $resultStreamRef,          #  1
+   $safeObject,               #  2
+   $flags{trace},             #  3
+   $flags{display},           #  4
+   $flags{filter},            #  5
+   $flags{linehints},         #  6
+   $flags{var2stream},        #  7
+   $flags{cache},             #  8
+   $flags{cached},            #  9
+   $flags{vis},               # 10
+   $flags{activeBaseData},    # 11
+   $flags{activeDataInit},    # 12
+   $flags{nestedTables},      # 13
+   $flags{headlineLinks},     # 14
+   $flags{skipcomments},      # 15
+   $flags{docstreams2skip},   # 16
+   $flags{docstreaming},      # 17
+   $flags{criticalSemantics}, # 18
+   $macroChecksum,            # 19
+   $varChecksum,              # 20
+   $anchors,                  # 21
   )=(
      $pars{stream},                                                                         #  1
      (                                                                                      #  2
@@ -8056,11 +8292,13 @@ sub run
      exists $pars{activeDataInit} ? $pars{activeDataInit} : 0,                              # 12
      exists $pars{nestedTables} ? $pars{nestedTables} : 0,                                  # 13
      exists $pars{headlineLinks} ? $pars{headlineLinks} : 0,                                # 14
-     exists $pars{docstreams2skip} ? {map {($_ => undef)} @{$pars{docstreams2skip}}} : 0,   # 15
-     exists $pars{docstreaming} ? $pars{docstreaming} : DSTREAM_DEFAULT,                    # 16
-     0,                                                                                     # 17
-     0,                                                                                     # 18
-     PerlPoint::Anchors->new,                                                               # 19
+     (exists $pars{skipcomments} and $pars{skipcomments}),                                  # 15
+     exists $pars{docstreams2skip} ? {map {($_ => undef)} @{$pars{docstreams2skip}}} : 0,   # 16
+     exists $pars{docstreaming} ? $pars{docstreaming} : DSTREAM_DEFAULT,                    # 17
+     exists $pars{criticalSemanticErrors} ? $pars{criticalSemanticErrors} : 0,              # 18
+     0,                                                                                     # 19
+     0,                                                                                     # 20
+     PerlPoint::Anchors->new,                                                               # 21
     );
 
   # prepare stream data structure and appropriate handlers
@@ -8302,6 +8540,7 @@ EOC
   my $helperBackend=new PerlPoint::Backend(
                                            name    => 'parsers helper backend',
                                            display => DISPLAY_NOINFO+DISPLAY_NOWARN,
+
                                            trace   => TRACE_NOTHING,
                                           );
 
@@ -8312,11 +8551,14 @@ EOC
   # store headlines as anchors, if necessary
   if (@$toc and $flags{headlineLinks})
     {
-     # scopy
-     my @headlinePath;
+     # scopies
+     my ($headlineNr, @headlinePath)=(0);
 
      foreach (@$toc)
        {
+        # update headline counter
+        $headlineNr++;
+
         # get data
         my ($level, $title)=@$_;
 
@@ -8326,25 +8568,53 @@ EOC
         # update headline path and numbers
         $headlinePath[$level]=$title;
 
-        # store both plain and composite headlines
-        $anchors->add($title, $title);
-        $anchors->add(join('|', map {defined($_) ? $_ : ''} @headlinePath[$_..$level]), $title) for (1..$level-1);
+        # store both plain and composite headlines in the anchor object
+        $anchors->add($title, $title, $headlineNr);
+        $anchors->add(join('|', map {defined($_) ? $_ : ''} @headlinePath[$_..$level]), $title, $headlineNr) for (1..$level-1);
        }
     }
 
   # add complete headline titles to streamed headline tokens,
-  # move abbreviation and docstream hints into data section
+  # move abbreviation, docstream and variable hints into data section
   if (@$toc)
    {
-    for (my $index=0; $index<=$#{$toc}; $index++)
+    # scopy
+    my (@headlinePath, @shortcutPath, @levelPath, @pagenumPath);
+
+    for (my $index=0; $index<=$#{$toc}; ++$index)
      {
+      # build a more readable shortcut
       my $ref=$resultStreamRef->[STREAM_TOKENS][$resultStreamRef->[STREAM_HEADLINES][$index]];
+
+      # get toc data
+      my ($level, $title)=@{$toc->[$index]};
+
+      # adapt arrays to get rid of previous data - important in case someone skips several levels
+      # (jumping from level 5 to 100 etc.)
+      $#headlinePath=$#shortcutPath=$#levelPath=$#pagenumPath=$level;
+
+      # update headline pathes and numbers
+      $headlinePath[$level]=$title;
+      $shortcutPath[$level]=$ref->[0]{shortcut} ? $ref->[0]{shortcut} : $title;
+      $levelPath[$level]++;
+      $pagenumPath[$level]=$index+1;  # real page number, no index
+
       my $docstreams=delete($ref->[0]{docstreams});
+      my $variables=delete($ref->[0]{vars});
       push (
             @$ref,
             $toc->[$index][1],
             delete($ref->[0]{shortcut}),
             $flags{docstreaming}==DSTREAM_DEFAULT ? [sort keys %$docstreams] : {},
+
+            # store headline path data in the streamed token
+            [
+             dclone([@headlinePath[1..$level]]),
+             dclone([@shortcutPath[1..$level]]),
+             dclone([@levelPath[1..$level]]),
+             dclone([@pagenumPath[1..$level]]),
+             $variables,
+            ],
            );
      }
    }
@@ -8382,7 +8652,7 @@ EOC
          unless ($@)
           {
            {
-            # Error? (Treat syntactic errors as semantic ones at this pointto give PARSING_FAILED a meaning.)
+            # Error? (Treat syntactic errors as semantic ones at this point to give PARSING_FAILED a meaning.)
             ++$semErr, last if $rc==PARSING_ERROR or $rc==PARSING_FAILED;
 
             # update options (might be modified, and checking for a difference
@@ -8453,6 +8723,15 @@ EOM
   $rc and not $semErr;
  }
 
+
+# report a semantic error, terminate process if necessary
+sub semerr
+ {
+  my $parser=shift;
+  warn "[Error ", ++$semErr, "] ", @_, "\n";
+  $parser->YYAbort if $flags{criticalSemantics};
+ }
+
 # ------------------------------------------------------
 # A tiny helper function intended for internal use only.
 # ------------------------------------------------------
@@ -8517,7 +8796,7 @@ sub normalizeTableRows
   confess "[BUG] Missing headline mode parameter.\n" unless defined $autoHeadline;
 
   # declare variables
-  my ($refColumns, $columns, $nested, @flags, @improvedStream)=(0, 0.5, 0, 1);
+  my ($refColumns, $maxColumns, $columns, $nested, @flags, @improvedStream)=(0, 0, 0.5, 0, 1);
 
   # remove whitespaces at the beginning and end of the stream, if necessary
   shift(@$stream) if $stream->[0]=~/^\s*$/; $stream->[0]=~s/^\s+//;
@@ -8571,7 +8850,7 @@ sub normalizeTableRows
         # at the end of this first row, marks that it is reached, store the number
         # of its columns as a reference for the complete table, and reset the column counter
         # (which will be used slightly differently in the following lines)
-        $flags[0]=0, $refColumns=$columns, $columns=0 if $flags[3];
+        $flags[0]=0, $refColumns=$maxColumns=$columns, $columns=0 if $flags[3];
        }
      else
        {
@@ -8591,6 +8870,9 @@ sub normalizeTableRows
            $columns=0;
           }
         
+        # update maximum number of columns, if necessary
+        $maxColumns=$columns if $columns>$maxColumns;
+
         # in any case, copy this stream part
         push(@improvedStream, $_);
        }
@@ -8598,6 +8880,9 @@ sub normalizeTableRows
 
   # replace original stream by the improved variant
   @$stream=@improvedStream;
+
+  # supply the number of columns in the table row *and* the maximum number of columns
+  ($refColumns, $maxColumns);
  }
 
 
@@ -8666,7 +8951,7 @@ sub updateTagFinishMem
 sub pfilterCall
  {
   # get and check parameters
-  my ($filters, $pstream, $lineNr)=@_;
+  my ($parser, $filters, $pstream, $lineNr)=@_;
   confess "[BUG] Missing filter list.\n" unless $filters;
   confess "[BUG] Filter list is no array reference.\n" unless ref($filters) eq 'ARRAY';
   confess "[BUG] Missing paragraph stream.\n" unless $pstream;
@@ -8772,8 +9057,12 @@ sub pfilterCall
                                               # table tags need special care, is it one?
                                               unless ($tag=~/^TABLE/)
                                                 {
+                                                 # it can happen that perl complains about an undefined value here
+                                                 # even if no such value is to be find in debugging
+                                                 local($^W)=0;
+
                                                  # act mode dependend
-                                                 $retranslationBuffer.=$mode==DIRECTIVE_START ? join('', "\\$tag", (defined $settings and %$settings) ? join('', '{', join(' ', map {qq($_="$settings->{$_}")} grep(!/^__/, keys %$settings)), '}') : (), ($bodyHint ? '<' : ())) : ($bodyHint ? '>' : ());
+                                                 $retranslationBuffer.=$mode==DIRECTIVE_START ? join('', "\\$tag", (defined $settings and %$settings and grep(!/^__/, keys %$settings)) ? join('', '{', join(' ', map {qq($_="$settings->{$_}")} grep(!/^__/, keys %$settings)), '}') : (), ((defined $bodyHint and $bodyHint) ? '<' : ())) : ((defined $bodyHint and $bodyHint) ? '>' : ());
                                                 }
                                               else
                                                 {
@@ -8853,7 +9142,7 @@ sub pfilterCall
      }
 
      # inform user
-     warn qq([Warn] $sourceFile, line $lineNr: Running paragraph filter "$perl".\n) if $flags{trace} & TRACE_ACTIVE;
+     warn qq([Trace] $sourceFile, line $lineNr: Running paragraph filter "$perl".\n) if $flags{trace} & TRACE_ACTIVE;
 
      # call the filter
      $retranslationBuffer=ref($safeObject) ? $safeObject->reval($perl) : eval(join(' ', '{package main; no strict;', $perl, '}'));
@@ -8862,7 +9151,7 @@ sub pfilterCall
      if ($@)
        {
         # inform user, if necessary
-        warn "[Error ", ++$semErr, qq(] $sourceFile, line $lineNr: paragraph filter "$perl" could not be evaluated: $@.\n);
+        semerr($parser, qq($sourceFile, line $lineNr: paragraph filter "$perl" could not be evaluated: $@.));
 
         # stop processing, flag error
         return undef;
@@ -8872,6 +9161,10 @@ sub pfilterCall
    # success: reply result (embed it into empty lines to avoid paragraph mismatch)
    defined $retranslationBuffer ? [("\n") x 2, split(/(\n)/, $retranslationBuffer), ("\n") x 2] : '';
   }
+
+# supply anchors
+sub anchors
+ {$anchors;}
 
 1;
 

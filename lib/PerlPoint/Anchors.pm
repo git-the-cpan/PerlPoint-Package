@@ -5,6 +5,12 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.03    |18.08.2003| JSTENZEL | new method generic();
+#         |05.05.2004| JSTENZEL | anchors now store the absolute number of their page,
+#         |          |          | (which changes the results of query() from scalar string
+#         |          |          | to [$headline, $page]!;
+#         |12.09.2004| JSTENZEL | using the portable fields::new();
+#         |16.09.2004| JSTENZEL | objects declared as typed lexicals now;
 # 0.02    |< 14.04.02| JSTENZEL | new methods checkpoint() and reportNew();
 #         |19.04.2002| JSTENZEL | adapted the construction of reportNew()'s return
 #         |          |          | value construction to certainly reply a hash ref.;
@@ -19,7 +25,7 @@ B<PerlPoint::Anchors> - simple anchor collection class
 
 =head1 VERSION
 
-This manual describes version B<0.02>.
+This manual describes version B<0.03>.
 
 =head1 SYNOPSIS
 
@@ -65,7 +71,7 @@ require 5.00503;
 package PerlPoint::Anchors;
 
 # declare package version
-$VERSION=0.02;
+$VERSION=0.03;
 
 
 
@@ -74,8 +80,8 @@ $VERSION=0.02;
 # set pragmata
 use strict;
 
-# there is only one data field
-use fields qw(anchors logMode newAnchors);
+# declare attributes
+use fields qw(anchors logMode newAnchors genericPrefix generator);
 
 
 
@@ -103,6 +109,10 @@ B<Parameters:>
 
 The class name.
 
+=item class
+
+An optional prefix for generic anchor names. Defaults to "__GANCHOR__".
+
 =back
 
 B<Returns:> the new object.
@@ -115,20 +125,20 @@ B<Example:>
 sub new
  {
   # get parameter
-  my ($class)=@_;
+  my ($class, $genericPrefix)=@_;
 
   # check parameters
   confess "[BUG] Missing class name.\n" unless $class;
 
   # build object
-  my $me;
-  {
-   no strict 'refs';
-   $me=bless([\%{"$class\::FIELDS"}], $class);
-  }
+  my $me=fields::new($class);
 
   # set logging up
   $me->checkpoint(0);
+
+  # init generator of anchor generic anchor names
+  $me->{generator}=0;
+  $me->{genericPrefix}=defined $genericPrefix ? $genericPrefix : '__GANCHOR__';
 
   # supply new object
   $me;
@@ -159,8 +169,13 @@ already registered before, an existing entry will be overwritten quietly.
 =item value
 
 Data related to the anchor. This is an scalar. The object does nothing
-with it then storing an providing it on request, so it is up to the used
+with it then storing and providing it on request, so it is up to the user
 what kind of data is collected here.
+
+=item page
+
+The absolute number of the page the anchor is located in. This counting starts
+with 1 for the first chapter and continues with 2, 3 etc. regardless of chapter levels.
 
 =back
 
@@ -168,19 +183,20 @@ B<Returns:> the object.
 
 B<Example:>
 
-  $anchors->add('new anchor', [{new=>'anchor'}]);
+  $anchors->add('new anchor', [{new=>'anchor'}], 17);
 
 =cut
 sub add
  {
   # get and check parameters
-  my ($me, $name, $value)=@_;
+  ((my __PACKAGE__ $me), my ($name, $value, $page))=@_;
   confess "[BUG] Missing object parameter.\n" unless $me;
   confess "[BUG] Object parameter is no ", __PACKAGE__, " object.\n" unless ref $me and ref $me eq __PACKAGE__;
   confess "[BUG] Missing anchor name parameter.\n" unless defined $name;
+  confess "[BUG] Missing page number parameter.\n" unless defined $page;
 
   # add new anchor (should we check overwriting?)
-  $me->{anchors}{$name}=defined $value ? $value : undef;
+  $me->{anchors}{$name}=[defined $value ? $value : undef, $page];
 
   # update anchor log, if necessary
   $me->{newAnchors}{$name}=$me->{anchors}{$name} if $me->{logMode};
@@ -219,14 +235,14 @@ This parameter is optional.
 B<Returns:>
 
 If no C<name> was passed, the complete collection is provided as a
-reference to a hash containing name value pairs. The referenced hash
+reference to a hash containing name-value/page-pairs. The referenced hash
 is the objects own hash used internally, so modifications will affect
 the object.
 
 If an anchor name was passed and this name was registered, a hash
 reference is provided as well (for reasons of consistency). The
-referenced hash is a I<copy> and contains the appropriate name value
-pair.
+referenced hash is a I<copy> and contains the appropriate pair of
+anchor name and a reference to an array of its value and page.
 
 If an anchor name was passed and this name was I<not> registered,
 the method returns an undefined value.
@@ -247,7 +263,7 @@ B<Examples:>
 sub query
  {
   # get and check parameters
-  my ($me, $name)=@_;
+  ((my __PACKAGE__ $me), my $name)=@_;
   confess "[BUG] Missing object parameter.\n" unless $me;
   confess "[BUG] Object parameter is no ", __PACKAGE__, " object.\n" unless ref $me and ref $me eq __PACKAGE__;
 
@@ -295,7 +311,7 @@ B<Example:>
 sub checkpoint
  {
   # get and check parameters
-  my ($me, $mode)=@_;
+  ((my __PACKAGE__ $me), my $mode)=@_;
   confess "[BUG] Missing object parameter.\n" unless $me;
   confess "[BUG] Object parameter is no ", __PACKAGE__, " object.\n" unless ref $me and ref $me eq __PACKAGE__;
 
@@ -341,7 +357,7 @@ B<Example:>
 sub reportNew
  {
   # get and check parameters
-  my ($me)=@_;
+  (my __PACKAGE__ $me)=@_;
   confess "[BUG] Missing object parameter.\n" unless $me;
   confess "[BUG] Object parameter is no ", __PACKAGE__, " object.\n" unless ref $me and ref $me eq __PACKAGE__;
 
@@ -349,6 +365,43 @@ sub reportNew
   # to enforce perl to recognize the hash reference constructor)
   my $rc={%{$me->{newAnchors}}};
   $rc;
+ }
+
+
+=pod
+
+=head2 generic()
+
+Supplies a generic anchor name build according to the pattern /^<generic prefix>\d+$/ (with
+the <generic prefix> set up in the call of I<new()>) - so it is recommended not to use those
+names explicitly.
+
+B<Parameters:>
+
+=over 4
+
+=item object
+
+An object made by C<new>.
+
+=back
+
+B<Returns:> The new anchor name.
+
+B<Example:>
+
+  $anchors->add($anchors->generic, $data);
+
+=cut
+sub generic
+ {
+  # get and check parameters
+  (my __PACKAGE__ $me)=@_;
+  confess "[BUG] Missing object parameter.\n" unless $me;
+  confess "[BUG] Object parameter is no ", __PACKAGE__, " object.\n" unless ref $me and ref $me eq __PACKAGE__;
+
+  # suppply a new generic name
+  join('', $me->{genericPrefix}, ++$me->{generator});
  }
 
 
@@ -387,7 +440,7 @@ as well.
 
 =head1 AUTHOR
 
-Copyright (c) Jochen Stenzel (perl@jochen-stenzel.de), 1999-2002.
+Copyright (c) Jochen Stenzel (perl@jochen-stenzel.de), 1999-2004.
 All rights reserved.
 
 This module is free software, you can redistribute it and/or modify it

@@ -5,6 +5,12 @@
 # ---------------------------------------------------------------------------------------
 # version | date   | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.12    |15.06.03| JSTENZEL | removed an unused list counter;
+#         |        | JSTENZEL | removed an unused list counter;
+#         |21.06.03| JSTENZEL | bugfix: LOCALTOC code modified global data instead of
+#         |        |          | a local copy;
+#         |22.06.03| JSTENZEL | maximum number of table columns now taken from a new
+#         |        |          | tag option __maxColumns__ set by the parser;
 # 0.11    |30.08.02| JSTENZEL | brackets ("[]") seem to have a special meaning in SDF:
 #         |        |          | sdf evaluates their contents by eval(), which causes
 #         |        |          | a lot of confusion in (Perl) example paragraphs - as a
@@ -103,7 +109,7 @@ B<pp2sdf> - translates PerlPoint to SDF
 
 =head1 VERSION
 
-This manual describes version B<0.11>.
+This manual describes version B<0.12>.
 
 =head1 DESCRIPTION
 
@@ -185,7 +191,7 @@ docstreams and C<-docstreaming> is not set.
 This mode causes C<pp2sdf> to produce one document per document stream, each of
 them containing only the main stream and the parts written of one certain stream.
 For example, the first produced document according to the code above would be
-euqivalent to the following source:
+equivalent to the following source:
 
  =This is the main stream
 
@@ -727,7 +733,7 @@ distribution for more details.
 package PerlPoint::Converter::pp2sdf;
 
 # declare version
-$VERSION=$VERSION=0.11;
+$VERSION=$VERSION=0.12;
 
 # pragmata
 use strict;
@@ -751,7 +757,6 @@ my (
     $htmlBuffer,                # intermediate buffer for embedded HTML;
 
     @streamData,                # PerlPoint stream;
-    @openLists,
     @openTags,                  # a buffer used to autoclose / autoopen tags exceeding example lines;
     @headlinePath,              # composite headline (consisting of all hierarchy levels);
     @headlineNumbers,           # internal headline number memory, used for \LOCALTAG;
@@ -984,7 +989,7 @@ sub handleSimple
   # get parameters
   my ($opcode, $mode, @contents)=@_;
 
-  # build a small translation tables to handle curly braces
+  # build a small translation table to handle curly braces
   my %curlyBraceTranslations=('{' => '{{CHAR:lbrace}}', '}' => '{{CHAR:rbrace}}');
 
   unless ($flags{sdf})
@@ -1141,17 +1146,13 @@ sub handleTag
        }
      else
        {
-        # get the greatest number of columns
-        my $rowNr=0;
-        $rowNr>=@$_ or $rowNr=@$_ for (@{$table->{rows}});
-
-        # clean up global table buffer, use a local copy fro completion
+        # clean up global table buffer, use a local copy for completion
         my $tableBuffer=$table;
 	$table={};
 
         # open table
         present("\n\n!block table; noheadings\n");
-        present(join(';', map {"c$_";} (1..$rowNr)), "\n");
+        present(join(';', map {"c$_";} (1..$settings->{__maxColumns__})), "\n");
 
         foreach my $row (@{$tableBuffer->{rows}})
           {
@@ -1400,12 +1401,12 @@ sub handleTag
                  my ($level, $title)=@$_;
 
                  # update headline numbering
-                 splice(@headlineNumbers, $level+1);
-                 $headlineNumbers[$level]++;
+                 splice(@localHeadlineNumbers, $level+1);
+                 $localHeadlineNumbers[$level]++;
 
                  # build result
                  present('*', ' ',
-                         join('.', @headlineNumbers[1..$level]), '. ',
+                         join('.', @localHeadlineNumbers[1..$level]), '. ',
                          $plain ? $title : $link->(@$_),
                          "\n\n"
                         );
@@ -1519,9 +1520,6 @@ sub handleListPoint
  {
   # get parameters
   my ($opcode, $mode, @data)=@_;
-
-  # update list counter if the item begins
-  $openLists[0]++ if $mode==DIRECTIVE_START;
 
   # update list point counter
   $flags{listpoints}++;

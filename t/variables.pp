@@ -1,4 +1,8 @@
 
+
+=Variables
+
+
 $word=word
 
 $words=words words words
@@ -17,10 +21,6 @@ next line
 
 
 ${noAssignment}=no assignment
-
-
-
-
 
 Text: $word.
 

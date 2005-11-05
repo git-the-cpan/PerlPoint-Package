@@ -1,4 +1,5 @@
 
+=Code
 
  # this is intended for examples,
  # which typically means CODE examples

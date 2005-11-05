@@ -5,6 +5,7 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.03    |18.08.2003| JSTENZEL | A is a basic tag now;
 # 0.02    |16.06.2001| JSTENZEL | namespace bugfix;
 # 0.01    |31.03.2001| JSTENZEL | new.
 # ---------------------------------------------------------------------------------------
@@ -17,7 +18,7 @@ B<PerlPoint::Tags::SDF> - PerlPoint tag set used by pp2sdf
 
 =head1 VERSION
 
-This manual describes version B<0.02>.
+This manual describes version B<0.03>.
 
 =head1 SYNOPSIS
 
@@ -53,7 +54,7 @@ parser object.
 
 B<PerlPoint::Tags::SDF> declares all the tags of B<PerlPoint::Tags::Basic>.
 
-Additionally, the B<PerlPoint::Tags::HTML> tags C<A>, C<L>, C<PAGEREF>,
+Additionally, the B<PerlPoint::Tags::HTML> tags C<L>, C<PAGEREF>,
 C<SECTIONREF>, C<U> and C<XREF> tags are supported. C<pp2sdf> might interprete them
 slightly different to C<pp2html>, please read its documentation for details.
 
@@ -72,8 +73,8 @@ require 5.00503;
 # declare package
 package PerlPoint::Tags::SDF;
 
-# declare package version (as a STRING!!)
-$VERSION="0.02";
+# declare package version
+$VERSION=0.03;
 
 # declare base "class"
 use base qw(PerlPoint::Tags);
@@ -92,7 +93,7 @@ use PerlPoint::Constants 0.14 qw(:tags);
 
 # declare tags - just combining other declarations
 use PerlPoint::Tags::Basic;
-use PerlPoint::Tags::HTML qw(A L PAGEREF SECTIONREF U XREF);
+use PerlPoint::Tags::HTML qw(L PAGEREF SECTIONREF U XREF);
 
 1;
 
@@ -115,7 +116,7 @@ Basic tags imported by B<PerlPoint::Tags::SDF>.
 
 =item PerlPoint::Tags::HTML
 
-which declares the original C<A>, C<L>, C<PAGEREF>, C<SECTIONREF>, C<U> and C<XREF> tags.
+which declares the original C<L>, C<PAGEREF>, C<SECTIONREF>, C<U> and C<XREF> tags.
 
 =back
 

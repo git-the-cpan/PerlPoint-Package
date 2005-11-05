@@ -1,4 +1,6 @@
 
+=Macros
+
 +RED:\FONT{color=red}<__body__>
 
 +F:\FONT{color=__c__}<__body__>

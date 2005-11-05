@@ -1,4 +1,6 @@
 
+=Includes
+
 We include \INCLUDE{type=pp file="include1.pp"} something.
 
 Continued frame source.

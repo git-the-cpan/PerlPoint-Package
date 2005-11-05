@@ -1,4 +1,6 @@
 
+=Tags
+
 Simple: \TEST.
 Guarded: \\TEST.
 Sequence: \TEST\TOAST.

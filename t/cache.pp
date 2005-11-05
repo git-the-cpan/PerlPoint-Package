@@ -1,4 +1,6 @@
 
+=Cache
+
 \TABLE{bg=blue separator="|" border=2}
 
 Spalte 1  |  Spalte 2  | Spalte 3

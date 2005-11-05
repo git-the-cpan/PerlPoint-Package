@@ -13,23 +13,36 @@ lib/PerlPoint/Constants.pm
 lib/PerlPoint/Parser.pm
 lib/PerlPoint/Tags.pm
 lib/PerlPoint/Tags/Basic.pm
-lib/PerlPoint/Tags/CPPP.pm
 lib/PerlPoint/Tags/SDF.pm
 
-demo/pp2cppp
+lib/PerlPoint/Generator.pm
+lib/PerlPoint/Generator/Object/Page.pm
+
+lib/PerlPoint/Generator/SDF.pm
+lib/PerlPoint/Generator/SDF/Default.pm
+
+lib/PerlPoint/Template.pm
+
 demo/pp2pod
 demo/pp2pp
 demo/pp2ppresenter
 demo/.pp2sdf
 demo/pp2sdf
 demo/pp2tree
+demo/pp2tdo
 
 demo/perlpods.pp
 
 doc/getting-started.pp
 doc/getting-started.pod
 
+doc/tutorial.pp
+
 doc/writing-converters.pp
+doc/writing-converters-traditional.pp
+doc/writing-converters-formatters.pp
+doc/writing-converters-entityinterfaces.pp
+doc/writing-converters-appendix.pp
 doc/pp-src-stream-e.png
 doc/pp-stream-result-e.png
 
@@ -48,70 +61,74 @@ doc/parser-paragraphs.pp
 doc/parser-tags.pp
 
 doc/tagdoc-example.pp
-doc/tags/image.gif
-doc/tags/tag-B.pp
-doc/tags/tag-C.pp
-doc/tags/tag-FORMAT.pp
-doc/tags/tag-HIDE.pp
-doc/tags/tag-I.pp
-doc/tags/tag-IMAGE.pp
-doc/tags/tag-LOCALTOC.pp
-doc/tags/tag-READY.pp
-doc/tags/tag-REF.pp
-doc/tags/tag-SEQ.pp
-doc/tags/tag-STOP.pp
-doc/tags/tag-TABLE.pp
-doc/tags/basic-tag-macros.pp
+
+# tag docs were moved
+# doc/tags/image.gif
+# doc/tags/tag-B.pp
+# doc/tags/tag-C.pp
+# doc/tags/tag-FORMAT.pp
+# doc/tags/tag-HIDE.pp
+# doc/tags/tag-I.pp
+# doc/tags/tag-IMAGE.pp
+# doc/tags/tag-LOCALTOC.pp
+# doc/tags/tag-READY.pp
+# doc/tags/tag-REF.pp
+# doc/tags/tag-SEQ.pp
+# doc/tags/tag-STOP.pp
+# doc/tags/tag-TABLE.pp
+# doc/tags/basic-tag-macros.pp
+
+examples/xmldefault2html.cfg
 
 t/PerlPoint/Tags/_macros.pm
 t/PerlPoint/Tags/_tags.pm
 
-t/backend-base.t
-t/backend-modes.t
+t/l0_backend-base.t
+t/l0_backend-modes.t
 t/backend-modes.pp
-t/backend-navi.t
+t/l0_backend-navi.t
 t/backend-toc.pp
-t/backend-toc.t
+t/l0_backend-toc.t
 
-t/cache-fill.t
-t/cache-hits.t
-t/cache-remove.t
+t/l0_cache-fill.t
+t/l0_cache-hits.t
+t/l0_cache-remove.t
 t/cache.pp
 
-t/code.t
+t/l0_code.t
 t/code.pp
 
-t/comments.t
+t/l0_comments.t
 t/comments.pp
 
-t/conditions.t
+t/l0_conditions.t
 t/conditions.pp
 
-t/documents.t
+t/l0_documents.t
 
-t/docstreams1.t
-t/docstreams2.t
-t/docstreams3.t
+t/l0_docstreams1.t
+t/l0_docstreams2.t
+t/l0_docstreams3.t
 t/docstreams.pp
-t/docstream-default-checks.pl
+t/l0_docstream-default-checks.pl
 
-t/embedded.t
+t/l0_embedded.t
 t/embedded.pp
 
 t/empty1.pp
 t/empty2.pp
 
-t/headlines.t
+t/l0_headlines.t
 t/headlines.pp
 
-t/ifilters.t
+t/l0_ifilters.t
 t/ifilters.pp
 t/ifilters.lang
 
-t/include1.t
-t/include2.t
-t/include3.t
-t/include6.t
+t/l0_include1.t
+t/l0_include2.t
+t/l0_include3.t
+t/l0_include6.t
 t/include.pp
 t/include1.pp
 t/include2.pp
@@ -124,45 +141,50 @@ t/include2.perl
 t/includelib/searchMeInPath.pp
 t/includelib2/searchMeInPath2.pp
 
-t/index.t
+t/l0_index.t
 t/index.pp
 
-t/linehints.t
+t/l0_linehints.t
 t/linehints.pp
 
-t/lists.t
+t/l0_lists.t
 t/lists.pp
 
-t/macros.t
+t/l0_macros.t
 t/macros.pp
 
-t/pfilters.t
+t/l0_pfilters.t
 t/pfilters.pp
 t/pfilter-code.pp
-t/pfilter-checks.pl
+t/l0_pfilter-checks.pl
 
-t/simple.t
+t/l0_simple.t
 t/simple.pp
 
-t/tables.t
+t/l0_tables.t
 t/tables.pp
 
-t/tags.t
+t/l0_tags.t
 t/tags.pp
 
-t/text.t
+t/l0_text.t
 t/text.pp
+t/text2.pp
 
-t/variables1.t
-t/variables2.t
-t/variables3.t
+t/l0_variables1.t
+t/l0_variables2.t
+t/l0_variables3.t
 t/variables.pp
 t/variables3.pp
 
-t/verbatim.t
+t/l0_verbatim.t
 t/verbatim.pp
+
+t/testlib.pm
 
 utilities/PerlPoint.clp
 utilities/PerlPoint.vim
 utilities/perlpoint-hilit19.lisp
 utilities/utilities.txt
+
+module_templates/Formatter.pm

@@ -6,21 +6,271 @@
 
 // -- end of "preface"
 
+
+=0.40
+
+This update has two parts.
+
+First, it is a feature update. It has a few incompatible changes (see below), but
+should require only slight adaptations of existing converters. All converters should
+continue to run or should be adapted soon (as I know there is an adapted Converters
+package on the way).
+
+Second, 0.40 introduces an extended framework, which in this release is in \I<beta state>
+because of lacking tests and incomplete docs. Nevertheless, it is well tested in production
+and should be save to use.
+
+Read on for all the details!
+
+\LOCALTOC
+
+
+==Features
+
+There are lots of new features, most of all an extended framework which should
+make it much easier to write converters.
+
+The new parts are just \I<extensions> of the "old" framework which remains in action
+(and is used by the new parts), so converters using the traditional interface
+should continue to run.
+
+
+==Extended framework 
+
+This version introduces a new converter, \BC<pp2tdo> ("template driven output"),
+and a new part of the module framework, the \C<PerlPoint::Generator>
+hierarchy, which implement a very generic and general converter approach.
+
+See the new section "The formatter approach" in "Writing converters" for
+details about this new model.
+
+Here are a few highlights:
+
+* Object oriented extension design.
+
+* Separation of general function, language specific actions and formatting.
+
+* A clear, simple to use, entity based interface for subclassing of only
+  a few methods to overwrite.
+
+* All the basic work - dealing with parser, stream, backend and backend events
+  - is already done by \C<PerlPoint::Generator>.
+
+* Easy to extend. Generator authors just add formatting.
+
+* Every subclass can add additional options.
+
+* Every subclass can add additional help portions.
+
+* As formatting is determined by the formatter subclass, several templating
+  systems can be used in parallel by just switching the template engine. A
+  general template layer is provided.
+
+* \I<All> generators can use styles.
+
+* General style format with parts for configuration, templates, docs and screenshots.
+
+* Subclasses can be defined even in a style, so a style can come with its
+  own formatters and template systems if necessary.
+
+* Most of the docstreaming and index work is now done a central place, so
+  all generators can use it and do not have to deal with it themselves.
+
+* \I<The "old" approach is still available and supported>, and existing converters
+  will continue to run, as the old part of the framework is the base of the new part.
+  The new generator part just adds an additional level of abstraction, making it easier
+  to focus on the target format and layout.
+
+
+===New SDF generator
+
+As a reference implementation, the functionality of \C<pp2sdf> was reimplemented
+in the generator model. To produce SDF this way, invoke \C<pp2tdo> with option
+\C<-target SDF>.
+
+
+===First pure XML generator(s)
+
+Well, we already had the demo converter that produced XML for PPresenter,
+but now a \I<common> implementation is available, implemented with the
+new generator approach. To produce XML, invoke \C<pp2tdo> with option
+\C<-target XML>.
+
+Best of all, if the result does not meet your needs, it is easy to control
+entity translation by options. If this is not sufficient, it is easy to write
+a modified converter by subclassing \C<PerlPoint::Generator::XML>. See
+\C<PerlPoint::Generator::XML::Default> for an example and "Writing converters"
+for instructions.
+
+Various formatters are available to produce XHTML, paged XHTML and AxPoint.
+These are published as standalone CPAN packages, watch the PerlPoint namespace
+or the project side on SourceForge.
+
+
+===Further reading
+
+To learn more about the new features and generators, please read via \C<perldoc>
+
+* the docs of \C<pp2tdo>;
+
+* the \I<help> of \C<pp2tdo>, activated by option \C<-help>, which adapts itself to
+  the \C<-target>, \C<-formatter> and \C<-template> options:
+
+  Here are a few example calls (each call on one line):
+
+  pp2tdo -target SDF
+  pp2tdo -target XML
+  pp2tdo -target XML -formatter XHTML
+  pp2tdo -target XML -formatter XHTML::Paged
+  pp2tdo -target XML -formatter XHTML::Paged -templatetype Traditional
+         -templatesAccept XML/XHTML::Paged
+  pp2tdo -target XML -formatter AxPoint
+  ...
+
+... and have a look at the example template provided in the \C<demos> subtree.
+
+
+==Incompatibel changes for users
+
+* Empty (reset) variables will no longer be replaced by empty strings.
+  This might become a problem - such variables were occasionally used
+  to start generated text paragraphs, as by Pod::PerlPoint's pod2pp,
+  which wrote:
+
+    $__pod2pp__empty__=
+
+    ${__pod2pp__empty__}Converted POD text ...
+
+  To work around this, use the new optional dot start for text paragraphs:
+
+    .Converted POD text ...
+
+  And please install an updated version of Pod::PerlPoint, please ;-)
+
+* The first chapter now \I<requires> a headline. Comments and all paragraphs
+  not producing visible content (like macro definitions, code fragments and
+  variable asignments) can appear \I<before> the first headline.
+
+
+==Incompatible changes of the converter API
+
+* Modified \I<anchor interface>. Anchors now store the absolute number of
+  the page they are defined in. As this is an internal interface, this
+  does not affect document authors. On the other hand, converters will have
+  to be adapted \I<if> they make use of anchors (as far as I know, mostly
+  converters of this package do, which \I<were> adapted as necessary).
+
+* \C<LOCALTOC> added to the list of standalone tags (which are stripped of
+  of an enveloping text paragraph if they are its only contents);
+
+* \C<\\A> and \C<\\F> are basic tags now, which means they are available to
+  all converters. The original meaning of "F" was \I<\B<f>ont>, but can
+  be generalized now (to "formatting" or something like that). In fact, it
+  formats a selected text, and it is up to the converters how to tranform
+  the various options. (As with \C<\\FORMAT>, conventions will help to
+  establish documents that are portable between converters.)
+
+* \BC<\\A> now checks if it is the innermost tag/macro. This \I<can> break
+  existing sources.
+
+
+==Tutorial
+
+Beginning with this release, a tutorial is part of the package. Being in an early
+state till it already describes the PerlPoint basics. Please have a look. Comments
+are appreciated.
+
+
+==Various
+
+* Anchor objects now can produce "arbitrary" anchor names on request.
+
+* The \I<\\REF> tag now provides the absolute chapter number of the related
+  anchor, in the internal option \C<__chapter__>.
+
+* Backends can register a handler for \I<all> directives (\C<DIRECTIVE_EVERY>).
+  This slows down operation, but allows central prehandling of all stream
+  parts where necessary.
+
+* Headlines provide additional data: their full and shortcut pathes as well as
+  level and page number pathes, plus variables that are valid when the chapter
+  is complete (for templates).
+
+* New warning if the maximum columns number is detected in another line than the
+  first table line (which is the base of normalization).
+
+* New parser option \C<criticalSemanticErrors> treats semantic errors as
+  critical, causing the parser to terminate immediately (as after syntactic
+  errors).
+
+* New parser option \C<skipcomments> excludes comments from the stream.
+
+* Input filters can access the source file by a variable \C<$main::_ifilterFile>
+  now.
+
+* \I<Tag hooks take (provide) an additional parameter>: the absolute number of the
+  page the tag is used on.
+
+* Table directives provide additional hints: \C<__maxColumns__> and \C<__titleColumns__>.
+
+* New directive DIRECTIVE_DPOINT_TEXT now encloses definition point explanations in the
+  stream.
+
+* Text paragraphs can be started by an (optional!) dot now:
+
+   .Text begins.
+
+  This is mostly useful when \I<generating> PerlPoint from other sources,
+  to make sure the first characters of the converted text will not be interpreted
+  as special PerlPoint characters.
+
+* As Clinton Pierce's Perl Projector seems no longer to be supported, the demo
+  converter \C<pp2cppp> and the module \C<PerlPoint::Tags::CPPP> were removed
+  from the distribution.
+
+
+==Bugfixes
+
+* A subtile bug could cause parser crashes when an included document contained
+  just a macro without trailing newlines, in a deeper nesting level. The parser
+  now behaves more robust in this area. Thanks to Heike Metz who reported the
+  crash.
+
+* Docstream "main" was ignored like any other docstream if working in the
+  "docstream ignore" mode.
+
+* Undefind variables were expanded. Fixed. Note: this might turn out
+  to be an incompatible change for you, if you unset an empty variable in order
+  to get an empty string (like Pod::PerlPoint did):
+
+    $empty=
+
+    ${empty}Text starts here ...
+
+  To work around this, use the new optional dot start for text paragraphs instead:
+
+    .Text starts here ...
+
+* There was a general error in variable handling, which caused wrong resolving of
+  backslash preceeded variables in several cases. Thanks to Lorenz for the bug report.
+
+* When continuing an ordered list after returning from a nested list, the continued
+  list was treated as "new". This was not really a bug as it was treated as a new
+  list, but continuation would have been more intuitive - now it is there.
+
+* The \C<alt> option of \CX<\\REF> can handle backslashed commata now - it was not
+  possible before to use headlines with commata as alternatives.
+
+
+
+
 =0.39
 
 This update moves a tag (\C<\\X>) from converter definitions to the basic tags.
 To make use of the new functionality, you need to update to adapted converters.
-
 Alternativelely and as a workaround, go to the definition lib, e.g.
 \C<PerlPoint::Tags::HTML>, and delete the definition of the \C<\\X> tag.
-(Please note that full support of the new index features \I<needs> updated
-converters.)
-
-As of the time of this writing, \CX<PerlPoint::Converters> was not adapted
-yet, but you can load an adapted (patched) version from our SourceForge
-project site.
-
-
+(Please note that full support of the new index features \I<needs> updated converters.)
 
 ==Bugfixes
 

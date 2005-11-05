@@ -1,4 +1,5 @@
 
+=Verbatim blocks
 
 <<CODE
  This is a verbatim block.

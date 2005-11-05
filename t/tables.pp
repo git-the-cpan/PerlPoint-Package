@@ -1,4 +1,6 @@
 
+=Tables
+
 \TABLE{bg=blue separator="|" border=2}
 
 column 1  |  column 2  | column 3

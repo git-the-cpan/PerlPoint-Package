@@ -726,7 +726,7 @@ sub handleTag
   # image tag translation is done straight forward
   if ($tag eq 'IMAGE')
     {
-     # compose an CPPP image macro
+     # compose an image tag
      push(@stack, $xml->img({%$settings})) if $mode==DIRECTIVE_START;
 
      # ok, well done

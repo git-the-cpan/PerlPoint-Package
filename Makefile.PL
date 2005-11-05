@@ -11,7 +11,7 @@ use ExtUtils::MakeMaker;
 # the package requires modern perl
 require 5.00503;
 
-my $version='0.39';
+my $version='0.40';
 
 # write makefile
 $ok=WriteMakefile(
@@ -22,7 +22,9 @@ $ok=WriteMakefile(
 		                   Digest::SHA1      => 1,
                                    File::Spec        => 0.8,
                                    File::Temp        => 0.12,
+                                   Getopt::Long      => 2.24,
                                    IO::File          => 1,
+                                   Pod::Simple       => 3.02,
                                    Storable          => 1,
                                    Test::Harness     => 1.25,
                                    Test::More        => 0.11,
@@ -31,7 +33,7 @@ $ok=WriteMakefile(
                                    COMPRESS     => 'gzip -9',
                                    SUFFIX       => 'tgz',
                                   },
-                  EXE_FILES    => ['demo/pp2sdf'],
+                  EXE_FILES    => ['demo/pp2sdf', 'demo/pp2tdo'],
                  );
 
 # provide additional informations
@@ -53,8 +55,18 @@ first PerlPoint input to run the demo scripts.
 implement the full language but demonstrate
 how converters can be built.)
 
-pp2sdf will be installed together with the
-package modules. It serves as a reference
-implementation of a converter.
+pp2sdf and pp2tdo will be installed together
+with the package modules. pp2sdf serves as a
+reference implementation of an (traditional)
+converter, while pp2tdo implements a very
+general converter using the new Generator design.
+
+To get more converters and generators , please see
+the project page on SourceForge or search CPAN for
+"Perlpoint".
+
+Note: a Generator approach reimplementation of pp2sdf
+      is available with this package. Please try
+      pp2tdo -help -target SDF for details. 
 
 EOM

@@ -1,4 +1,6 @@
 
+=Embedded
+
 Literal text with an \EMBED{lang=html}<i>embedded</i>\END_EMBED part.
 
 Here we go for more.

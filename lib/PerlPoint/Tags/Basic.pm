@@ -5,6 +5,18 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.05    |15.04.2005| JSTENZEL | A is now checking if it is the innermost tag/macro;
+#         |16.05.2005| JSTENZEL | alt option of REF can handle backslash guarded commata;
+#         |23.08.2005| JSTENZEL | doc fix: intro option of INDEXRELATIONS was not described;
+# 0.04    |18.08.2003| JSTENZEL | A is a basic tag now;
+#         |02.05.2004| JSTENZEL | F is a basic tag now;
+#         |05.05.2004| JSTENZEL | anchors now take the number of their definition page;
+#         |          | JSTENZEL | additional hook parameter: page number;
+#         |          | JSTENZEL | REF: type=plain was ignored in case of a body - why? changed;
+#         |          | JSTENZEL | new REF option "valueformat";
+#         |          | JSTENZEL | REF: __value__ now holds an array reference to object name
+#         |          |          | and page;
+#         |06.05.2004| JSTENZEL | A stored headline IDs in the anchor, replaced by name;
 # 0.03    |26.01.2003| JSTENZEL | X is a basic tag now;
 #         |          | JSTENZEL | new index related tags INDEX and INDEXRELATIONS;
 #         |02.02.2003| JSTENZEL | X is now checking if it is the innermost tag/macro;
@@ -28,7 +40,7 @@ B<PerlPoint::Tags::Basic> - declares basic PerlPoint tags
 
 =head1 VERSION
 
-This manual describes version B<0.03>.
+This manual describes version B<0.05>.
 
 =head1 SYNOPSIS
 
@@ -82,6 +94,25 @@ marks text as I<bold>. No options, but a mandatory tag body.
 marks text as I<code>. No options, but a mandatory tag body.
 
 
+=head2 F
+
+This is a generalized I<font> tag, introduced by C<pp2html>
+and made generally available. It sets up the formatting of a
+selected text. Traditionally, these are font settings like
+text color and font size, but there can be more formattings.
+
+Both options and body are mandatory.
+
+Please note that this tag is fairly general. Accepted options and
+their meaning are defined by the I<converters>, but there are
+conventions that make documents portable between converters.
+
+So, by convention, options C<color> and C<size> set up the color
+and font size of the selected text, in the tradition and argument
+syntax of HTML.
+
+ A \F{color=red}<red> colored text.
+
 =head2 FORMAT
 
 is a container tag to configure result formatting. Configuration
@@ -91,7 +122,7 @@ default text color of examples to green. This would remain valid
 until the next text color setting.
 
 Please note that this tag is very general. Accepted options and
-their meaning are defined by the \I<converters>. Nevertheless,
+their meaning are defined by the I<converters>. Nevertheless,
 certain settings are commonly used by convention.
 
 
@@ -143,7 +174,7 @@ values are specified:
 
 =item bullets
 
-produces an unordered list,
+produces an I<unordered> (bullet) list,
 
 =item enumerated
 
@@ -158,9 +189,14 @@ according to the documents hierarchy (C<1.1.5>, C<2.3.> etc.).
 
 If this option is omitted, the setting defaults to C<bullets>.
 
+=item intro
+
+A text that can optional preceed the list of related chapters.
+I<This text is not displayed if the list is empty.>
+
 =item readdepth
 
-Configures where keyword shall be collected - B<startpage> includes
+Configures where keywords shall be collected - B<startpage> includes
 only the chapter where the tag is located in, while B<full> includes
 all the subchapters as well.
 
@@ -177,8 +213,8 @@ Defaults to C<full>.
 =item threshold
 
 Sets up what chapters shall be counted as "related", basing on the matching
-index entries: can set up absolutely (C<3 similar entries at least>) or
-by a percentage (C<50% of I<my> entries shall be marked there at least>).
+index entries: can be set up absolutely (e.g. C<3 similar entries at least>) or
+by a percentage (e.g. C<50% of I<my> entries shall be marked there at least>).
 
 Defaults to 100%.
 
@@ -332,7 +368,7 @@ and it can finally be that optional that the specified
 reference does not even has to exist.
 
 There are various options. Please note that several options
-are filled by the parser. They are not internded to be
+are filled by the parser. They are not intended to be
 propagated to document authors.
 
 To make best use of \REF it is recommended to register
@@ -358,8 +394,43 @@ configures which way the result should be produced:
 
 I<linked>: The result is made a link to the referenced object.
 
-I<plain>:  This is the default formatting and means that the
-result is supplied as plain text.
+I<plain>:  This is the default and means that the result is supplied as plain text.
+(This is the body text. For bodyless use, option I<valueformat> determines which text this is.)
+
+=item valueformat
+
+This option configures which text to display I<if the tag has no body>. If there I<is> a
+tag body, this option is ignored and the body text is used.
+
+=over 4
+
+=item pure
+
+This is the default. The text displayed is the I<value> of the referenced object.
+The value of a referenced object highly depends on its construction method. Please
+refer to the specific elements documentation for details or just find it out be a trial.
+
+  Headline anchors made by the parser have an value
+  of the "headline string", which means the pure title
+  without any included tags.
+
+  Sequence numbers made by C<\SEQ> are evaluated
+  with their respective numbers.
+
+
+=item pagetitle
+
+The I<title> of the page the referenced object is located in.
+
+=item pagenr
+
+The I<number> of the page the referenced object is located in, e.g. "1.2.3.4.".
+(Note that the format depends on the documents numbering scheme, which might be determined
+by the used converter and calling options.)
+
+=back
+
+
 
 =item alt
 
@@ -369,6 +440,9 @@ specified by this options value. (For readability,
 commata may be surrounded by whitespaces.) Trials
 follow the listed link order, the first valid address
 found will be used.
+
+If an alternative contains commata itself, guard them
+by a preceeding backslash.
 
 Links are verified using the parsers anchor
 object which is passed to all tag hooks.
@@ -397,6 +471,11 @@ only works if the referenced anchor was registered
 to the parsers C<PerlPoint::Anchors> object which
 is passed to all tag hooks.
 
+=item __chapter__
+
+The I<absolute> number of the chapter the reference points to.
+Again, this only works if the referenced anchor was registered
+to the parsers C<PerlPoint::Anchors> object.
 
 =back
 
@@ -471,8 +550,8 @@ require 5.00503;
 # declare package
 package PerlPoint::Tags::Basic;
 
-# declare package version (as a STRING!!)
-$VERSION="0.03";
+# declare package version
+$VERSION=0.05;
 
 # declare base "class"
 use base qw(PerlPoint::Tags);
@@ -505,6 +584,42 @@ my (%seq, %index);
        I => {body => TAGS_MANDATORY,},
 
 
+       # anchor
+       A => {
+             # optional options, mandatory body
+             options => TAGS_MANDATORY,
+             body    => TAGS_OPTIONAL,
+
+             # hook - update the hash of index entries
+             hook    => sub
+                         {
+                          # take parameters
+                          my ($tagLine, $options, $body, $anchors, $headlineIds, $chapterNr)=@_;
+
+                          # inits
+                          my $ok=PARSING_OK;
+
+                          # probably we should check if the anchor entry is the innermost tag
+                          # - which it currently should be (at least for HTML targets), but of
+                          # course this makes it more inconvenient for users ...
+                          warn qq(\n\n[Error] Anchor tags need to be the innermost tags/macros in line $tagLine, sorry.\n) and return(PARSING_ERROR) if grep((ref), @$body);
+
+                          # check options
+                          $ok=PARSING_FAILED, warn qq(\n\n[Error] Missing "name" option in A tag, line $tagLine.\n) unless exists $options->{name};
+
+                          # all right?
+                          if ($ok==PARSING_OK)
+                           {
+                            # add an anchor
+                            $anchors->add($options->{name}, $options->{name}, $chapterNr);
+                           }
+
+                          # flag success
+                          $ok;
+                         },
+            },
+
+
        # index entry
        X => {
              # optional options, mandatory body
@@ -515,7 +630,7 @@ my (%seq, %index);
              hook    => sub
                          {
                           # take parameters
-                          my ($tagLine, $options, $body, $anchors, $headlineIds)=@_;
+                          my ($tagLine, $options, $body, $anchors, $headlineIds, $chapterNr)=@_;
 
                           # probably we should check if the index entry is the innermost tag
                           # - which it currently should be, but of course this makes it more
@@ -523,7 +638,14 @@ my (%seq, %index);
                           warn qq(\n\n[Error] Index tags need to be the innermost tags/macros in line $tagLine, sorry.\n) and return(PARSING_ERROR) if grep((ref), @$body);
 
                           # add or update entry (this only works if the tag is the innermost tag/macro)
-                          $index{tags}{$headlineIds}{join(' ', @$body)}++;
+                          my $entry=join(' ', @$body);
+                          $index{tags}{$headlineIds}{$entry}++;
+
+                          # add an anchor (with a generic name), store its name for \INDEX
+                          # and make it part of the option list (for converter access)
+                          $anchors->add((my $anchor)=$anchors->generic, $headlineIds, $chapterNr);
+                          push(@{$index{anchors}{$entry}}, [$anchor, (split('-', $headlineIds))[-1]], $chapterNr);
+                          $options->{__anchor}=$anchor;
 
                           # flag success
                           PARSING_OK;
@@ -535,20 +657,29 @@ my (%seq, %index);
        INDEX => {
                  # no body, currently no options
                  body    => TAGS_DISABLED,
+                 options => TAGS_DISABLED,
+
+                 # activate the finish hook
+                 hook    => sub {PARSING_OK;},
 
                  # finish hook - provide index data
-                 finish    => sub
+                 finish  => sub
+                             {
+                              # take parameters
+                              my ($options, $anchors)=@_;
+
+                              # preformat an index
+                              foreach my $entry (sort keys %{$index{anchors}})
                                {
-                                # take parameters
-                                my ($options)=@_;
+                                my $group=uc(substr($entry, 0, 1));
+                                $group='_' if $group=~/[\W\d]/;
+                                push(@{$options->{__anchors}{$group}}, [$entry, $index{anchors}{$entry}]);
+                               }
 
-                                # provide data via option (should we pass a copy instead?)
-                                $options->{__data}=$index{tags};
-
-                                # flag success
-                                PARSING_OK;
-                               },
-            },
+                              # flag success
+                              PARSING_OK;
+                             },
+                },
 
 
        # index crossref (related chapters according to matching index entries)
@@ -561,7 +692,7 @@ my (%seq, %index);
                           hook    => sub
                                       {
                                        # take parameters
-                                       my ($tagLine, $options, $body, $anchors, $headlineIds)=@_;
+                                       my ($tagLine, $options, $body, $anchors, $headlineIds, $chapterNr)=@_;
 
                                        # declare variables
                                        my $ok=PARSING_OK;
@@ -709,6 +840,13 @@ my (%seq, %index);
                  },
 
 
+       # format a selected text ("F" initially meant "font")
+       F     => {
+                 # options and body both are required
+                 options => TAGS_MANDATORY,
+                 body    => TAGS_MANDATORY,
+                },
+
        # resolve a reference
        HIDE  => {
                  # conditions are options (currently), so ...
@@ -843,12 +981,13 @@ my (%seq, %index);
                                 if     exists $options->{type}
                                    and $options->{type}!~/^(linked|plain)$/;
 
+                              $ok=PARSING_FAILED, warn qq(\n\n[Error] Invalid "valueformat" setting "$options->{valueformat}" in REF tag, line $tagLine.\n)
+                                if     exists $options->{valueformat}
+                                   and $options->{valueformat}!~/^(pure|pagetitle|pagenr)$/;
+
                               # set defaults, if necessary
                               $options->{type}='plain' unless exists $options->{type};
-
-                              # plain references make no sense with a body
-                              $ok=PARSING_IGNORE, warn qq(\n\n[Warn] REF tag ignored in line $tagLine: body makes "plain" formatting useless.\n)
-                                if $options->{type} eq 'plain' and @$body;
+                              $options->{valueformat}='pure' unless exists $options->{valueformat};
 
                               # store a body hint
                               $options->{__body__}=@$body ? 1 : 0;
@@ -872,8 +1011,12 @@ my (%seq, %index);
                               # try to find an alternative, if possible
                               if (exists $options->{alt} and not $anchors->query($options->{name}))
                                 {
-                                 foreach my $alternative (split(/\s*,\s*/, $options->{alt}))
+                                 foreach my $alternative (split(/\s*(?<!\\),\s*/, $options->{alt}))
                                    {
+                                    # remove guarding backslashes
+                                    $alternative=~s/(?<!\\)\\//g;
+                                    $alternative=~s/\\\\/\\/g;
+
                                     if ($anchors->query($alternative))
                                       {
                                        warn qq(\n\n[Info] Unknown link address "$options->{name}" is replaced by alternative "$alternative" in REF tag.\n);
@@ -900,8 +1043,8 @@ my (%seq, %index);
                                 }
                               else
                                 {
-                                 # link ok, get value
-                                 $options->{__value__}=$anchors->query($options->{name})->{$options->{name}};
+                                 # link ok, get value and chapter number
+                                 @{$options}{qw(__value__ __chapter__)}=@{$anchors->query($options->{name})->{$options->{name}}};
                                 }
 
                               # supply status
@@ -925,7 +1068,7 @@ my (%seq, %index);
                               my $ok=PARSING_OK;
 
                               # take parameters
-                              my ($tagLine, $options, $body, $anchors)=@_;
+                              my ($tagLine, $options, $body, $anchors, $headlineIds, $chapterNr)=@_;
 
                               # check them (a sequence type must be specified, a name is optional)
                               $ok=PARSING_FAILED, warn qq(\n\n[Error] Missing "type" option in SEQ tag, line $tagLine.\n) unless exists $options->{type};
@@ -937,7 +1080,7 @@ my (%seq, %index);
                                  $options->{__nr__}=++$seq{$options->{type}};
 
                                  # if a name was set, store it together with the value
-                                 $anchors->add($options->{name}, $seq{$options->{type}}) if $options->{name};
+                                 $anchors->add($options->{name}, $seq{$options->{type}}, $chapterNr) if $options->{name};
                                 }
 
                               # supply status
@@ -965,7 +1108,7 @@ my (%seq, %index);
 
 
 %sets=(
-       basic => [qw(B C I FORMAT HIDE IMAGE LOCALTOC READY REF SEQ STOP)],
+       basic => [qw(A B C I FORMAT HIDE IMAGE LOCALTOC READY REF SEQ STOP)],
       );
 
 
@@ -1031,7 +1174,7 @@ as well.
 
 =head1 AUTHOR
 
-Copyright (c) Jochen Stenzel (perl@jochen-stenzel.de), 1999-2001.
+Copyright (c) Jochen Stenzel (perl@jochen-stenzel.de), 1999-2004.
 All rights reserved.
 
 This module is free software, you can redistribute it and/or modify it

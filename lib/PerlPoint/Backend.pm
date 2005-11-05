@@ -5,6 +5,10 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.14    |16.09.2004| JSTENZEL | objects declared as typed lexicals now;
+# 0.13    |29.05.2003| JSTENZEL | new optional generator passing;
+#         |15.06.2003| JSTENZEL | new general handler interface (DIRECTIVE_EVERY);
+#         |12.09.2004| JSTENZEL | using the portable fields::new();
 # 0.12    |04.02.2003| JSTENZEL | new method headlineIds2Data();
 # 0.11    |08.03.2002| JSTENZEL | new method docstreams();
 # 0.10    |14.08.2001| JSTENZEL | adapted to new stream data format, introduced modes;
@@ -50,7 +54,7 @@ B<PerlPoint::Backend> - frame class to transform PerlPoint::Parser output
 
 =head1 VERSION
 
-This manual describes version B<0.12>.
+This manual describes version B<0.13>.
 
 =head1 SYNOPSIS
 
@@ -155,7 +159,7 @@ features as it is necessary to build the converter you want!
 package PerlPoint::Backend;
 
 # declare version
-$VERSION=$VERSION="0.12";
+$VERSION=$VERSION="0.13";
 
 # pragmata
 use strict;
@@ -165,6 +169,7 @@ use fields qw(
               data
               display
               flags
+              generator
               handler
               hide
               ignoredDirectives
@@ -241,6 +246,17 @@ Process visualization is automatically suppressed unless STDERR is
 connected to a terminal, if this option is omitted, I<display> was set
 to C<DISPLAY_NOINFO> or backend I<trace>s are activated.
 
+=item generator
+
+This is an internal interface, to make backends work together with
+C<PerlPoint::Generator> objects. If you build a backend manually,
+you do not have to care for this, just ignore it. If you build
+a C<PerlPoint::Generator> application, just pass the generator
+object.
+
+Note: Generator handling is in alpha state, so manual usage is
+      standard and traditional.
+
 =back
 
 B<Returns:>
@@ -248,7 +264,7 @@ the new object.
 
 B<Example:>
 
-  my ($parser)=new PerlPoint::Backend(name=>'example');
+  my ($backend)=new PerlPoint::Backend(name=>'example');
 
 =cut
 sub new
@@ -265,11 +281,7 @@ sub new
   confess "[BUG] Missing name parameter.\n" unless exists $pars{name};
 
   # build object
-  my $me;
-  {
-   no strict 'refs';
-   $me=bless([\%{"$class\::FIELDS"}], $class);
-  }
+  my $me=fields::new($class);
 
   # init object
   @{$me}{qw(handler hide ignoredDirectives name stream)}=({}, 0, [], $pars{name}, STREAM_TOKENS);
@@ -283,6 +295,7 @@ sub new
               and not $me->{trace}>TRACE_NOTHING
               and -t STDERR
              ) ? $pars{vispro} : 0;
+  $me->{generator}=exists $pars{generator} ? $pars{generator} : '';
 
   # reply the new object
   $me;
@@ -416,7 +429,7 @@ of I<plain strings>, which will be I<printed> by default.
 sub register
  {
   # get and check parameters
-  my ($me, $directive, $handler)=@_;
+  ((my __PACKAGE__ $me), my ($directive, $handler))=@_;
   confess "[BUG] Missing object parameter.\n" unless $me;
   confess "[BUG] Object parameter is no ", __PACKAGE__, " object.\n" unless ref $me and ref $me eq __PACKAGE__;
   confess "[BUG] Missing directive parameter.\n" unless defined $directive;
@@ -485,7 +498,7 @@ B<Example:>
 sub mode
  {
   # get parameters
-  my ($me, $mode)=@_;
+  ((my __PACKAGE__ $me), my $mode)=@_;
 
   # and check parameters
   confess "[BUG] Missing object parameter.\n" unless $me;
@@ -577,7 +590,7 @@ B<Example:>
 sub run
  {
   # get parameters
-  my ($me, $stream)=@_;
+  ((my __PACKAGE__ $me), my $stream)=@_;
 
   # and check them
   confess "[BUG] Missing object parameter.\n" unless $me;
@@ -659,7 +672,7 @@ B<Example:>
 sub next
  {
   # get parameters
-  my ($me)=@_;
+  (my __PACKAGE__ $me)=@_;
 
   # and check them
   confess "[BUG] Missing object parameter.\n" unless $me;
@@ -678,7 +691,7 @@ sub _next
  {
   # get parameters (do not check them for reasons of performance - this function
   # is intended to be called internally *only* (quite often))
-  my ($me, $stream)=@_;
+  ((my __PACKAGE__ $me), my $stream)=@_;
 
   # flag that we are invoked
   $me->{flags}{_nextInvokation}++;
@@ -753,7 +766,7 @@ sub _next
          warn "[Trace] Using user defined handler.\n" if $me->{trace} & TRACE_BACKEND;
 
          # call the handler passing the string
-         &{$me->{handler}{DIRECTIVE_SIMPLE()}}(DIRECTIVE_SIMPLE, DIRECTIVE_START, $token);
+         &{$me->{handler}{DIRECTIVE_SIMPLE()}}($me->{generator} ? $me->{generator} : (), DIRECTIVE_SIMPLE, DIRECTIVE_START, $token);
         }
       else
         {
@@ -800,6 +813,9 @@ sub _next
            }
         }
 
+      # call the general handler, if any
+      &{$me->{handler}{DIRECTIVE_EVERY()}}($me->{generator} ? $me->{generator} : (), @{$token}[1..$#{$token}]) if exists $me->{handler}{DIRECTIVE_EVERY()};
+
       # now check if there was a handler declared
       if (exists $me->{handler}{$token->[STREAM_DIR_TYPE]})
         {
@@ -807,7 +823,7 @@ sub _next
          warn "[Trace] Using user defined handler.\n" if $me->{trace} & TRACE_BACKEND;
 
          # call the handler passing additional informations, if any
-         &{$me->{handler}{$token->[STREAM_DIR_TYPE]}}(@{$token}[1..$#{$token}]);
+         &{$me->{handler}{$token->[STREAM_DIR_TYPE]}}($me->{generator} ? $me->{generator} : (), @{$token}[1..$#{$token}]);
         }
       else
         {
@@ -867,7 +883,7 @@ B<Example:>
 sub bind
  {
   # get parameters
-  my ($me, $stream)=@_;
+  ((my __PACKAGE__ $me), my $stream)=@_;
 
   # and check them
   confess "[BUG] Missing object parameter.\n" unless $me;
@@ -915,7 +931,7 @@ B<Example:>
 sub unbind
  {
   # get parameters
-  my ($me)=@_;
+  (my __PACKAGE__ $me)=@_;
 
   # and check them
   confess "[BUG] Missing object parameter.\n" unless $me;
@@ -958,7 +974,7 @@ B<Example:>
 sub reset
  {
   # get parameters
-  my ($me)=@_;
+  (my __PACKAGE__ $me)=@_;
 
   # and check them
   confess "[BUG] Missing object parameter.\n" unless $me;
@@ -1003,7 +1019,7 @@ B<Example:>
 sub move2chapter
  {
   # get parameters
-  my ($me, $chapter)=@_;
+  ((my __PACKAGE__ $me), my $chapter)=@_;
 
   # and check them
   confess "[BUG] Missing object parameter.\n" unless $me;
@@ -1057,7 +1073,7 @@ B<Example:>
 sub headlineNr
  {
   # get parameters
-  my ($me)=@_;
+  (my __PACKAGE__ $me)=@_;
 
   # and check them
   confess "[BUG] Missing object parameter.\n" unless $me;
@@ -1093,13 +1109,13 @@ The number of headlines in the stream if a stream is associated, an undefined va
 
 B<Example:>
 
-  $backend->headlineNr;
+  $backend->headlineIds2Data;
 
 =cut
 sub headlineIds2Data
  {
   # get parameters
-  my ($me, $ids)=@_;
+  ((my __PACKAGE__ $me), my $ids)=@_;
 
   # and check them
   confess "[BUG] Missing object parameter.\n" unless $me;
@@ -1158,7 +1174,7 @@ B<Example:>
 sub currentChapterNr
  {
   # get parameters
-  my ($me)=@_;
+  (my __PACKAGE__ $me)=@_;
 
   # and check them
   confess "[BUG] Missing object parameter.\n" unless $me;
@@ -1217,7 +1233,7 @@ B<Example:>
 sub toc
  {
   # get parameters
-  my ($me, $start, $depth)=@_;
+  ((my __PACKAGE__ $me), my ($start, $depth))=@_;
 
   # and check them
   confess "[BUG] Missing object parameter.\n" unless $me;
@@ -1337,7 +1353,7 @@ B<Example:>
 sub docstreams
  {
   # get parameters
-  my ($me)=@_;
+  (my __PACKAGE__ $me)=@_;
 
   # and check them
   confess "[BUG] Missing object parameter.\n" unless $me;

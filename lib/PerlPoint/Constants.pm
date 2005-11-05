@@ -5,7 +5,10 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
-# 0.16    |< 02.03.02| JSTENZEL | added DIRCTIVE_DSTREAM_ENTRYPOINT constant;
+# 0.17    |15.06.2003| JSTENZEL | added DIRECTIVE_EVERY constant;
+#         |10.09.2003| JSTENZEL | added DIRECTIVE_DPOINT_TEXT constant;
+#         |08.07.2004| JSTENZEL | added TEMPLATE_ACTION_... constants;
+# 0.16    |< 02.03.02| JSTENZEL | added DIRECTIVE_DSTREAM_ENTRYPOINT constant;
 #         |02.03.2002| JSTENZEL | added DSTREAM_... constants;
 #         |29.09.2002| JSTENZEL | added STREAM_DOCSTREAMS;
 #         |02.01.2003| JSTENZEL | added TRACE_TMPFILES;
@@ -47,7 +50,7 @@ B<PerlPoint::Constants> - public PerlPoint module constants
 
 =head1 VERSION
 
-This manual describes version B<0.16>.
+This manual describes version B<0.17>.
 
 =head1 DESCRIPTION
 
@@ -67,7 +70,7 @@ of the using modules B<PerlPoint::Parser> and B<PerlPoint::Backend>.
 package PerlPoint::Constants;
 
 # declare version
-$VERSION=$VERSION=0.16;
+$VERSION=$VERSION=0.17;
 
 # startup actions
 BEGIN
@@ -120,6 +123,10 @@ flags a "definition point" paragraph;
 =item DIRECTIVE_DPOINT_ITEM
 
 flags a "definition point" item (the stuff to be defined);
+
+=item DIRECTIVE_DPOINT_TEXT
+
+flags a "definition point" text (the definition part);
 
 =item DIRECTIVE_DSTREAM_ENTRYPOINT
 
@@ -191,6 +198,8 @@ flags a verbatim block paragraph;
 
   # directive constants
   startupGenerateConstants(
+                           'DIRECTIVE_EVERY',                  # pseudo_directive used in backend;
+
                            'DIRECTIVE_START',                  # entity start;
                            'DIRECTIVE_COMPLETE',               # entity complete;
 
@@ -199,7 +208,8 @@ flags a verbatim block paragraph;
                            'DIRECTIVE_DLIST',                  # definition list;
                            'DIRECTIVE_DOCUMENT',               # document;
                            'DIRECTIVE_DPOINT',                 # definition list point;
-                           'DIRECTIVE_DPOINT_ITEM',            # definition list point;
+                           'DIRECTIVE_DPOINT_ITEM',            # defined item;
+                           'DIRECTIVE_DPOINT_TEXT',            # definition text;
                            'DIRECTIVE_HEADLINE',               # headline;
                            'DIRECTIVE_LIST_LSHIFT',            # shift list left;
                            'DIRECTIVE_LIST_RSHIFT',            # shift list right;
@@ -415,10 +425,6 @@ Document stream entry points are streamed as headlines.
 
 
 
-  # release memory
-  undef &startupGenerateConstants;
-
-
 =pod
 
 =head2 Trace constants
@@ -544,6 +550,51 @@ Cleans up an existing cache before the parser starts (and possibly rebuilds it).
   use constant 'CACHE_CLEANUP'    => 2;            # cache cleanup;
 
 
+=pod
+
+=head2 Template action constants
+
+flag which way a template engine should perform an action.
+
+=over 4
+
+=item TEMPLATE_ACTION_DOC
+
+Produce files which are needed I<once> (per document).
+
+=item TEMPLATE_ACTION_INDEX
+
+Processes the index page.
+
+=item TEMPLATE_ACTION_PAGE
+
+Produce a page.
+
+=item TEMPLATE_ACTION_PAGE_SUPPLEMENTS
+
+Produce additional files belonging to a page.
+
+=item TEMPLATE_ACTION_TOC
+
+Processes the table of contents page.
+
+=back
+
+=cut
+
+  # template action constants
+  startupGenerateConstants(
+                           'TEMPLATE_ACTION_DOC',               # process doc data;
+                           'TEMPLATE_ACTION_INDEX',             # process index;
+                           'TEMPLATE_ACTION_PAGE',              # process page data;
+                           'TEMPLATE_ACTION_PAGE_SUPPLEMENTS',  # process page supplement files;
+                           'TEMPLATE_ACTION_TOC',               # process TOC template;
+                          );
+
+
+# release memory
+undef &startupGenerateConstants;
+
 
 # modules
 use Exporter;
@@ -560,6 +611,7 @@ use Exporter;
            DIRECTIVE_DOCUMENT
            DIRECTIVE_DPOINT
            DIRECTIVE_DPOINT_ITEM
+           DIRECTIVE_DPOINT_TEXT
            DIRECTIVE_DSTREAM_ENTRYPOINT
            DIRECTIVE_HEADLINE
            DIRECTIVE_LIST_LSHIFT
@@ -576,6 +628,8 @@ use Exporter;
            DIRECTIVE_VERBATIM
 
            DIRECTIVE_SIMPLE
+
+           DIRECTIVE_EVERY
 
            TRACE_ACTIVE
            TRACE_BACKEND
@@ -600,12 +654,19 @@ use Exporter;
           );
 
 %EXPORT_TAGS=(
-              parsing => [qw(PARSING_OK PARSING_COMPLETED PARSING_ERROR PARSING_FAILED PARSING_IGNORE PARSING_ERASE)],
-              stream  => [qw(
-                             STREAM_IDENT STREAM_DOCSTREAMS STREAM_TOKENS STREAM_HEADLINES
-                             STREAM_DIR_HINTS STREAM_DIR_TYPE STREAM_DIR_STATE STREAM_DIR_DATA
-                            )],
-              tags    => [qw(TAGS_OPTIONAL TAGS_MANDATORY TAGS_DISABLED)],
+              parsing   => [qw(PARSING_OK PARSING_COMPLETED PARSING_ERROR PARSING_FAILED PARSING_IGNORE PARSING_ERASE)],
+              stream    => [qw(
+                               STREAM_IDENT STREAM_DOCSTREAMS STREAM_TOKENS STREAM_HEADLINES
+                               STREAM_DIR_HINTS STREAM_DIR_TYPE STREAM_DIR_STATE STREAM_DIR_DATA
+                              )],
+              tags      => [qw(TAGS_OPTIONAL TAGS_MANDATORY TAGS_DISABLED)],
+              templates => [qw(
+                               TEMPLATE_ACTION_DOC
+                               TEMPLATE_ACTION_INDEX
+                               TEMPLATE_ACTION_PAGE
+                               TEMPLATE_ACTION_PAGE_SUPPLEMENTS
+                               TEMPLATE_ACTION_TOC
+                              )],
              );
 
 Exporter::export_ok_tags(
@@ -613,6 +674,7 @@ Exporter::export_ok_tags(
                             parsing
                             stream
                             tags
+                            templates
                            )
                         );
 
@@ -650,7 +712,7 @@ as well.
 
 =head1 AUTHOR
 
-Copyright (c) Jochen Stenzel (perl@jochen-stenzel.de), 1999-2001.
+Copyright (c) Jochen Stenzel (perl@jochen-stenzel.de), 1999-2004.
 All rights reserved.
 
 This module is free software, you can redistribute it and/or modify it

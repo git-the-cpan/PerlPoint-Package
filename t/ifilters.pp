@@ -14,10 +14,10 @@ sub lang2pp
     $paragraphStart=1, next unless /\S/;
 
     # translate headlines
-    $paragraphStart and s/^(\*+)\s*/'=' x length($1)/e and (($paragraphStart=0) or 1) and next;
+    $paragraphStart and s/^(\*+)\s*/'=' x length($1)/e and (($paragraphStart=0), next);
 
     # translate bullet points
-    $paragraphStart and s/^-(\s+)/*$1/ and (($paragraphStart=0) or 1) and next;
+    $paragraphStart and s/^-(\s+)/*$1/ and (($paragraphStart=0), next);
    }
 
   # supply the translated text

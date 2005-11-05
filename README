@@ -19,19 +19,16 @@ document description language. This is, by tradition,
 usually HTML, but you may decide to use another
 target format like XML, SGML, TeX or whatever you want.
 
-Well, this sounds fine, but how to build a translator
+Well, this sounds fine, but how to write a translator
 which transforms ASCII into the output format of your
-choice? Thats what PerlPoint::Parser is made for. It
-performs the first translation step by parsing ASCII
-and transforming it into an intermediate stream format,
-which can then be processed by a subsequently called
-translator backend.
-By separating parsing and output generation we get the
-flexibility to write as many backends as necessary by
-using the same parser frontend for all translators.
+choice? Thats what this package is for. It provides a
+general converter (pp2tdo) which can be easily extended
+by own formatter modules to produce what you want.
 
-This package provides *both* the parser module *and* a
-backend framework class.
+Additionally, the included base framework allows to write
+complete converters like pp2tdo itself, or like the already
+existing pp2sdf, pp2html, pp2latex etc.
+
 
 
 INSTALLATION
@@ -44,12 +41,6 @@ modules) and the translator pp2sdf.
 If you are using CPAN.pm or CPANPLUS, try to
 install Bundle::PerlPoint to get all PerlPoint
 related packages at once.
-
-Note: To make use of new features with pp2html,
-      you need PerlPoint::Package > 1.01. Till
-      this is available, use the patched version
-      of pp2html that is provided on our
-      SourceForge project site.
 
 
 DOCUMENTATION
@@ -132,10 +123,13 @@ Thanks to Johan Vromans and Mark Overmeer for the PerlPoint
 brainstorming meeting at the 3rd German Workshop. Various ideas
 came up there and are still making their way into the software.
 
+Thanks to Benjamin Holzmann for XML::Generator and his very fast
+help and patches.
+
 
 AUTHOR
 
-Copyright (c) Jochen Stenzel (perl@jochen-stenzel.de), 1999-2004.
+Copyright (c) Jochen Stenzel (perl@jochen-stenzel.de), 1999-2003.
 All rights reserved.
 
 This module is free software, you can redistribute it and/or modify it
