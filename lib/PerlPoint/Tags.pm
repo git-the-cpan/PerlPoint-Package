@@ -5,6 +5,8 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.04    |15.12.2005| JSTENZEL | added POD for public methods to avoid Pod::Coverage
+#         |          |          | complaints (behaviour was already documented before);
 # 0.03    |11.10.2001| JSTENZEL | slight POD fix in "NAME" section;
 #         |          | JSTENZEL | hooks now receive the body array by reference;
 #         |          | JSTENZEL | now hook paramter: anchor object;
@@ -27,7 +29,7 @@ B<PerlPoint::Tags> - processes PerlPoint tag declarations
 
 =head1 VERSION
 
-This manual describes version B<0.03>.
+This manual describes version B<0.04>.
 
 =head1 SYNOPSIS
 
@@ -419,6 +421,8 @@ who wrote a document with C<pp2html> in mind, passing it to C<pp2sdf> which prov
 significantly less tags, only has to add the option C<"-tagset HTML"> to the
 C<pp2sdf> call to make his document pass the PerlPoint parser.
 
+=head1 METHODS
+
 =cut
 
 
@@ -433,7 +437,7 @@ require 5.00503;
 package PerlPoint::Tags;
 
 # declare package version (as a STRING!!)
-$VERSION="0.03";
+$VERSION="0.04";
 
 
 # = PRAGMA SECTION =======================================================================
@@ -523,7 +527,13 @@ sub import
  }
 
 
-# import tagsets
+=pod
+
+=head2 addTagSets()
+
+Imports tagsets. See "Allowing translator users to import foreign tag declarations" for details.
+
+=cut
 sub addTagSets
  {
   # accept multiplicity
@@ -538,7 +548,13 @@ sub addTagSets
  }
 
 
-# call a hook function of a registered tag
+=pod
+
+=head2 call()
+
+Calls a hook function of a registered tag. See "Using other tag definitions" for details.
+
+=cut
 sub call
  {
   # get and check parameters

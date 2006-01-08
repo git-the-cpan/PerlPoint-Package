@@ -29,7 +29,7 @@ demo/pp2ppresenter
 demo/.pp2sdf
 demo/pp2sdf
 demo/pp2tree
-demo/pp2tdo
+demo/perlpoint
 
 demo/perlpods.pp
 
@@ -61,7 +61,6 @@ doc/parser-paragraphs.pp
 doc/parser-tags.pp
 
 doc/tagdoc-example.pp
-
 # tag docs were moved
 # doc/tags/image.gif
 # doc/tags/tag-B.pp
@@ -180,6 +179,9 @@ t/variables3.pp
 t/l0_verbatim.t
 t/verbatim.pp
 
+t/l9_pod.t
+t/l9_pod-coverage.t
+
 t/testlib.pm
 
 utilities/PerlPoint.clp
@@ -188,3 +190,5 @@ utilities/perlpoint-hilit19.lisp
 utilities/utilities.txt
 
 module_templates/Formatter.pm
+
+META.yml

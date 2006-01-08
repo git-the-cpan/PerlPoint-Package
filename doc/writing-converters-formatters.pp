@@ -72,7 +72,7 @@ Every user can derive further levels. See \REF{type=linked name="Style featured"
 All configurations are done by options, which (using option files) makes generator calls
 very comfortable.
 
-Options are defined by the several (module) levels: the startup script (\CX<pp2tdo>) declares
+Options are defined by the several (module) levels: the startup script (\CX<perlpoint>) declares
 a few bootstrap options only. Then \CX<\PP::Generator> declares options common to all
 generators. Then \C<\PP::Generator::<language\>> declares options available for all
 converters to \C<<language\>>, and \C<\PP::Generator::<language\>::<formatter\>> the
@@ -104,7 +104,7 @@ file in the future) that defines several things:
 * \B<Template engines.> Similar to formatters, a style can extend the installed PerlPoint
   libraries by own \<template engines>. This works the same way: if the style contains a
   \C<lib> directory with an own engine module \C<\PP::Template::<special_engine\>> and
-  the style options contain \C<-templatetype special_engine>, than \C<pp2tdo> will
+  the style options contain \C<-templatetype special_engine>, than \C<perlpoint> will
   use that engine to process your template files.
 
 * \B<Templates.> A formatter can be template driven. The style contains all necessary
@@ -121,7 +121,7 @@ file in the future) that defines several things:
 
 Because the \C<Generator> module does most of the work, the startup needs are really small
 and independent on the target format. So the few startup code lines are collected in a single
-script called \BCX<pp2tdo> ("tdo"="template driven output", based on an initial goal of the
+script called \BCX<perlpoint> ("tdo"="template driven output", based on an initial goal of the
 new design (to write a common platform for the integration of arbitrary templating systems)).
 
 

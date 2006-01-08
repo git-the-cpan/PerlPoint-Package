@@ -271,7 +271,7 @@ sub preprocessData
   $rc->{uNumber}=$me->pageBySpec('up', $page);
   $rc->{uPage}=$me->page($rc->{uNumber});
   $rc->{uFile}=$me->buildFilename($rc->{uNumber}) || '';
-  $rc->{uText}=$rc->{uFile} ? $rc->{uPage}->path(type=>'spath', mode=>'title') : '';
+  $rc->{uText}=defined $rc->{uPage} ? $rc->{uPage}->path(type=>'spath', mode=>'title') : '';
 
   # get data of the previous page
   $rc->{pNumber}=$me->pageBySpec('previous', $page);

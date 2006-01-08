@@ -15,21 +15,11 @@ implement it yourself, this might be possible - please contact us.
 
 =General
 
-* add a tutorial to PerlPoint
-
 * Bodyless macro call before a new chapter inserts an additional headline (delayed "=")
   when the macro opens an included file and produces additional paragraphs.
 
 * add tests for the \C<_cnd>_ option (both for generic tags declared by modules and the builtin
   ones like \C<\\INCLUDE>, \C<\\EMBED> and \C<\\TABLE>)
-
-* Add a pod2pp. It seems that a good way to do so is to copy the way \C<Pod::Text> works
-  to write a \C<Pod::PerlPoint>, which could provide a \C<pod2perlpoint()> function. After
-  doing so we'll be able to use that function both for a standalone translator (that
-  just makes use of the function) and filters that could translate POD snippets right
-  into PerlPoint (see the "Include file filters" section below).
-
-* publish a collection of example macros
 
 * publish a collection of example filters
 
@@ -41,17 +31,6 @@ implement it yourself, this might be possible - please contact us.
 * The Emacs 19.x lisp file does not work under Emacs 21.x. I made a workaround, but it
   still produces an error message. Check if it still works with older Emacs versions, and
   try to remove the error message.
-
-
-=List shifting
-
-* current stream representation might not be optimal
-  (because it closes the first list, shifts and opens
-  a new one instead of holding the first list open
-  and opening a subordered list);
-
-* but list directives now contain hints about preceding
-  and following level shifts, may be this is sufficient;
 
 
 =pp2pod
@@ -80,5 +59,50 @@ implement it yourself, this might be possible - please contact us.
 * add documentation in PerlPoint format;
 
 * include tests;
+
+
+=Parser: Cache
+
+* old cache typically delays processing (with lots of dynamisation), remove it
+
+* implement a new file based cache, store
+
+>
+
+* stat() data
+
+* path
+
+* entry checksums for all dynamic parts: macros, code, variables, filters, ... (read exception list in old cache doc)
+
+* stream
+
+* updated dynamic parts if they changed (new macros, filters, ... etc.)
+
+<
+
+* exclude
+
+>
+
+* files using \\INCLUDE (ooops!) - this means that only leaves are cached - or can we split up files automatically, virtually building container
+  documents?
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 

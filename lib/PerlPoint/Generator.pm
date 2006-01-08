@@ -5,6 +5,11 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.02    |09.12.2005| JSTENZEL | main stream now produces stack objects as well, but
+#         |          |          | still outside the special "streamframe" wrapper;
+#         |          | JSTENZEL | new option -mainstream;
+#         |06.01.2006| JSTENZEL | runParser() supports nested table setting;
+#         |08.01.2006| JSTENZEL | "pp2tdo" became "perlpoint", adapted POD;
 # 0.01    |25.05.2003| JSTENZEL | new.
 # ---------------------------------------------------------------------------------------
 
@@ -16,7 +21,7 @@ B<PerlPoint::Generator> - generic PerlPoint generator
 
 =head1 VERSION
 
-This manual describes version B<0.01>.
+This manual describes version B<0.02>.
 
 =head1 SYNOPSIS
 
@@ -41,7 +46,7 @@ require 5.00503;
 package PerlPoint::Generator;
 
 # declare package version and author
-$VERSION=0.01;
+$VERSION=0.02;
 $AUTHOR=$AUTHOR='J. Stenzel (perl@jochen-stenzel.de), 2003-2005';
 
 
@@ -252,13 +257,14 @@ sub new
   $plugin->{cfg}{setup}{stylepath}=$stylepath;
 
   # perform inits
+  $plugin->{build}{docstream}=undef;
   $plugin->{build}{listclosingops}=[];
   $plugin->{build}{listlevels}=[0];
   $plugin->{build}{listtypes}=[];
-  $plugin->{build}{docstream}=undef;
+  $plugin->{build}{nestedTables}=0;
   $plugin->{build}{sourcefilters}=[];
-  $plugin->{build}{streamData}=[];
   $plugin->{build}{stack}=[];
+  $plugin->{build}{streamData}=[];
   $plugin->{pages}=[new PerlPoint::Generator::Object::Page()];
 
   # perform bootstrap
@@ -536,6 +542,7 @@ sub declareOptions
     "set=s@",            # user settings;
     "skipcomments",      # do not convert PerlPoint comments;
     "skipstream=s@",     # skip certain document streams;
+    "mainstream=s",      # choose an alternative name for the "main" stream;
     "streamBuffer=s",    # a file to store the stream;
     "suffix|slide_suffix=s", # target file suffix (slide_suffix for pp2html backwards compatibility);
     "tagset=s@",         # add a tag set to the scripts own tag declarations;
@@ -812,6 +819,14 @@ but directories specified via C<-includelib> are searched first.
 
 EOO
 
+               mainstream        => <<EOO,
+
+Sets an alternative name for the default document stream "main".
+
+ Example: -mainstream slidecontent
+
+EOO
+
                nocopyright       => qq(Suppress copyright message.),
                noinfo            => qq(Suppress runtime informations.),
                nowarn            => qq(Suppress runtime warnings.),
@@ -840,7 +855,7 @@ EOO
                set               => <<EOO,
 
 This option allows you to pass in user defined options. Those options have no direct impact
-to the way C<pp2tdo> does its job, instead it allows you to control source processing by making
+to the way C<perlpoint> does its job, instead it allows you to control source processing by making
 or omitting settings queried in Active Contents, namely conditions.
 
  Example: The following condition checks if
@@ -910,7 +925,7 @@ EOO
 
 Adds a tag set to the scripts own tag declarations.
 
-Usually, C<pp2tdo> only acepts tags declared by the processor to your chosen target format.
+Usually, C<perlpoint> only acepts tags declared by the processor to your chosen target format.
 This means that an HTML target processor can allow other targets than an SDF target processor.
 
 This makes things very flexible, but can result in nonportable sources. Sources using HTML
@@ -1295,6 +1310,8 @@ sub runParser
 
                             docstreaming    => (exists $me->{options}{dstreaming} and ($me->{options}{dstreaming}==DSTREAM_HEADLINES or $me->{options}{dstreaming}==DSTREAM_IGNORE)) ? $me->{options}{dstreaming} : DSTREAM_DEFAULT,
 
+                            nestedTables    => $me->{build}{nestedTables},
+
                             vispro          => 1,
 
                             headlineLinks   => 1,
@@ -1331,7 +1348,7 @@ sub runBackend
 
   # if there's a final pending page, produce it
   # (don't forget there might be an open docstream frame)
-  $me->handleDocstreamEntry(DIRECTIVE_DSTREAM_ENTRYPOINT, DIRECTIVE_START, 'main'),
+  $me->handleDocstreamEntry(DIRECTIVE_DSTREAM_ENTRYPOINT, DIRECTIVE_START, ''),
   $me->format(item => $me->stackCollect())
     if @{$me->{build}{stack}};
 
@@ -1764,7 +1781,7 @@ sub handleHeadline
   if ($mode==DIRECTIVE_START)
     {
      # new slide: if there's a pending docstream / page, produce it
-     $me->handleDocstreamEntry(DIRECTIVE_DSTREAM_ENTRYPOINT, DIRECTIVE_START, 'main'),
+     $me->handleDocstreamEntry(DIRECTIVE_DSTREAM_ENTRYPOINT, DIRECTIVE_START, ''),
      $me->format(item => $me->stackCollect()) if @{$me->{build}{stack}};
 
      # start a new slide and stack a placeholder
@@ -1786,6 +1803,9 @@ sub handleHeadline
     {
      # complete the stack object
      $me->stackStore($me->format(item => $me->stackCollect()));
+
+     # start a new main stream part
+     $me->handleDocstreamEntry(DIRECTIVE_DSTREAM_ENTRYPOINT, DIRECTIVE_START, $me->{options}{mainstream} || 'main'),
     }
  }
 
@@ -2172,13 +2192,31 @@ sub handleDocstreamEntry
   confess "[BUG] Missing object parameter.\n" unless $me;
   confess "[BUG] Object parameter is no ", __PACKAGE__, " object.\n" unless ref $me and $me->isa(__PACKAGE__);
 
-  # switching from "main" to another docstream, we start a docstream frame
+  # build a pattern to check for default stream and empty pseudo stream
+  my $mainstreamName=$me->{options}{mainstream} || 'main';
+  my $stdStream=qr/(?:$mainstreamName)?/;
+
+  # all docstreams complete the previous dstream object, except this was the empty pseudo stream
+      defined $me->{build}{docstream}
+  and $me->{build}{docstream}
+  and $me->stackStore($me->format(item => $me->stackCollect()));
+
+
+  # switching from another docstream to an empty pseudo stream or the default stream
+  # we close the docstream frame
+      defined $me->{build}{docstream}
+  and $me->{build}{docstream}!~/^$stdStream$/
+  and $docstream=~/^$stdStream$/
+  and $me->stackStore($me->format(item => $me->stackCollect()));
+
+
+  # switching from default stream or empty pseudo stream to another docstream we start a docstream frame
   if (
           (
               not defined $me->{build}{docstream}
-           or $me->{build}{docstream} eq 'main'
+           or $me->{build}{docstream}=~/^$stdStream$/
           )
-      and $docstream ne 'main'
+      and $docstream!~/^$stdStream$/
      )
     {
      # stack a new docstream frame object
@@ -2190,25 +2228,16 @@ sub handleDocstreamEntry
                      );
     }
 
-  # all docstreams complete the previous dstream object, except this was main
-      defined $me->{build}{docstream}
-  and $me->{build}{docstream} ne 'main'
-  and $me->stackStore($me->format(item => $me->stackCollect()));
 
-  # all docstreams except main produce special objects
+  # all docstreams except the empty pseudo stream produce special objects
   $me->stackObject(
                    type => $opcode,
                    mode => $mode,
                    data => {
                             name => $docstream,
                            },
-                  ) if $docstream ne 'main';
+                  ) if $docstream;
 
-  # switching from another docstream to "main", we close the docstream frame
-      defined $me->{build}{docstream}
-  and $me->{build}{docstream} ne 'main'
-  and $docstream eq 'main'
-  and $me->stackStore($me->format(item => $me->stackCollect()));
 
   # flag that we are in this docstream now
   $me->{build}{docstream}=$docstream;

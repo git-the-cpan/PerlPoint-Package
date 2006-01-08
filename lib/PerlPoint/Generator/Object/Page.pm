@@ -5,7 +5,8 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
-# 0.01    |11.07.2004| JSTENZEL | new.
+# 0.03    |15.12.2005| JSTENZEL | added a gew more POD lines, still to be completed;
+# 0.02    |11.07.2004| JSTENZEL | new (startet as 0.01 - ?).
 # ---------------------------------------------------------------------------------------
 
 # = POD SECTION =========================================================================
@@ -16,7 +17,7 @@ B<PerlPoint::Generator::Object::Page> - generators page object class
 
 =head1 VERSION
 
-This manual describes version B<0.01>.
+This manual describes version B<0.03>.
 
 =head1 SYNOPSIS
 
@@ -24,6 +25,8 @@ This manual describes version B<0.01>.
 
 =head1 DESCRIPTION
 
+This is an internal class. Objects represent chapters and provide access
+to various chapter data, see method descriptions below.
 
 =head1 METHODS
 
@@ -41,8 +44,8 @@ require 5.00503;
 package PerlPoint::Generator::Object::Page;
 
 # declare package version and author
-$VERSION=0.01;
-$AUTHOR=$AUTHOR='J. Stenzel (perl@jochen-stenzel.de), 2004';
+$VERSION=0.03;
+$AUTHOR=$AUTHOR='J. Stenzel (perl@jochen-stenzel.de), 2004-2005';
 
 
 # = PRAGMA SECTION =======================================================================
@@ -113,7 +116,92 @@ sub new
   $me;
  }
 
-# supply a path
+
+=pod
+
+=head2 path()
+
+Provides the path of a chapter, this means, the sequence of main and subchapters to enter the document
+part under a certain headline.
+
+B<Parameters:>
+
+=over 4
+
+=item object
+
+An object as produced by C<new()>.
+
+=item parameters
+
+This should be a reference to a hash containing the following keys:
+
+=over 4
+
+=item type
+
+A chapter path has various forms (or types). Choose here which is of interest.
+
+=over 4
+
+=item fpath
+
+the path of full (or long) chapter titles (headlines)
+
+=item npath
+
+the I<numerical> path - levels are represented by their I<public> numbers, as used in schemes like
+C<1.2.3.4.>.
+
+=item ppath
+
+the I<page> headline path: each level holds its chapter number.
+
+=item spath
+
+the path of I<short> chapter titles (or headlines), these are the parts entered after
+an optional C<~> in a headline:
+
+  =Long headline ~ Short
+
+=back
+
+=item mode
+
+Configures how the path should be suppplied:
+
+=over 4
+
+=item array
+
+All parts of the path are elements of an array that is supplied via reference.
+
+=item full
+
+The path is provided as a string. Parts are delimited by the value of option
+C<delimiter> which is mandatory in this mode.
+
+=item title
+
+Supplies just the last part of the path (this is the chapters own title).
+
+=back
+
+=item delimiter
+
+In mode C<full> this needs to be set to a string that is used as a
+delimiter between the path parts.
+
+=back
+
+=back
+
+B<Returns:> the requested path, as configured by option C<mode>.
+
+B<Example:>
+
+
+=cut
 sub path
  {
   # get and check parameters
@@ -138,11 +226,32 @@ sub path
  }
 
 
-# provide page number
+=pod
+
+=head2 nr()
+
+Provide chapter number.
+
+B<Parameters:>
+
+=over 4
+
+=item object
+
+An object as produced by C<new()>.
+
+=back
+
+B<Returns:> the page (or chapter) number.
+
+B<Example:>
+
+
+=cut
 sub nr
  {
   # get and check parameters
-  ((my __PACKAGE__ $me), my %params)=@_;
+  ((my __PACKAGE__ $me))=@_;
   confess "[BUG] Missing object parameter.\n" unless $me;
   confess "[BUG] Object parameter is no ", __PACKAGE__, " object.\n" unless ref $me and $me->isa(__PACKAGE__);
 
@@ -151,11 +260,32 @@ sub nr
  }
 
 
-# provide variables
+=pod
+
+=head2 vars()
+
+Provide chapter variables.
+
+B<Parameters:>
+
+=over 4
+
+=item object
+
+An object as produced by C<new()>.
+
+=back
+
+B<Returns:> the chapters variables, as a hash.
+
+B<Example:>
+
+
+=cut
 sub vars
  {
   # get and check parameters
-  ((my __PACKAGE__ $me), my %params)=@_;
+  ((my __PACKAGE__ $me))=@_;
   confess "[BUG] Missing object parameter.\n" unless $me;
   confess "[BUG] Object parameter is no ", __PACKAGE__, " object.\n" unless ref $me and $me->isa(__PACKAGE__);
 
@@ -199,7 +329,7 @@ as well.
 
 =head1 AUTHOR
 
-Copyright (c) Jochen Stenzel (perl@jochen-stenzel.de), 2004.
+Copyright (c) Jochen Stenzel (perl@jochen-stenzel.de), 2004-2005.
 All rights reserved.
 
 This module is free software, you can redistribute it and/or modify it

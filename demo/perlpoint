@@ -11,14 +11,14 @@ no warnings;
 # ---------------------------------------------------------------------------------------
 # version | date   | author   | changes
 # ---------------------------------------------------------------------------------------
-# 0.01    |23.05.03| JSTENZEL | derived from pp2tdo 0.11.
+# 0.01    |23.05.03| JSTENZEL | derived from pp2sdf 0.11.
 # ---------------------------------------------------------------------------------------
 
 # = POD SECTION =========================================================================
 
 =head1 NAME
 
-B<pp2tdo> - a very general PerlPoint converter, using the generator interface
+B<perlpoint> - a very general PerlPoint converter, using the generator interface
 
 =head1 VERSION
 
@@ -39,15 +39,15 @@ described below. If there are libraries missing it will be notified.
 
 =head1 SYNOPSIS
 
-pp2tdo [<options>] <PerlPoint sources>
+perlpoint [<options>] <PerlPoint sources>
 
 =head2 Options
 
 All options can be abbreviated uniqly.
 
-Please note that there are more options than described below. C<pp2tdo>
+Please note that there are more options than described below. C<perlpoint>
 just defines bootstrap options. For a complete option list please call
-C<pp2tdo> with C<-help> and the appropriate C<-target>, C<-formatter> and
+C<perlpoint> with C<-help> and the appropriate C<-target>, C<-formatter> and
 C<-template> options, the help displayed will be adapted to this call.
 
 =over 4
@@ -103,7 +103,7 @@ command line, but may be spread to several lines and extended by comment lines w
 with a "#" character. To mark an option file in the commandline, simply enter its (path and)
 name prededed by a "@" character, for example
 
-  pp2tdo @myOptions ppfile
+  perlpoint @myOptions ppfile
 
   where the file myOptions could look like
 
@@ -118,10 +118,10 @@ the first time it is detected.
   -noinfo @moreOptions
 
 The script also takes care of I<default option files> which means that usual options can
-be stored in files named C<.pp2tdo>. If such a file is placed in the directory where the script itself
-resides, options in the file are read in automatically by all pp2tdo calls. These are global
+be stored in files named C<.perlpoint>. If such a file is placed in the directory where the script itself
+resides, options in the file are read in automatically by all perlpoint calls. These are global
 settings. If you place such a file in your home directory, it is read automatically as well
-but only if pp2tdo is called under your account, so this is for personal preferences.
+but only if perlpoint is called under your account, so this is for personal preferences.
 
 A personal default option file overwrites global settings, and all default options are
 overwritten by options passed to the script call.
@@ -180,7 +180,7 @@ distribution for more details.
 =cut
 
 # declare script package
-package PerlPoint::Converter::pp2tdo;
+package PerlPoint::Converter::perlpoint;
 
 # declare version and author
 $VERSION=$VERSION=0.01;

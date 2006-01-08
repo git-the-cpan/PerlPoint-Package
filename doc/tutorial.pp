@@ -395,7 +395,7 @@ makes it easy to have \I<one> converter for \I<many> target formats. In this des
 format capabilities are added by \I<formatter plugins>, which from a users point of view
 come in the form of Perl module distributions.
 
-In the extended design, the all in one converter is called \BCX<pp2tdo>. Currently the
+In the extended design, the all in one converter is called \BCX<perlpoint>. Currently the
 following formatters are available:
 
 * \BCX<PerlPoint::Generator::SDF::Default>, generating SDF. In fact the default converter
@@ -535,10 +535,10 @@ different as each converter can define options of its own. Please refer to their
 
 ===Using formatter based converters ~ Generators
 
-With this approach, there is only one converter to know: \BCX<pp2tdo>. This converter is
+With this approach, there is only one converter to know: \BCX<perlpoint>. This converter is
 installed with \C<PerlPoint::Package>.
 
-\C<pp2tdo> is kind of a launcher. It can handle various \C<target languages> by loading related
+\C<perlpoint> is kind of a launcher. It can handle various \C<target languages> by loading related
 modules. Likewise, it \I<formats> the results in a specific way, using \I<templates> if
 requested. You just have to define the way your output should be built. The setup is performed
 by options.
@@ -556,16 +556,16 @@ Language generators are implemented as Perl \I<modules>, so you can search for m
 are capitalized by convention.
 
 OK, let's say we want to produce XML, as this is cool and near to HTML. We use the \BCX<-target>
-option to let \C<pp2tdo> know of this decision.
+option to let \C<perlpoint> know of this decision.
 
-  pp2tdo \RED<-target XML> source.pp
+  perlpoint \RED<-target XML> source.pp
 
 Similar to \REF{type=linked name="Using target specific converters"}<other converters>, the
 source files are passed in as parameters.
 
 With this call, we get a list of copyright notes and an error message:
 
-  pp2tdo 0.01, (c) J. Stenzel (perl@jochen-stenzel.de), 2003-2005.
+  perlpoint 0.01, (c) J. Stenzel (perl@jochen-stenzel.de), 2003-2005.
 
   This is a PerlPoint::Generator::XML::Default converter.
 
@@ -577,18 +577,18 @@ With this call, we get a list of copyright notes and an error message:
 
 First, the program is reported to be a \I<\C<PerlPoint::Generator::XML::Default>> converter.
 Every language is written by a \I<formatter>. Changing the formatter redefines your results.
-If no formatter is specified as in our call, \C<pp2tdo> falls back to the default converter.
+If no formatter is specified as in our call, \C<perlpoint> falls back to the default converter.
 \I<Every language module comes with a related default converter, so it is always available.>
 
 Then, you see all the modules that were loaded automatically. From a users point of view,
 these are just internals handled behind the scenes, but you can see that there's a hierarchy.
 
-Finally, we have that error message. Oops - \C<pp2tdo> requires a minimum of document and file
+Finally, we have that error message. Oops - \C<perlpoint> requires a minimum of document and file
 data, including the title (\CX<-doctitle>), filename prefix (\CX<-prefix>) and filename suffix
 (\C<-suffix>) Different to \C<pp2html>, the \C<-suffix> option requires to specify the
 extension dot).
 
-  pp2tdo -target XML \RED<-doctitle Example -prefix example -suffix .xml> source.pp
+  perlpoint -target XML \RED<-doctitle Example -prefix example -suffix .xml> source.pp
 
 And with this call, the converter generates an XML file \C<example.xml>.
 
@@ -608,7 +608,7 @@ and empty lines for readability. At this opportunity we add a target directory:
 
 The call now changes to
 
-  pp2tdo \RED<@options.cfg> source.pp
+  perlpoint \RED<@options.cfg> source.pp
 
 In the following we will assume that all necesary options are stored in the option file.
 On the command line, we will focus on the options we are talking about.
@@ -616,7 +616,7 @@ On the command line, we will focus on the options we are talking about.
 Well! The XML produced is very general, but of course it follows a DTD. The DTD can be
 printed out by using \C<-writedtd> and \C<-xmldtd>.
 
-  pp2tdo @options.cfg \RED<-xmldtd example.dtd -writedtd> source.pp
+  perlpoint @options.cfg \RED<-xmldtd example.dtd -writedtd> source.pp
 
 After this call, you not only have the required XML file but also \C<example.dtd> which
 describes the general format and can be used to transform the results in whatever you
@@ -635,10 +635,10 @@ formatters:
 
 * PerlPoint::Generator::XML::\RED<AxPoint>.
 
-By installing their distributions, these formats become available to \C<pp2tdo>. To invoke
+By installing their distributions, these formats become available to \C<perlpoint>. To invoke
 a formatter, use the \C<-formatter> option.
 
-  pp2tdo @options -target XML \RED<-formatter XHTML> \BLUE<-suffix .html> source.pp
+  perlpoint @options -target XML \RED<-formatter XHTML> \BLUE<-suffix .html> source.pp
 
 Note that the formatter name is specified in a short form. Only the module levels after
 \C<PerlPoint::Generator::<target language\>> are required.
@@ -647,13 +647,13 @@ Our latest call produced a single HTML page \C<example.html>. The XHTML is basic
 be easily improved by using the various options of the new formatter. To find the available
 tuning tools, add \C<-help> to your call.
 
-  pp2tdo @options.cfg \RED<-help> source.pp
+  perlpoint @options.cfg \RED<-help> source.pp
 
 This will display the online help, containing a section "Options". You'll find things like
 \C<-css>, \C<-favicon>, \C<-norobots> and more. These were not available before as we
 used the default formatter - check it by another help request:
 
-  pp2tdo @options.cfg \RED<-formatter Default> -help source.pp
+  perlpoint @options.cfg \RED<-formatter Default> -help source.pp
 
 Indeed - now there are no XHTML specific sections. Instead we find XML specific stuff like
 \C<-writedtd>. \I<The help adapts to the current call. Always use -help to find out the
@@ -665,7 +665,7 @@ after updates). \I<What> we get with this formatter is a splitted output - each 
 on its own page now. These pages are named \C<<prefix\>-<chapter number\><suffix\>>,
 e.g. \C<example-10.html>.
 
-  pp2tdo @options \RED<-formatter XHTML::Paged> source.pp
+  perlpoint @options \RED<-formatter XHTML::Paged> source.pp
 
 The layout is still basic. There are two ways to beautify it. First, we can use the options
 provided by the language generator and the formatter, e.g. \C<-css>. Additionally, we can use
@@ -674,20 +674,20 @@ driven output", and all you need is typically a \I<style> for your language form
 are special directory structures containing configurations and templates for a certain layout,
 and are assigned using the \C<-styledir> and \C<-style> options:
 
-  pp2tdo @options \RED<-styledir . -style test> source.pp
+  perlpoint @options \RED<-styledir . -style test> source.pp
 
 For a working style, please have a look at the \C<demo/styles> directory in the
 \C<PerlPoint::Package> distribution. To use the style "GPW7-PPGenerator-01", change
 your call to this
 
-  pp2tdo @options -styledir \RED<.../demo/styles> -style \RED<GPW7-PPGenerator-01> source.pp
+  perlpoint @options -styledir \RED<.../demo/styles> -style \RED<GPW7-PPGenerator-01> source.pp
 
 And voila - now your pages have a modern, CSS driven layout with navigation, colors, headers,
 footers, bullet graphics, JavaScript navigation and more!
 
 Now, you might try the second example style, "FramesAndApplet" ...
 
-  pp2tdo @options -style \RED<FramesAndApplet> source.pp
+  perlpoint @options -style \RED<FramesAndApplet> source.pp
 
 ... to get a layout with frames, different colors, detailed navigation bars on each page
 and a Java applet navigation tree.
@@ -701,11 +701,11 @@ about this later on, but as
 a short intro template modules add lots of options to fine tune your results. To get an
 impression please request help for a call with option \C<-templatesAccept>:
 
-  pp2tdo @options \RED<-templatetype Traditional -templatesAccept XML/XHTML::Paged> \BLUE<-help> source.pp
+  perlpoint @options \RED<-templatetype Traditional -templatesAccept XML/XHTML::Paged> \BLUE<-help> source.pp
 
 Don't care of the complicated call as it is usually hidden in a style definition.
 
-Basically these are the basics of using PerlPoint generators. Call \C<pp2tdo> for a target
+Basically these are the basics of using PerlPoint generators. Call \C<perlpoint> for a target
 language, specify a formatter to use, add a style if available and use \C<-help> to find
 out which options are available for tuning. Everything else is handled behind the scenes.
 
@@ -721,13 +721,13 @@ in files, and refer to these files in further calls:
   ...
 
   \GREEN<# call>
-  pp2tdo \C<@xhtml.cfg> source.pp
+  perlpoint \C<@xhtml.cfg> source.pp
 
 
 To get a step further, options used in \I<every> call can be stored in default option
 files in your home directory. These are loaded automatically and named like the converter
-they are called for: \C<.pp2html> is read by \C<pp2html>, while \C<.pp2tdo> is evaluated by
-\C<pp2tdo>. The definition of style directories could be a candidate:
+they are called for: \C<.pp2html> is read by \C<pp2html>, while \C<.perlpoint> is evaluated by
+\C<perlpoint>. The definition of style directories could be a candidate:
 
   \GREEN<# style directories>
   -styledir /home/xyz/styles
@@ -1684,10 +1684,10 @@ Roberts, we have to go through two more steps:
 ====Processing
 
 Document streams are a relatively new feature - not all of the traditional converters support
-them yet. If you are using another converter than \CX<pp2tdo> please refer to its documentation
+them yet. If you are using another converter than \CX<perlpoint> please refer to its documentation
 for docstream support.
 
-With \C<pp2tdo>, there are two options that control how docstreams are handled. First,
+With \C<perlpoint>, there are two options that control how docstreams are handled. First,
 \CX<-dstreaming> is of interest. By default or with a value of \C<0>, docstreams are handled
 as real streams. With a value of \C<1>, they are ignored - which means that all paragraphs
 belonging to other docstreams than \CX<main> will be removed from the result as if they were
@@ -1706,10 +1706,10 @@ It is not possible to filter out the \C<main> stream.
 ~main
 
    \GREEN<# no streams at all>
-   pp2tdo \RED<-dstreaming 1>
+   perlpoint \RED<-dstreaming 1>
 
    \GREEN<# no "notes" stream>
-   pp2tdo \RED<-skipstream notes>
+   perlpoint \RED<-skipstream notes>
 
 Now if your options let some document streams intact as streams, it's time to have a look at
 formatting and layout.
@@ -1894,7 +1894,7 @@ fly. This is known as "Active Contents".
 As evaluating (user) code is potentially dangerous, Active Contents is disabled by default.
 If you are sure you can trust the sources, it can be switched on by option \BCX<-active>:
 
-  pp2tdo \RED<-active> source.pp
+  perlpoint \RED<-active> source.pp
 
 But even then PerlPoint behaves defensive and runs the code snippets in a safe environment
 (by \CPAN<Safe>). This environment denies all operations that might corrupt your system
@@ -1902,14 +1902,14 @@ and is configured by option \BCX<-safe>: if you are in need of more operations, 
 them by adding a \C<-safe> option to your call. The arguments of \C<-safe> are opcodes as
 documented in Perls \CPAN<Opcode> manpage.
 
-  pp2tdo -active \RED<-safe sort -safe :browse> source.pp
+  perlpoint -active \RED<-safe sort -safe :browse> source.pp
 
 It might take time to fine tune this compartment, but remember it's the safest way to run
 code from external sources. If for any reason you cannot get the code to run, or if you
 are absolutely sure you can trust the author of your PerlPoint sources, you can declare
 everything as safe by using the special keyword \BCX<ALL>:
 
-  pp2tdo -active \RED<-safe ALL> source.pp
+  perlpoint -active \RED<-safe ALL> source.pp
 
 
 
@@ -2102,7 +2102,7 @@ at any position.\FNR{n="Footnotes: dotted explanation"}
 
 ==Writing styles
 
-// there could be sections both for pp2html and pp2tdo
+// there could be sections both for pp2html and perlpoint
 
 \ILLT
 
@@ -2117,7 +2117,7 @@ at any position.\FNR{n="Footnotes: dotted explanation"}
 ====Traditional templates
 
 This template engine was designed to make it easy to transfer \C<pp2html> styles to
-\C<pp2tdo>. Most of the old features are available (under the same name), plus something
+\C<perlpoint>. Most of the old features are available (under the same name), plus something
 new.
 
 Please note that old styles need to be transfered - they cannot be used directly. But

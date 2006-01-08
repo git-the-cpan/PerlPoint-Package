@@ -22,11 +22,11 @@ target format like XML, SGML, TeX or whatever you want.
 Well, this sounds fine, but how to write a translator
 which transforms ASCII into the output format of your
 choice? Thats what this package is for. It provides a
-general converter (pp2tdo) which can be easily extended
+general converter (perlpoint) which can be easily extended
 by own formatter modules to produce what you want.
 
 Additionally, the included base framework allows to write
-complete converters like pp2tdo itself, or like the already
+complete converters like perlpoint itself, or like the already
 existing pp2sdf, pp2html, pp2latex etc.
 
 

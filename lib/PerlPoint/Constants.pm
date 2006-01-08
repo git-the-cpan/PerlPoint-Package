@@ -5,6 +5,7 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.18    |15.12.2005| JSTENZEL | internal helper routine name now begins with underscore;
 # 0.17    |15.06.2003| JSTENZEL | added DIRECTIVE_EVERY constant;
 #         |10.09.2003| JSTENZEL | added DIRECTIVE_DPOINT_TEXT constant;
 #         |08.07.2004| JSTENZEL | added TEMPLATE_ACTION_... constants;
@@ -50,7 +51,7 @@ B<PerlPoint::Constants> - public PerlPoint module constants
 
 =head1 VERSION
 
-This manual describes version B<0.17>.
+This manual describes version B<0.18>.
 
 =head1 DESCRIPTION
 
@@ -70,13 +71,13 @@ of the using modules B<PerlPoint::Parser> and B<PerlPoint::Backend>.
 package PerlPoint::Constants;
 
 # declare version
-$VERSION=$VERSION=0.17;
+$VERSION=$VERSION=0.18;
 
 # startup actions
 BEGIN
  {
   # declare startup helper function
-  sub startupGenerateConstants
+  sub _startupGenerateConstants
     {
      # init counter
      my $c=0;
@@ -197,7 +198,7 @@ flags a verbatim block paragraph;
 =cut
 
   # directive constants
-  startupGenerateConstants(
+  _startupGenerateConstants(
                            'DIRECTIVE_EVERY',                  # pseudo_directive used in backend;
 
                            'DIRECTIVE_START',                  # entity start;
@@ -266,7 +267,7 @@ Input ok, parsing can be continued.
 =cut
 
   # parser constants
-  startupGenerateConstants(
+  _startupGenerateConstants(
                            'PARSING_OK',             # all right, proceed;
                            'PARSING_COMPLETED',      # we know without further parsing that the input was perfect;
                            'PARSING_ERROR',          # a semantic error occured;
@@ -302,7 +303,7 @@ the item must not be used.
 
 
   # tag constants
-  startupGenerateConstants(
+  _startupGenerateConstants(
                            'TAGS_OPTIONAL',          # something is optional;
                            'TAGS_MANDATORY',         # something is mandatory;
                            'TAGS_DISABLED',          # something is disabled (not necessary);
@@ -342,7 +343,7 @@ headline stream.
 
 
   # stream data structure part constants
-  startupGenerateConstants(
+  _startupGenerateConstants(
                            'STREAM_IDENT',           # stream data identifier;
                            'STREAM_DOCSTREAMS',      # list of document streams (hash);
                            'STREAM_TOKENS',          # token stream;
@@ -381,7 +382,7 @@ beginning of the data part, depends on directive type.
 
 
   # stream directive data structure index constants
-  startupGenerateConstants(
+  _startupGenerateConstants(
                            'STREAM_DIR_HINTS',       # backend hints stored by the parser;
                            'STREAM_DIR_TYPE',        # directive type;
                            'STREAM_DIR_STATE',       # directive state (starting, complete);
@@ -415,7 +416,7 @@ Document stream entry points are streamed as headlines.
 =cut
 
   # declare display constants
-  startupGenerateConstants(
+  _startupGenerateConstants(
                            'DSTREAM_DEFAULT',        # just stream them;
                            'DSTREAM_IGNORE',         # ignore all streams except of "main";
                            'DSTREAM_HEADLINES',      # stream entry points as headlines;
@@ -583,7 +584,7 @@ Processes the table of contents page.
 =cut
 
   # template action constants
-  startupGenerateConstants(
+  _startupGenerateConstants(
                            'TEMPLATE_ACTION_DOC',               # process doc data;
                            'TEMPLATE_ACTION_INDEX',             # process index;
                            'TEMPLATE_ACTION_PAGE',              # process page data;
@@ -593,7 +594,7 @@ Processes the table of contents page.
 
 
 # release memory
-undef &startupGenerateConstants;
+undef &_startupGenerateConstants;
 
 
 # modules

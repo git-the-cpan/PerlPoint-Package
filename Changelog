@@ -7,6 +7,46 @@
 // -- end of "preface"
 
 
+=0.41
+
+This is a light update performed with the introduction of \C<PP::Template::TT2>.
+No adaptations should be required except for the name change from \C<pp2tdo> to
+\C<perlpoint>.
+	
+As \CX<pp2tdo> is intended to be one converter for many formats, it is now renamed
+to \CX<perlpoint>. It does \I<not> mean other \C<pp2...> converters are out of
+support in any way which they are not. The idea just came up when thinking about a
+binary package built with pp (from \C<PAR>), for which a name of "perlpoint" seems
+appropriate and memorable.
+
+
+==Features
+
+* \C<PP::Generator> provides a new option \C<-mainstream> which allows to specify
+  an alternative name for the document stream "main" (as a usage example, this
+  helps to produce S5 slides which require DIV areas with certain names)
+
+* main document stream now produces entry and leave point as well, allowing to
+  format this stream a special way in the target format (again, S5 is an example
+  of how this can be used)
+	
+
+==Fixes
+
+* Generator classes did ignore the parsers nested table configuration, therefore no
+  generator based converter could provide nested table support. Fixed.
+
+	
+==Misc
+
+* Updated \C<MANIFEST> and \C<TODO>.
+
+* Prepared for use with \C<PP::Template::TT2>.
+
+* Took care to let the distribution pass more Kwalitee (CPANTS) tests.
+
+
+	
 =0.40
 
 This update has two parts.
