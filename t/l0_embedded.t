@@ -132,7 +132,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Here we go for more');
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
 is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
-is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
+
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'EMBED');
 {
  my $pars=shift(@results);
@@ -152,7 +152,6 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'EMBED');
  is(join(' ', sort keys %$pars), 'lang');
  is(join(' ', sort values %$pars), 'HTML');
 }
-is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 
 is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Here the literal ');
@@ -234,7 +233,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Here we go for more');
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
 is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
-is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
+
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'EMBED');
 {
  my $pars=shift(@results);
@@ -254,7 +253,6 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'EMBED');
  is(join(' ', sort keys %$pars), 'lang');
  is(join(' ', sort values %$pars), 'HTML');
 }
-is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 
 is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Here the literal ');

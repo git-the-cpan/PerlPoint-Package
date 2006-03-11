@@ -14,6 +14,16 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.42    |05.03.2006| JSTENZEL | non kernel tags now can be configured to be standalone,
+#         |          |          | in which case a wrapping paragraph is removed from the
+#         |          |          | stream (IMAGE and LOCALTOC configuration moved to tag
+#         |          |          | definition);
+#         |          | JSTENZEL | likewise, if a paragraph consists of just one embedded
+#         |          |          | area, the wrapping paragraph is removed;
+#         |07.03.2006| JSTENZEL | dummy tokens inserted by the parser now are special
+#         |          |          | strings that can be filtered out by the backend module;
+#         |10.03.2006| JSTENZEL | bugfix: statistics for list shifters did not work;
+#         |          | JSTENZEL | Macro default parameters were not documented! Added.
 # 0.41    |15.12.2005| JSTENZEL | almost all routines are internal, to avoid Pod::Coverage
 #         |          |          | complaints they now begin with an underscore;
 # 0.40    |12.06.2003| JSTENZEL | bugfix: delayed tokens were not reparsed when reinserted,
@@ -522,7 +532,7 @@ B<PerlPoint::Parser> - a PerlPoint Parser
 
 =head1 VERSION
 
-This manual describes version B<0.41>.
+This manual describes version B<0.42>.
 
 =head1 SYNOPSIS
 
@@ -931,8 +941,10 @@ his own shortcuts and to use them like a tag. The parser will resolve such alias
 replace them by the defined replacement text and work on with this replacement.
 
 An alias declaration starts with a "+" character followed I<immediately> by the
-alias I<name> (without backslash prefix), followed I<immediately> by a colon.
+alias I<name> (without backslash prefix), optionally followed I<immediately>
+by an option default list in "{}", followed I<immediately> by a colon.
 (No additional spaces here.)
+
 I<All text after this colon up to the paragraph closing empty line is stored as the replacement text.>
 So, whereever you will use the new macro, the parser will replace it by this
 text and I<reparse> the result. This means that your macro text can contain
@@ -940,9 +952,13 @@ any valid constructions like tags or other macros.
 
 The replacement text may contain strings embedded into doubled underscores like
 C<__this__>. This is a special syntax to mark that the macro takes parameters
-of these names (e.g. C<this>). If a tag is used and these parameters are set,
+of these names (e.g. C<this>). If a macro is used and these parameters are set,
 their values will replace the mentioned placeholders. The special placeholder
 "__body__" is used to mark where the macro I<body> is to place.
+
+If a macro is used and defined options are I<unset>, but there are defaults
+for them in the optional default list, these defaults will be used for the
+respective options.
 
 Here are a few examples:
 
@@ -950,9 +966,14 @@ Here are a few examples:
 
   +F:\FONT{color=__c__}<__body__>
 
+  +COLORED{c=blue}:\FONT{color=__c__}<__body__>
+
   +IB:\B<\I<__body__>>
 
   This \IB<text> is \RED<colored>.
+
+  Defaults: first, text in \COLORED{c=red}<Red>,
+  now text in \COLORED<Blue>.
 
   +TEXT:Macros can be used to abbreviate longer
      texts as well as other tags
@@ -1487,7 +1508,7 @@ B<Example:>
  require 5.00503;
 
  # declare module version
- $PerlPoint::Parser::VERSION=0.41;
+ $PerlPoint::Parser::VERSION=0.42;
  $PerlPoint::Parser::VERSION=$PerlPoint::Parser::VERSION; # to suppress a warning of exclusive usage only;
 
  # pragmata
@@ -1505,7 +1526,7 @@ B<Example:>
  use Cwd qw(:DEFAULT abs_path);
  use Digest::SHA1 qw(sha1_base64);
  use Storable qw(:DEFAULT dclone nfreeze);
- use PerlPoint::Constants 0.16 qw(:DEFAULT :parsing :stream :tags);
+ use PerlPoint::Constants 0.19 qw(:DEFAULT :parsing :stream :tags);
 
  # memoizations
 
@@ -1619,6 +1640,7 @@ B<Example:>
                         Tabled                   => 'an \END_TABLE tag',
                         Tag_name                 => 'a tag name',
                         Word                     => 'a word',
+                        NoToken                  => 'an internal dummy token that is finally ignored',
                        );
 
 %}
@@ -1857,21 +1879,39 @@ built_paragraph : optional_paragraph_filter
 original_paragraph: headline
                   | optionally_dotted_text
                      {
+                      # remove leading dummy tokens which might have been produced by "standalone macros"
+                      splice(@{$_[1][0]}, 1, 1) while @{$_[1][0]}>1 and !ref($_[1][0][1]) and $_[1][0][1] eq DUMMY_TOKEN;
+
                       # check if this paragraph consists of exactly one table only
-                      # or exactly one tag which is allowed to exists standalone
+                      # or exactly one tag which is allowed to exists standalone,
+                      # or exactly one embedded region
                       if (
                              (
-                              # starting with a table tag?
-                                  ref($_[1][0][1]) eq 'ARRAY'
+                              # starting with a table tag or standalone tag?
+                                  @{$_[1][0]}>1
+                              and ref($_[1][0][1]) eq 'ARRAY'
                               and $_[1][0][1][STREAM_DIR_TYPE]==DIRECTIVE_TAG
-                              and $_[1][0][1][STREAM_DIR_DATA]=~/^(IMAGE|LOCALTOC|TABLE)$/
+                              and (
+                                      $_[1][0][1][STREAM_DIR_DATA]=~/^(TABLE)$/
+                                   or (
+                                           $_[1][0][1][STREAM_DIR_DATA]=~/^(\w+)$/
+                                       and (
+                                               (
+                                                    exists $tagsRef->{$1}
+                                                and exists $tagsRef->{$1}{standalone}
+                                                and $tagsRef->{$1}{standalone}
+                                               )
+                                            or $1 eq 'EMBED'
+                                           )
+                                      )
+                                  )
 
-                              # ending with a table tag?
+                              # ending with the same tag?
                               and ref($_[1][0][-2]) eq 'ARRAY'
                               and $_[1][0][-2][STREAM_DIR_TYPE]==DIRECTIVE_TAG
                               and $_[1][0][-2][STREAM_DIR_DATA] eq $1
 
-                              # both covering the same table (if we are looking at a table)?
+                              # both building the same tag?
                               and $_[1][0][-2][STREAM_DIR_DATA+1] eq $_[1][0][1][STREAM_DIR_DATA+1]
                              )
                          )
@@ -2086,7 +2126,7 @@ list : list_part
      | list list_shift list_part
         {
          # update statistics, if necessary (shifters are not passed as standalone paragraphs, so ...)
-         $statistics{$_[2][0][0][0]}++;
+         $statistics{$_[2][0][0][1]}++;
 
          # add shift informations to related list parts: the predecessor
          # gets informations about a following shift, the successor about
@@ -2754,9 +2794,9 @@ list_shift : list_shifter
 
                 # update related data
                 if ($_[1][0]==LIST_SHIFT_RIGHT)
-		  {unshift(@olistLevels, 0) for (1..(defined $_[3][0] ? $_[3][0] : 1));}
-		else
-		  {shift(@olistLevels) for (1..(defined $_[3][0] ? $_[3][0] : 1));}
+                 {unshift(@olistLevels, 0) for (1..(defined $_[3][0] ? $_[3][0] : 1));}
+                else
+                 {shift(@olistLevels) for (1..(defined $_[3][0] ? $_[3][0] : 1));}
 
                 # reset ordered list flag
                 $flags{olist}=0;
@@ -2976,13 +3016,13 @@ tag : Tag_name
          if    (exists $macros{$_[1][0]} and %{$macros{$_[1][0]}->[0]})         # macro: evaluate declared options;
             || $tagsRef->{$_[1][0]}{__flags__}{__options__};                    # tag with options;
 
-	# deactivate boost
-	$flags{noboost}=1;
+	    # deactivate boost
+	    $flags{noboost}=1;
        }
       optional_tagpars
        {
-	# reactivate boost
-	$flags{noboost}=0;
+	    # reactivate boost
+	    $flags{noboost}=0;
 
         # restore special states of "{" and "}", if necessary
         @specials{('{', '}')}=splice(@specialStack, -2, 2)
@@ -3183,7 +3223,7 @@ tag : Tag_name
            # read token this way, this token would be streamed (in most cases) *before* the macro
            # replacement, while it was intented to come after it. So, if we detect this case, we
            # move this token *behind* the macro replacement. As for the parser, we replace
-           # this token by something streamed to "nothing", currently an empty string declared
+           # this token by something streamed to "nothing", currently a special string declared
            # as "Word" token.
            my $delayedToken;
            unless (@{$_[5][0]})
@@ -3194,7 +3234,7 @@ tag : Tag_name
               # set new dummy values to let the parser work on
               # (something without effect and valid everywhere a tag is)
               $_[0]->YYCurtok('Word');
-              $_[0]->YYCurval(['', $_[0]->YYCurval->[1]]);
+              $_[0]->YYCurval([DUMMY_TOKEN, $_[0]->YYCurval->[1]]);
              }
 
            # finally, pass the constructed text back to the input stream (by stack)

@@ -5,6 +5,7 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.19    |07.03.2006| JSTENZEL | added DUMMY_TOKEN;
 # 0.18    |15.12.2005| JSTENZEL | internal helper routine name now begins with underscore;
 # 0.17    |15.06.2003| JSTENZEL | added DIRECTIVE_EVERY constant;
 #         |10.09.2003| JSTENZEL | added DIRECTIVE_DPOINT_TEXT constant;
@@ -51,7 +52,7 @@ B<PerlPoint::Constants> - public PerlPoint module constants
 
 =head1 VERSION
 
-This manual describes version B<0.18>.
+This manual describes version B<0.19>.
 
 =head1 DESCRIPTION
 
@@ -71,7 +72,7 @@ of the using modules B<PerlPoint::Parser> and B<PerlPoint::Backend>.
 package PerlPoint::Constants;
 
 # declare version
-$VERSION=$VERSION=0.18;
+$VERSION=$VERSION=0.19;
 
 # startup actions
 BEGIN
@@ -545,7 +546,7 @@ Cleans up an existing cache before the parser starts (and possibly rebuilds it).
 
 =cut
 
-  # declare display constants
+  # declare cache constants
   use constant 'CACHE_OFF'        => 0;            # MUST be 0! Deactivates the cache.
   use constant 'CACHE_ON'         => 1;            # activates the cache;
   use constant 'CACHE_CLEANUP'    => 2;            # cache cleanup;
@@ -592,6 +593,24 @@ Processes the table of contents page.
                            'TEMPLATE_ACTION_TOC',               # process TOC template;
                           );
 
+
+=pod
+
+=head2 String constants
+
+used for various purposes.
+
+=over 4
+
+=item DUMMY_TOKEN
+
+a pseudo token added for reasons of parsing, which the backend can delete from the stream.
+
+=back
+
+=cut
+
+    use constant DUMMY_TOKEN => '__DUMMY__TOKEN__';
 
 # release memory
 undef &_startupGenerateConstants;
@@ -645,13 +664,15 @@ use Exporter;
            DISPLAY_NOINFO
            DISPLAY_NOWARN
 
-	   CACHE_OFF
-	   CACHE_ON
-	   CACHE_CLEANUP
+           CACHE_OFF
+           CACHE_ON
+           CACHE_CLEANUP
 
-	   DSTREAM_DEFAULT
-	   DSTREAM_IGNORE
+           DSTREAM_DEFAULT
+           DSTREAM_IGNORE
            DSTREAM_HEADLINES
+
+           DUMMY_TOKEN
           );
 
 %EXPORT_TAGS=(

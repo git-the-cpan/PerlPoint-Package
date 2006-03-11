@@ -7,6 +7,51 @@
 // -- end of "preface"
 
 
+=0.42
+
+The main intention of this update is to allow the production of better
+structured results (like correct XHTML). On the way to there, fixes and
+improvements were made.
+
+There should be no incompatibility with 0.41.
+
+
+==Features
+
+* Tag authors can declare their tags as standalone now. If the parser
+  finds a text paragraph is occupied by such a tag entirely, the
+  paragraph "wrapper" is removed from the stream. This allows to
+  produce better output for tags that are transformed into something
+  that does not fit into a paragraph. (We had this before for images
+  and a few other special tags, but now this is a general mechanism.)
+  Standalone tags not used standalone have no special effect.
+
+* Likewise, if all that is found in a paragraph is an embedded area
+  (\C<\\EMBED{...} ... \\END_EMBED>, the wrapping paragraph directives
+  are removed from the stream.
+
+* \C<IMAGE> tags now get an \C<alt> option by default unless they define
+  their own (the default is "Image").
+	
+* \C<perlpoint> now reads option files from the start directory, allowing to
+  have a \C<.perlpoint> file in a project tree.
+
+	
+	
+==Fixes
+	
+* statistics for list shifters did not work;
+
+* macro default parameters were not documented!
+
+	
+==Misc
+
+* dummy tokens inserted by the parser now are special strings that are filtered
+  out by the backend module, the old string solution injected empty tokens into
+  the stream;
+
+
 =0.41
 
 This is a light update performed with the introduction of \C<PP::Template::TT2>.

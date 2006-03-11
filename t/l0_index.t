@@ -5,6 +5,7 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.03    |05.03.2006| JSTENZEL | INDEX and INDEXRELATION became standalone tags;
 # 0.02    |27.12.2004| JSTENZEL | adapted to Package 0.40 (headlines, \X __anchor hint);
 # 0.01    |26.04.2003| JSTENZEL | new.
 # ---------------------------------------------------------------------------------------
@@ -149,8 +150,6 @@ is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'one everyon
 
 is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 
-is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
-
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'INDEXRELATIONS');
 {
  my $pars=shift(@results);
@@ -170,7 +169,6 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'INDEXRELATI
 }
 is(shift(@results), 0);
 
-is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 
 
 
@@ -267,8 +265,6 @@ is(shift(@results), 1);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
 is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 
-is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
-
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'INDEXRELATIONS');
 {
  my $pars=shift(@results);
@@ -288,7 +284,6 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'INDEXRELATI
 }
 is(shift(@results), 0);
 
-is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 
 
 # chapter 4
@@ -327,7 +322,6 @@ is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'dependent.');
 is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 
-is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'INDEXRELATIONS');
 {
  my $pars=shift(@results);
@@ -347,8 +341,6 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'INDEXRELATI
 }
 is(shift(@results), 0);
 
-is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
-
 
 # index chapter
 is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 1, 'Index', '');
@@ -361,7 +353,6 @@ is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_START, 1, 'Index'
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Index');
 is(shift(@results), $_) foreach (DIRECTIVE_HEADLINE, DIRECTIVE_COMPLETE, 1);
 
-is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'INDEX');
 {
  my $pars=shift(@results);
@@ -427,7 +418,7 @@ is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'INDEX');
  is(join(' ', sort keys %$pars), '');
 }
 is(shift(@results), 0);
-is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
+
 
 # document read
 is(shift(@results), $_) foreach (DIRECTIVE_DOCUMENT, DIRECTIVE_COMPLETE, 'index.pp');

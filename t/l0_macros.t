@@ -5,6 +5,7 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.08    |07.03.2006| JSTENZEL | adapted to removal of dummy tokens;
 # 0.07    |31.08.2002| JSTENZEL | adapted to extended tag streaming (body hint);
 #         |01.11.2005| JSTENZEL | each document needs a headline now;
 # 0.06    |16.08.2001| JSTENZEL | no need to build a Safe object;
@@ -162,14 +163,12 @@ is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 # 2nd section
 is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Macro options can be preset to contain ');
-is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '');
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'default values as set up');
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'If you want,');
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'you can assign ');
-is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '');
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'up to date values');
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '.');
 is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
@@ -291,7 +290,6 @@ is(shift(@results), 5);
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'is formatted by nested macros.');
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, ' ');
-is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '');
 is(shift(@results), $_) foreach (DIRECTIVE_TAG, DIRECTIVE_START, 'EMBED');
 {
  my $pars=shift(@results);
@@ -313,7 +311,6 @@ is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 
 # 4th section
 is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_START);
-is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, '');
 is(shift(@results), $_) foreach (DIRECTIVE_SIMPLE, DIRECTIVE_START, 'Macros can be used to abbreviate longer texts as well as other tags or tag combinations.');
 is(shift(@results), $_) foreach (DIRECTIVE_TEXT, DIRECTIVE_COMPLETE);
 

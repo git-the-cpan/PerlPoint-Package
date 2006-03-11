@@ -5,6 +5,7 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.05    |05.06.2006| JSTENZEL | documented the new "standalone" configuration;
 # 0.04    |15.12.2005| JSTENZEL | added POD for public methods to avoid Pod::Coverage
 #         |          |          | complaints (behaviour was already documented before);
 # 0.03    |11.10.2001| JSTENZEL | slight POD fix in "NAME" section;
@@ -29,7 +30,7 @@ B<PerlPoint::Tags> - processes PerlPoint tag declarations
 
 =head1 VERSION
 
-This manual describes version B<0.04>.
+This manual describes version B<0.05>.
 
 =head1 SYNOPSIS
 
@@ -283,6 +284,26 @@ if the parsing hook returned C<PARSING_OK>, or if there was
 no parsing hook at all.
 
 
+=head2 Marking tags that can act standalone
+
+A tag can be part of various paragraphs. A single tag in a
+paragraph with no prefix produces a text paragraph containing
+just this tag. This can be intended, but there are other cases
+when the tag should stand for its own.
+
+The I<standalone> attribute instructs the parser to strip off
+the wrapping paragraph from a handle that is used as its only
+content. If there is more content in the paragraph the
+paragraph wrapper will not be removed.
+
+The flag should be set to a true value to activate the
+occasional paragraph stripping.
+
+Example:
+
+  standalone => 1,
+
+
 =head2 Using other tag definitions
 
 One can invoke hooks of I<any other registered tag>. This is
@@ -437,7 +458,7 @@ require 5.00503;
 package PerlPoint::Tags;
 
 # declare package version (as a STRING!!)
-$VERSION="0.04";
+$VERSION="0.05";
 
 
 # = PRAGMA SECTION =======================================================================

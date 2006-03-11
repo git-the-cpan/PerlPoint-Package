@@ -5,6 +5,9 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.06    |05.03.2006| JSTENZEL | FORMAT, HIDE, INDEX, INDEXRELATIONS, LOCALTOC and READY
+#         |          |          | got a "standalone" configuration flag;
+#         |10.03.2006| JSTENZEL | IMAGE now adds an "alt" option ("Image") as default;
 # 0.05    |15.04.2005| JSTENZEL | A is now checking if it is the innermost tag/macro;
 #         |16.05.2005| JSTENZEL | alt option of REF can handle backslash guarded commata;
 #         |23.08.2005| JSTENZEL | doc fix: intro option of INDEXRELATIONS was not described;
@@ -40,7 +43,7 @@ B<PerlPoint::Tags::Basic> - declares basic PerlPoint tags
 
 =head1 VERSION
 
-This manual describes version B<0.05>.
+This manual describes version B<0.06>.
 
 =head1 SYNOPSIS
 
@@ -125,11 +128,18 @@ Please note that this tag is very general. Accepted options and
 their meaning are defined by the I<converters>. Nevertheless,
 certain settings are commonly used by convention.
 
+If used as the only contents of a text paragraph the paragraph wrapper
+will be removed from the stream and the tag is streamed standalone.
+
 
 =head2 HIDE
 
 hides everything in its body. Makes most sense when used with
 a tag condition.
+
+If used as the only contents of a text paragraph the paragraph wrapper
+will be removed from the stream and the tag is streamed standalone.
+
 
 =head2 I
 
@@ -140,15 +150,22 @@ marks text as I<italic>. No options, but a mandatory tag body.
 includes an I<image>. No tag body, but a mandatory option C<"src"> to pass
 the image file, and an optional option C<"alt"> to store text alternatively
 to be displayed. The option set is open - there can be more options
-but they will not be checked by the parser.
+but they will not be checked by the parser. If C<alt> is not set it defaults
+to an empty string (added automatically).
 
 The image source file name will be supplied I<absolutely> in the stream.
+
+If used as the only contents of a text paragraph the paragraph wrapper
+will be removed from the stream and the tag is streamed standalone.
 
 
 =head2 INDEX
 
 Generates an index listing all keywords collected via I<X>. Index formatting
 is up to the converters.
+
+If used as the only contents of a text paragraph the paragraph wrapper
+will be removed from the stream and the tag is streamed standalone.
 
 
 =head2 INDEXRELATIONS
@@ -160,6 +177,9 @@ So, the tag has two functions. First, it I<collects> all index entries
 made in its chapters (and optionally all its subchapters). Second, it
 includes a reference to other chapters with I<INDEXRELATIONS> which
 match the own index entries according to the configuration.
+
+If used as the only contents of a text paragraph the paragraph wrapper
+will be removed from the stream and the tag is streamed standalone.
 
 Configuration is done via options.
 
@@ -260,6 +280,9 @@ audience can expect in the following talk section.
 
 Using a tag relieves the documents author from writing and maintaining
 this list manually.
+
+If used as the only contents of a text paragraph the paragraph wrapper
+will be removed from the stream and the tag is streamed standalone.
 
 There is no tag body, but the result can be configured by I<options>.
 
@@ -551,7 +574,7 @@ require 5.00503;
 package PerlPoint::Tags::Basic;
 
 # declare package version
-$VERSION=0.05;
+$VERSION=0.06;
 
 # declare base "class"
 use base qw(PerlPoint::Tags);
@@ -659,6 +682,9 @@ my (%seq, %index);
                  body    => TAGS_DISABLED,
                  options => TAGS_DISABLED,
 
+                 # can be used as a standalone tag
+                 standalone => 1,
+
                  # activate the finish hook
                  hook    => sub {PARSING_OK;},
 
@@ -687,6 +713,9 @@ my (%seq, %index);
                           # options, no body
                           options => TAGS_OPTIONAL,
                           body    => TAGS_DISABLED,
+
+                          # can be used as a standalone tag
+                          standalone => 1,
 
                           # hook!
                           hook    => sub
@@ -837,6 +866,9 @@ my (%seq, %index);
 
                   # no body needed
                   body    => TAGS_DISABLED,
+
+                  # can be used as a standalone tag
+                  standalone => 1,
                  },
 
 
@@ -872,6 +904,9 @@ my (%seq, %index);
                  # no body required
                  body    => TAGS_DISABLED,
 
+                 # can be used as a standalone tag
+                 standalone => 1,
+
                  # hook!
                  hook    => sub
                              {
@@ -884,6 +919,9 @@ my (%seq, %index);
                               # check them
                               $ok=PARSING_FAILED, warn qq(\n\n[Error] Missing "src" option in IMAGE tag, line $tagLine.\n) unless exists $options->{src};
                               $ok=PARSING_ERROR,  warn qq(\n\n[Error] Image file "$options->{src}" does not exist or is no file in IMAGE tag, line $tagLine.\n) if $ok==PARSING_OK and not (-e $options->{src} and not -d _);
+
+                              # add "alt" option, if necessary
+                              $options->{alt}='Image' unless exists $options->{alt};
 
                               # add current path to options, if necessary (deprecated)
                               $options->{__loaderpath__}=cwd() if $ok==PARSING_OK;
@@ -902,6 +940,9 @@ my (%seq, %index);
                     # no body, optional options
                     body    => TAGS_DISABLED,
                     options => TAGS_OPTIONAL,
+
+                    # can be used as a standalone tag
+                    standalone => 1,
 
                     # hook in to check option values
                     hook    => sub
@@ -947,6 +988,9 @@ my (%seq, %index);
 
                  # no body required
                  body    => TAGS_DISABLED,
+
+                 # can be used as a standalone tag
+                 standalone => 1,
 
                  # hook!
                  hook    => sub

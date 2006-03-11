@@ -5,6 +5,7 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.15    |07.03.2006| JSTENZEL | the new simple dummy tokens are ignored;
 # 0.14    |16.09.2004| JSTENZEL | objects declared as typed lexicals now;
 # 0.13    |29.05.2003| JSTENZEL | new optional generator passing;
 #         |15.06.2003| JSTENZEL | new general handler interface (DIRECTIVE_EVERY);
@@ -54,7 +55,7 @@ B<PerlPoint::Backend> - frame class to transform PerlPoint::Parser output
 
 =head1 VERSION
 
-This manual describes version B<0.13>.
+This manual describes version B<0.15>.
 
 =head1 SYNOPSIS
 
@@ -159,7 +160,7 @@ features as it is necessary to build the converter you want!
 package PerlPoint::Backend;
 
 # declare version
-$VERSION=$VERSION="0.13";
+$VERSION=$VERSION=0.15;
 
 # pragmata
 use strict;
@@ -185,7 +186,7 @@ use fields qw(
 # load modules
 use Carp;
 use Storable qw(dclone);
-use PerlPoint::Constants 0.15 qw(:DEFAULT :stream);
+use PerlPoint::Constants 0.19 qw(:DEFAULT :stream);
 
 
 =pod
@@ -759,23 +760,27 @@ sub _next
       # trace, if necessary
       warn "[Trace] Token $me->{streamControl}{tokenIndex} is a simple string.\n" if $me->{trace} & TRACE_BACKEND;
 
-      # now check if there was a handler declared
-      if (exists $me->{handler}{DIRECTIVE_SIMPLE()})
-        {
-         # trace, if necessary
-         warn "[Trace] Using user defined handler.\n" if $me->{trace} & TRACE_BACKEND;
+      # dummy tokens are ignored, all other tokens are processed
+      unless ($token eq DUMMY_TOKEN)
+       {
+        # now check if there was a handler declared
+        if (exists $me->{handler}{DIRECTIVE_SIMPLE()})
+         {
+          # trace, if necessary
+          warn "[Trace] Using user defined handler.\n" if $me->{trace} & TRACE_BACKEND;
 
-         # call the handler passing the string
-         &{$me->{handler}{DIRECTIVE_SIMPLE()}}($me->{generator} ? $me->{generator} : (), DIRECTIVE_SIMPLE, DIRECTIVE_START, $token);
-        }
-      else
-        {
-         # trace, if necessary
-         warn "[Trace] Using default handler.\n" if $me->{trace} & TRACE_BACKEND;
+          # call the handler passing the string
+          &{$me->{handler}{DIRECTIVE_SIMPLE()}}($me->{generator} ? $me->{generator} : (), DIRECTIVE_SIMPLE, DIRECTIVE_START, $token);
+         }
+        else
+         {
+          # trace, if necessary
+          warn "[Trace] Using default handler.\n" if $me->{trace} & TRACE_BACKEND;
 
-         # well, the default is to just print it out
-         print $token;
-        }
+          # well, the default is to just print it out
+          print $token;
+         }
+       }
      }
    else
      {
