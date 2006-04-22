@@ -81,6 +81,7 @@ examples/xmldefault2html.cfg
 
 t/PerlPoint/Tags/_macros.pm
 t/PerlPoint/Tags/_tags.pm
+t/PerlPoint/Import/LANG.pm
 
 t/l0_backend-base.t
 t/l0_backend-modes.t

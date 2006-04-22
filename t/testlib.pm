@@ -43,7 +43,7 @@ sub checkHeadline
   # check headline path
   my $headlinePath=$pathData->[0];
   is(ref($headlinePath), 'ARRAY', 'Headline check: headline path data type.');
-  is(scalar(@$headlinePath), $depth, 'Headline check: headline path array size.');
+  is(scalar(@$headlinePath), $depth, "Headline check: headline path array size.");
   is($headlinePath->[$_], $elongPath->[$_], "Headline check: headline path, ${\($_+1)}. element of $depth (\"${\( defined $headlinePath->[$_] ? $headlinePath->[$_] : 'undefined' )}\").") for 0..($depth-1);
 
   my $shortcutPath=$pathData->[1];

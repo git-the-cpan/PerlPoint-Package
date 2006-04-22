@@ -5,6 +5,9 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.03    |09.04.2006| JSTENZEL | new option -acceptedFormat;
+#         |          | JSTENZEL | file test adapted to new IMPORT: directive;
+#         |22.04.2006| JSTENZEL | new option -version;
 # 0.02    |09.12.2005| JSTENZEL | main stream now produces stack objects as well, but
 #         |          |          | still outside the special "streamframe" wrapper;
 #         |          | JSTENZEL | new option -mainstream;
@@ -21,7 +24,7 @@ B<PerlPoint::Generator> - generic PerlPoint generator
 
 =head1 VERSION
 
-This manual describes version B<0.02>.
+This manual describes version B<0.03>.
 
 =head1 SYNOPSIS
 
@@ -46,8 +49,8 @@ require 5.00503;
 package PerlPoint::Generator;
 
 # declare package version and author
-$VERSION=0.02;
-$AUTHOR=$AUTHOR='J. Stenzel (perl@jochen-stenzel.de), 2003-2005';
+$VERSION=0.03;
+$AUTHOR=$AUTHOR='J. Stenzel (perl@jochen-stenzel.de), 2003-2006';
 
 
 # = PRAGMA SECTION =======================================================================
@@ -152,7 +155,7 @@ sub new
 
   # check parameters
   confess "[BUG] Missing class name.\n" unless $class;
-  confess "[BUG] Missing target language parameter.\n" unless exists $params{options}{target} or exists $params{options}{help};
+  confess "[BUG] Missing target language parameter.\n" unless exists $params{options}{target} or exists $params{options}{help} or exists $params{options}{version};
   confess "[BUG] This method should be called via its own package only.\n" unless $class eq __PACKAGE__;
 
   # declarations
@@ -251,6 +254,7 @@ sub new
                       target    => uc($params{options}{target}),
                       formatter => $params{options}{formatter},
                       exists $params{options}{help}     ? (help     => $params{options}{help}) : (),
+                      exists $params{options}{version}  ? (version  => $params{options}{version}) : (),
                      };
 
   # add configuration setting
@@ -274,6 +278,12 @@ sub new
   Getopt::Long::Configure(qw(no_pass_through));
   die "[Fatal] Unknown options: please use the correct -target and -style settings.\n"
     unless GetOptions();
+
+  # check for a version report request
+  if (exists $plugin->{options}{version})
+    {
+     exit;
+    }
 
   # check for a help request
   if (exists $plugin->{options}{help})
@@ -432,7 +442,7 @@ sub bootstrap
     }
 
   # anything more to do?
-  unless (exists $me->{options}{help}) #  and $me->{options}{help})
+  unless (exists $me->{options}{help} or exists $me->{options}{version})
    {
     # usage needs to be checked basically
     die "[Fatal] Please use -target to specify a target language.\n" unless exists $me->{options}{target};
@@ -524,6 +534,7 @@ sub declareOptions
   (
    # added options
    [
+    "acceptedFormat=s@", # more accepted formats (embedded or included);
     "activeContents",    # evaluation of active contents;
     "cache",             # control the cache;
     "cacheCleanup",      # cache cleanup;
@@ -550,6 +561,7 @@ sub declareOptions
     "templatesAccept=s@", # targets accepted by the templates used;
     "templatetype=s",    # template engine type;
     "trace:i",           # activate trace messages;
+    "version",           # display version informations and exit;
 
     # document data ("doc...")
     "docdescription|description=s",  # presentation description (allow "description" for backwards compatibility);
@@ -593,9 +605,13 @@ sub sourceFilters
   confess "[BUG] Missing object parameter.\n" unless $me;
   confess "[BUG] Object parameter is no ", __PACKAGE__, " object.\n" unless ref $me and $me->isa(__PACKAGE__);
 
-  # just provide the list
+  # provide the list and add all accepted formats specified by the user
   (
-   "perl",              # most converters will support active contents;
+   # most converters will support active content;
+   "perl",
+
+   # add formats specified by the user
+   exists $me->{options}{acceptedFormat} ? @{$me->{options}{acceptedFormat}} : (),
   );
  }
 
@@ -687,6 +703,14 @@ sub help
   {
    # supply the options part
    OPTIONS => {
+               acceptedFormat    => <<EOO,
+
+Configures the converter to accept the specified format for embedded or included files.
+
+This option can be specified multiply.
+
+EOO
+
                activeContents    => <<EOO,
 
 For reasons of security, Active Contents (conditions, embedded Perl, paragraph filters,
@@ -1044,6 +1068,16 @@ An explicitly configured presentation date string.
  Example: -docdate '01.02.04'
 
 EOO
+
+               version           => <<EOO,
+
+displays version informations and terminates the program. Versions are collected dynamically,
+depending on the chosen generator (option C<target>), formatter and template engine. So for
+a complete help, try to set all of the following as in a "real" call: C<-target>, C<-formatter>,
+C<-styledir>, C<-style>.
+
+EOO
+
               },
 
    # supply synopsis part
@@ -1123,7 +1157,7 @@ sub checkUsage
     }
 
   # check mandatory options, if necessary
-  unless (exists $me->{options}{help})
+  unless (exists $me->{options}{help} or exists $me->{options}{version})
     {
      foreach my $option (qw(doctitle prefix suffix))
        {die "[Fatal] Missing mandatory option -$option.\n" unless exists $me->{options}{$option};}
@@ -1230,7 +1264,7 @@ sub run
   confess "[BUG] Object parameter is no ", __PACKAGE__, " object.\n" unless ref $me and $me->isa(__PACKAGE__);
 
   # check sources
-  -r or die "[Fatal] Source file $_ does not exist or is unreadable.\n" foreach @ARGV;
+  (/^(?:IMPORT:)?(.+)/ and -r $1) or die "[Fatal] Source file $1 does not exist or is unreadable.\n" foreach @ARGV;
 
   # can we reload a stream?
   if (
@@ -2360,7 +2394,7 @@ as well.
 
 =head1 AUTHOR
 
-Copyright (c) Jochen Stenzel (perl@jochen-stenzel.de), 2003-2005.
+Copyright (c) Jochen Stenzel (perl@jochen-stenzel.de), 2003-2006.
 All rights reserved.
 
 This module is free software, you can redistribute it and/or modify it

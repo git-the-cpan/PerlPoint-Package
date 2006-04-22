@@ -1,4 +1,4 @@
-
+ 
 # ATTENTION:
 #
 # This is NO module and NO script, but a GRAMMAR. To build the module,
@@ -14,11 +14,15 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.43    |09.04.2006| JSTENZEL | slight code optimizations in file embedding;
+#         |          | JSTENZEL | INCLUDE now has an "import" option with module API;
+#         |          | JSTENZEL | included file type and embedded language now have
+#         |          |          | default "pp";
+#         |          | JSTENZEL | run(): new configuration parameter "importMapping";
 # 0.42    |05.03.2006| JSTENZEL | non kernel tags now can be configured to be standalone,
 #         |          |          | in which case a wrapping paragraph is removed from the
 #         |          |          | stream (IMAGE and LOCALTOC configuration moved to tag
 #         |          |          | definition);
-#         |          | JSTENZEL | likewise, if a paragraph consists of just one embedded
 #         |          |          | area, the wrapping paragraph is removed;
 #         |07.03.2006| JSTENZEL | dummy tokens inserted by the parser now are special
 #         |          |          | strings that can be filtered out by the backend module;
@@ -532,7 +536,7 @@ B<PerlPoint::Parser> - a PerlPoint Parser
 
 =head1 VERSION
 
-This manual describes version B<0.42>.
+This manual describes version B<0.43>.
 
 =head1 SYNOPSIS
 
@@ -1212,6 +1216,29 @@ Input filters are Active Content. If Active Content is disabled,
 \INCLUDE tags using input filters will be ignored I<completely>.
 
 
+As a simplified option, C<import> allows to use I<predefined>
+import filters defined in C<PerlPoint::Import::...> modules. To use
+such a filter do I<not> set the C<ifilter> option, set C<import> instead.
+C<import> takes the name of the source format, like "POD", or a true
+number to indicate that the file extension should be used as the source
+format name. The uppercased name is used as the final part of the filter
+module - for "POD", the modules name would be "PerlPoint::Import::POD".
+If this module is installed and has a function C<importFilter()> this
+function name is used like C<ifilter>.
+
+Here are a few examples:
+
+  \INCLUDE{file="source.pod" import=1}
+
+  \INCLUDE{file="source.pod" import=pod}
+  
+  \INCLUDE{file=source import=pod}
+
+Please note that in the last example C<import=1> will not work, as the
+source file has no extension that indicates its format is POD.
+
+If C<ifilter> is used together with C<import>, C<import> is ignored.
+  
 
 A PerlPoint file can be included wherever a tag is allowed, but sometimes
 it has to be arranged slightly: if you place the inclusion directive at
@@ -1508,7 +1535,7 @@ B<Example:>
  require 5.00503;
 
  # declare module version
- $PerlPoint::Parser::VERSION=0.42;
+ $PerlPoint::Parser::VERSION=0.43;
  $PerlPoint::Parser::VERSION=$PerlPoint::Parser::VERSION; # to suppress a warning of exclusive usage only;
 
  # pragmata
@@ -1707,9 +1734,14 @@ document : paragraph
                 elsif ($_[1][0][0][STREAM_DIR_TYPE]!=DIRECTIVE_COMMENT)
                  {
                   # the document starts with streamed content before the first headline,
-                  # this is considered an error
+                  # this is considered an error except when this happens due to an import
                   _semerr($_[0], "$sourceFile, line $_[1][1]: the first chapter needs a headline, please add one.") unless exists $flags{complainedAbout1stHeadline};
-                  $flags{complainedAbout1stHeadline}=1;
+
+                  # update complaint flag
+                  if (exists $flags{complainedAbout1stHeadline} and $flags{complainedAbout1stHeadline} eq 'IMPORT')
+                   {delete $flags{complainedAbout1stHeadline};}
+                  else
+                   {$flags{complainedAbout1stHeadline}=1;}
                  }
 
                # this is for the parser to flag success
@@ -1754,12 +1786,24 @@ document : paragraph
                     if     $flags{vis}
                        and not $statistics{&DIRECTIVE_HEADLINE} % $flags{vis};
                  }
-               elsif ($_[2][0][0][STREAM_DIR_TYPE]!=DIRECTIVE_COMMENT and not @{$resultStreamRef->[STREAM_HEADLINES]} and not exists $flags{complainedAbout1stHeadline})
+               elsif (
+                          $_[2][0][0][STREAM_DIR_TYPE]!=DIRECTIVE_COMMENT
+                      and not @{$resultStreamRef->[STREAM_HEADLINES]}
+                      and (
+                              not exists $flags{complainedAbout1stHeadline}
+                           or $flags{complainedAbout1stHeadline} eq 'IMPORT'
+                          )
+                     )
                  {
                   # the document starts with streamed content before the first headline,
-                  # this is considered an error
-                  _semerr($_[0], "$sourceFile, line $_[2][1]: the first chapter needs a headline, please add one.");
-                  $flags{complainedAbout1stHeadline}=1;
+                  # this is considered an error except when this happens due to an import
+                  _semerr($_[0], "$sourceFile, line $_[2][1]: the first chapter needs a headline, please add one.") unless exists $flags{complainedAbout1stHeadline};
+
+                  # update complaint flag
+                  if (exists $flags{complainedAbout1stHeadline} and $flags{complainedAbout1stHeadline} eq 'IMPORT')
+                   {delete $flags{complainedAbout1stHeadline};}
+                  else
+                   {$flags{complainedAbout1stHeadline}=1;}
                  }
 
                # this is for the parser to flag success
@@ -3581,9 +3625,9 @@ embedded : Embed
              # trace, if necessary
              warn "[Trace] $sourceFile, line $_[1][1]: Embedding starts.\n" if $flags{trace} & TRACE_PARAGRAPHS;
 
-	     # Disable storage of a checksum. (Dynamic parts may change or have changed.
+             # Disable storage of a checksum. (Dynamic parts may change or have changed.
              # Static parts are static of course, but the filter settings may vary.)
-	     $flags{checksummed}=0;
+             $flags{checksummed}=0;
 
              # temporarily activate specials "{" and "}"
              push(@specialStack, @specials{('{', '}')});
@@ -3599,10 +3643,6 @@ embedded : Embed
 
              # restore special state of "{" and "}"
              @specials{('{', '}')}=splice(@specialStack, -2, 2);
-
-             # check parameters: language should be set at least
-             my %tagpars=@{$_[3][0]};
-             _semerr($_[0], "$sourceFile, line $_[3][1]: You forgot to specify the language of embedded text.") unless exists $tagpars{lang};
             }
            optional_literals_and_empty_lines Embedded
             {
@@ -3618,6 +3658,9 @@ embedded : Embed
                 %pars=@{$_[3][0]}
                }
 
+             # set default language, if necessary
+             $pars{lang}='pp' unless exists $pars{lang};
+
              # Tag condition set?
              if (exists $pars{_cnd_})
               {
@@ -3632,14 +3675,23 @@ embedded : Embed
                 }
               }
 
+             # did the user exclude files of the language the embedded source is written in?
+             my $langExcluded=not (
+                                      not $flags{filter}                        # no general language filter is defined, so all languages are allowed, or 
+                                   or lc($pars{lang}) eq 'pp'                   # this is a PerlPoint file, or
+                                   or (
+                                           exists $pars{lang}                   # there is a general language filter,
+                                       and $pars{lang}=~/^$flags{filter}$/i     # and it allows to include files of this language
+                                      )
+                                  );
+
+             # set import filter as necessary
+             my $filterSet=_setImportFilter($_[0], \%pars);
+
              # Input filter to call?
-             if (    exists $pars{ifilter}
-                 and (   not $flags{filter}
-                      or lc($pars{lang}) eq 'pp'
-                      or (    exists $pars{lang}
-                          and $pars{lang}=~/^$flags{filter}$/i
-                         )
-                     )
+             if (    
+                     not $langExcluded       # files in the language of the embedded one are not excluded in general
+                 and exists $pars{ifilter}   # and there is an import filter
                 )
                {
                 # Can we invoke the filter code?
@@ -3690,14 +3742,10 @@ embedded : Embed
                }
 
              # check if we have to stream this code
-             unless (   not $flags{filter}
-                     or lc($pars{lang}) eq 'pp'
-                     or (    exists $pars{lang}
-                         and $pars{lang}=~/^$flags{filter}$/i
-                        )
-                    )
+             if (not defined($filterSet) or $langExcluded)
                {
-                # caller wants to skip the embedded code: we have to supply something, but it should be nothing
+                # filter error occured, or the caller wants to skip the embedded code:
+                # we have to supply something, but it should be nothing
                 [[()], $_[6][1]];
                }
              elsif (lc($pars{lang}) eq 'pp')
@@ -3802,8 +3850,10 @@ included : Include
 
              # check parameters: type and filename should be set at least
              my %tagpars=@{$_[3][0]};
-             $errors++, _semerr($_[0], "$sourceFile, line $_[3][1]: You forgot to specify the type of your included file.") unless exists $tagpars{type};
              $errors++, _semerr($_[0], "$sourceFile, line $_[3][1]: You forgot to specify the name of your included file.") unless exists $tagpars{file};
+
+             # set default type, if necessary
+             $tagpars{type}='pp' unless exists $tagpars{type};
 
              # Tag condition set?
              if (exists $tagpars{_cnd_})
@@ -3863,15 +3913,32 @@ included : Include
                    # background which happens with input filters)
                    my $orgname=$tagpars{file};
 
-                   # Input filter to call?
-                   if (    exists $tagpars{ifilter}
-                       and (   not $flags{filter}
-                            or lc($tagpars{type}) eq 'pp'
-                            or (    exists $tagpars{type}
-                                and $tagpars{type}=~/^$flags{filter}$/i
-                               )
-                           )
-                      )
+                   # did the user exclude files of the language the embedded source is written in?
+                   my $typeExcluded=not (
+                                            not $flags{filter}                           # no general language filter is defined, so all languages are allowed, or 
+                                         or lc($tagpars{type}) eq 'pp'                   # this is a PerlPoint file, or
+                                         or (
+                                                 exists $tagpars{type}                   # there is a general language filter,
+                                             and $tagpars{type}=~/^$flags{filter}$/i     # and it allows to include files of this language
+                                            )
+                                        );
+
+                   # try to set a set default import filter, if necessary
+                   if (exists $tagpars{import} and $tagpars{import} and $tagpars{import}!~/\D/)
+                    {
+                     # import format not set explicitly, scan file name for extension
+                     $tagpars{file}=~/\.(\w+)$/;
+                     $tagpars{import}=$1;
+
+                     # success?
+                     delete $tagpars{import}, _semerr($_[0], qq($sourceFile, line $_[3][1]: could not determine import filter via file extension.)) unless $1;
+                    }
+
+                   # arrange import as necessary
+                   my $filterSet=_setImportFilter($_[0], \%tagpars);
+
+                   # Import filter to call?
+                   if (not $typeExcluded and exists $tagpars{ifilter})
                      {
                       # Can we invoke the filter code?
                       unless ($safeObject)
@@ -3915,6 +3982,7 @@ included : Include
                          # run the filter in the files directory and catch what it supplies
                          my $startDir=cwd();
                          chdir(dirname($orgname));
+
                          my @ifiltered=ref($safeObject) ? $safeObject->reval($tagpars{ifilter}) : eval(join(' ', '{package main; no strict;', $tagpars{ifilter}, '}'));
                          chdir($startDir);
 
@@ -3937,14 +4005,20 @@ included : Include
                         }
                      }
 
+                   # check for errors
+                   if (not defined $filterSet)
+                     {
+                      # we have to supply something - but it should be nothing
+                      [[()], $_[3][1]];
+                     }
                    # check specified file type
-                   if ($tagpars{type}=~/^pp$/i)
+                   elsif ($tagpars{type}=~/^pp$/i)
                      {
                       # update nesting stack
                       push(@nestedSourcefiles, $orgname);
 
-		      # update source file nesting level hint
-		      _predeclareVariables({_SOURCE_LEVEL=>scalar(@nestedSourcefiles)});
+                      # update source file nesting level hint
+                      _predeclareVariables({_SOURCE_LEVEL=>scalar(@nestedSourcefiles)});
 
                       # build a hash of variables to "localize"
                       my ($localizedVars, $localizeAll)=({}, 0);
@@ -5548,6 +5622,14 @@ itself, of course. See C<pp2sdf> for a reference implementation.)
 
 a reference to an array of files to be scanned.
 
+Files are treated as PerlPoint sources except when their name has the
+prefix C<IMPORT:>, as in C<IMPORT:podsource.pod>. With this prefix, the
+parser tries to automatically tranform the source into PerlPoint,
+using a standard import filter for the format indicated by the file
+extension (C<pod> in our example). The filter must be installed as
+C<PerlPoint::Import::E<lt>uppercased format nameE<gt>>, e.g.
+C<PerlPoint::Import::POD>.
+
 =item filter
 
 a regular expression describing the target language. This setting, if used,
@@ -5923,7 +6005,7 @@ sub run
 # complete compartment code
 EOC
 
-     ref($safeObject) ? $safeObject->reval($code) : eval(join(' ', '{package main; no strict;', $code, '}'));
+     ref($safeObject) ? $safeObject->reval($code) : eval(join(' ', '{package main; undef &flagSet; undef &varValue; no strict;', $code, '}'));
     }
 
   # predeclare variables
@@ -5947,6 +6029,7 @@ EOC
 
   # init more
   @flags{qw(skipInput headlineLevelOffset headlineLevel olist virtualParagraphStart)}=(0) x 5;
+  delete $flags{ifilters};
   $statistics{cache}[1]=0 if $flags{cache} & CACHE_ON;
 
   # init even more
@@ -6010,8 +6093,27 @@ EOC
   # scan all input files
   foreach my $file (@{$pars{files}})
     {
+     # scopies
+     my $specifiedFile=$file;
+
+     # scan for an import directive
+     if ($file=~/^IMPORT:(.+)/)
+      {
+       # replace the original file by a temporary one ...
+       my ($tmpHandle, $tmpFilename)=tempfile(UNLINK => ($flags{trace} & TRACE_TMPFILES ? 0 : 1));
+       $file=$tmpFilename;
+
+       # which imports the real file
+       my $realfile=abs_path($specifiedFile=$1);
+       print $tmpHandle qq(\n\n\\INCLUDE{import=1 file="$realfile"}\n\n);
+       close($tmpHandle);
+
+       # due to the extra level chances are we have to to accept a first paragraph that is not a headline
+       $flags{complainedAbout1stHeadline}='IMPORT' unless exists $flags{complainedAbout1stHeadline} and $flags{complainedAbout1stHeadline} eq '1';
+      }
+
      # inform user
-     warn "[Info] Processing $file ...\n" unless $flags{display} & DISPLAY_NOINFO;
+     warn "[Info] Processing $specifiedFile ...\n" unless $flags{display} & DISPLAY_NOINFO;
 
      # init input stack
      @inputStack=([]);
@@ -6040,8 +6142,8 @@ EOC
      my $cachefile=sprintf(".%s.ppcache", basename($file));
      if (($flags{cache} & CACHE_CLEANUP) and -e $cachefile)
        {
-	warn "       Resetting paragraph cache for $file.\n" unless $flags{display} & DISPLAY_NOINFO;
-	unlink($cachefile);
+        warn "       Resetting paragraph cache for $specifiedFile.\n" unless $flags{display} & DISPLAY_NOINFO;
+        unlink($cachefile);
        }
      if (($flags{cache} & CACHE_ON) and -e $cachefile)
        {
@@ -6060,7 +6162,7 @@ EOC
                 and $checksums->{sha1_base64('Storable')}==$Storable::VERSION
                )
           {
-           warn "       Paragraph cache for $file is rebuilt because of an old format.\n" unless $flags{display} & DISPLAY_NOINFO;
+           warn "       Paragraph cache for $specifiedFile is rebuilt because of an old format.\n" unless $flags{display} & DISPLAY_NOINFO;
            unlink($cachefile);
            $checksums={};
           }
@@ -6093,7 +6195,7 @@ EOC
      $rc=($rc and $me->YYParse(yylex=>\&_lexer, yyerror=>\&_Error, yydebug => ($flags{trace} & TRACE_PARSER) ? 0x1F : 0x00));
 
      # stop time, if necessary
-     warn "\n       $file was parsed in ", time-$flags{started}, " seconds.\n" unless $flags{display} & DISPLAY_NOINFO;
+     warn "\n       $specifiedFile was parsed in ", time-$flags{started}, " seconds.\n" unless $flags{display} & DISPLAY_NOINFO;
 
      # store a document completion directive (done here to save memory)
      push(@{$resultStreamRef->[STREAM_TOKENS]}, [\%docHints, DIRECTIVE_DOCUMENT, DIRECTIVE_COMPLETE, basename($file)]);
@@ -6526,11 +6628,78 @@ sub _updateTagFinishMem
  }
 
 
+
+# set import filter, if necessary (by setting an import function - a user function is *not* overwritten!)
+sub _setImportFilter
+ {
+  # get and check parameters
+  my ($parser, $optionHash)=@_;
+  confess "[BUG] Missing parser parameter.\n" unless $parser;
+  confess "[BUG] Missing option hash parameter.\n" unless defined $optionHash;
+  confess "[BUG] Option hash parameter is no hash reference.\n" unless ref($optionHash) eq 'HASH';
+
+  # anything to do?
+  if (
+          not exists $optionHash->{ifilter}                                # there is no functional import filter set yet
+      and exists $optionHash->{import}                                     # but there is a type specific import filter set yet
+      and not (                                                            # and there is not ...
+                   exists $flags{ifilters}{lc($optionHash->{import})}      # ... a general import filter known yet
+               and not defined $flags{ifilters}{lc($optionHash->{import})} # ... which flags that there is no such filter
+              )
+      )
+   {
+    # parser options allow to use input filters of other languages, if this is the case we find that the
+    # value of the general import filter is a special string which holds the name of that language
+    my $filterLang=lc(
+                      (
+                           exists $flags{ifilters}{lc($optionHash->{import})}
+                       and $flags{ifilters}{lc($optionHash->{import})}=~/^MAP:\s*(\w+)$/
+                      ) ? $flags{ifilters}{lc($1)} : $optionHash->{import}
+                     );
+
+    # first time we need this import filter?
+    unless (exists $flags{ifilters}{$filterLang})
+     {
+      # so, there is a chance to find such a filter via general modules, search for such a module
+      eval
+       {
+        # no strict subs
+        no strict;
+
+        # build module name
+        my $moduleName=join('::', 'PerlPoint::Import', uc($filterLang));
+
+        # try to load the module
+        my $evalCode="require $moduleName;";
+        ref($safeObject) ? $safeObject->reval($evalCode) : eval $evalCode;
+        die $@ if $@;
+
+        # check for the import function specified by the API, store the code reference to the function
+        # found or the undefined value otherwise, which will avoid repeated searches (store it both
+        # for the filter language and the file language, which might differ due to filter mapping)
+        $evalCode="exists \$${moduleName}::{importFilter}";
+        $flags{ifilters}{lc($optionHash->{import})}=$flags{ifilters}{$filterLang}=join('::', $moduleName, 'importFilter()') if ref($safeObject) ? $safeObject->reval($evalCode) : eval $evalCode;
+       };
+
+      # check success
+      $parser->_semerr("Could not load $optionHash->{import} import filter module: $@."), return undef if $@;
+     }
+
+    # now, set a functional filter, if possible
+    $optionHash->{ifilter}=$flags{ifilters}{$filterLang}
+      if exists $flags{ifilters}{$filterLang} and defined $flags{ifilters}{$filterLang};
+   }
+
+  # flag success
+  1;
+ }
+
 # perform paragraph filter calls
 sub _pfilterCall
  {
   # get and check parameters
   my ($parser, $filters, $pstream, $lineNr)=@_;
+  confess "[BUG] Missing parser parameter.\n" unless $parser;
   confess "[BUG] Missing filter list.\n" unless $filters;
   confess "[BUG] Filter list is no array reference.\n" unless ref($filters) eq 'ARRAY';
   confess "[BUG] Missing paragraph stream.\n" unless $pstream;

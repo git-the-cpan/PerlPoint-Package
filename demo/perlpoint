@@ -11,6 +11,8 @@ no warnings;
 # ---------------------------------------------------------------------------------------
 # version | date   | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.03    |22.04.06| JSTENZEL | new option -version;
+#         |        | JSTENZEL | added missing doc for -help;
 # 0.02    |23.01.06| JSTENZEL | option files now read from the current directory as well;
 # 0.01    |23.05.03| JSTENZEL | derived from pp2sdf 0.11.
 # ---------------------------------------------------------------------------------------
@@ -23,7 +25,7 @@ B<perlpoint> - a very general PerlPoint converter, using the generator interface
 
 =head1 VERSION
 
-This manual describes version B<0.02>.
+This manual describes version B<0.03>.
 
 =head1 DESCRIPTION
 
@@ -52,6 +54,12 @@ C<perlpoint> with C<-help> and the appropriate C<-target>, C<-formatter> and
 C<-template> options, the help displayed will be adapted to this call.
 
 =over 4
+
+=item -help
+
+displays a help and terminates. I<The help adapts itself to further options>, so
+for best results it is recommended to enter all options that are intended to
+used, and to add C<-help> additionally.
 
 =item -target <format>
 
@@ -94,6 +102,11 @@ The directory to be searched for styles. Defaults to the start directory.
 =item -style
 
 The layout to be used. A layout defines the result format.
+
+=item -version
+
+displays the current program version and the versions of generator, formatter and template
+modules that are loaded according to the remaining options.
 
 =back
 
@@ -141,7 +154,7 @@ PerlPoint::Generator
 
 =head1 AUTHOR
 
-Copyright (c) Jochen Stenzel (perl@jochen-stenzel.de), 2003-2005. All rights reserved.
+Copyright (c) Jochen Stenzel (perl@jochen-stenzel.de), 2003-2006. All rights reserved.
 
 This script is free software, you can redistribute it and/or modify it
 under the terms of the Artistic License distributed with Perl version
@@ -184,8 +197,8 @@ distribution for more details.
 package PerlPoint::Converter::perlpoint;
 
 # declare version and author
-$VERSION=$VERSION=0.02;
-$AUTHOR=$AUTHOR='J. Stenzel (perl@jochen-stenzel.de), 2003-2005';
+$VERSION=$VERSION=0.03;
+$AUTHOR=$AUTHOR='J. Stenzel (perl@jochen-stenzel.de), 2003-2006';
 
 # pragmata
 use strict;
@@ -206,6 +219,7 @@ GetOptions(
                       "style=s",                      # style name;
                       "styledir|style_dir=s@",        # style directories;
                       "target=s",                     # target language;
+                      "version",                      # report version;
           ); 
 
 # build and run the generator

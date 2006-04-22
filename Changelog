@@ -4,9 +4,76 @@
 
 +CX:\C<\X<__body__>>
 
++ILLT:\LOCALTOC{type=linked depth=1}
+	
 // -- end of "preface"
 
 
+=0.43
+
+\ILLT
+
+==Features
+
+\ILLT
+
+===Import filter API for the INCLUDE and EMBED tags
+
+PerlPoint supports import filters for other formats since package version
+0.38, via tag option \C<ifilter>:
+
+  \\INCLUDE{type=pp ifilter='pod2pp' file="file.pod"}
+
+Nevertheless, this could be simplified. With the new option C<import>
+this can be written as
+
+  \\INCLUDE{type=pp import=pod file="file.pod"}
+
+, given a module \C<PerlPoint::Import::POD> is installed (note: see the
+\C<Pod::PerlPoint> distribution for this module). The import
+module API is new and requires the module to define a function \C<importFilter()>,
+with the same interface as functions for \C<ifilter>. In fact,
+\C<import=pod> is a shortcut for \C<ifilter="PerlPoint::Import::POD">.
+
+With \C<\\INCLUDE>, the import option can use the \I<source file extension> as the
+source format. This is enforced by using a true numeric value for this option,
+instead of a string:
+
+  \\INCLUDE{type=pp import=1 file="file.pod"}
+
+When both \C<import> and \C<ifilter> are used together \C<import> is ignored.
+
+===Automatic import of entire files
+	
+The new standard import filter API is used to allow automatic import of source
+files in other formats. Import is requested by the special prefix \C<IMPORT:>,
+like in
+
+  > perlpoint ... \B<IMPORT:>source.pod
+
+With the prefix, PerlPoint treats the file extension (\C<pod>) as the name
+of the source format, searches for the related import module (\C<PerlPoint::Import::\B<POD>>,
+again the format is all uppercased in the module name by convention) and
+invokes it automatically.
+
+This feature applies to all existing converters automatically.
+
+	
+===Misc
+
+* new option \BC<-version> for \C<perlpoint> and \C<PerlPoint::Generator>,
+  thanks to Achim Grolms for the suggestion;
+	
+* the default file type for C<\\INCLUDE> and the default language for
+  \C<\\EMBED> are \C<pp> now;
+	
+* all generator based converters now accept the new option \C<-acceptedFormat>,
+  which specifies languages to be accepted in included files or embedded
+  snippets (with \C<\\INCLUDE> or \C<\\EMBED>);
+
+* parser: slight code optimizations;
+
+	
 =0.42
 
 The main intention of this update is to allow the production of better
@@ -15,7 +82,8 @@ improvements were made.
 
 There should be no incompatibility with 0.41.
 
-
+\ILLT
+	
 ==Features
 
 * Tag authors can declare their tags as standalone now. If the parser

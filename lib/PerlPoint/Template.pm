@@ -222,9 +222,7 @@ sub help
               },
 
    # supply synopsis part
-   SYNOPSIS => <<EOS,
-
-=head2 Templates
+   SYNOPSIS => join("\n\n", "\n\n=head2 Templates", <<EOS), # complicated to pass PAR (pp)
 
 Templates allow to specify common page (part) patterns, specialized for certain pages via
 keywords or functions. Various templating systems are around, and it is basically possible

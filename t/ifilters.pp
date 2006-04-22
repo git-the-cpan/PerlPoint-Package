@@ -35,7 +35,7 @@ Now the included file:
 
 And now, we embed something in this language. \EMBED{lang=pp ifilter=lang2pp}Oops!
 
-Another lang(uage) source!
+Another lang(usage) source!
 
 - lang is simple
 
