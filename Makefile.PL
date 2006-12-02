@@ -11,7 +11,7 @@ use ExtUtils::MakeMaker;
 # the package requires modern perl
 require 5.00503;
 
-my $version='0.43';
+my $version='0.44';
 
 # write makefile
 $ok=WriteMakefile(

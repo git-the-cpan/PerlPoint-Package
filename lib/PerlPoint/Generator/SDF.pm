@@ -5,6 +5,7 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.02    |30.04.2006| JSTENZEL | added INDEXCLOUD support;
 # 0.01    |23.05.2003| JSTENZEL | new.
 # ---------------------------------------------------------------------------------------
 
@@ -16,7 +17,7 @@ B<PerlPoint::Generator::SDF> - generic SDF generator
 
 =head1 VERSION
 
-This manual describes version B<0.01>.
+This manual describes version B<0.02>.
 
 =head1 SYNOPSIS
 
@@ -41,7 +42,7 @@ require 5.00503;
 package PerlPoint::Generator::SDF;
 
 # declare package version
-$VERSION=0.01;
+$VERSION=0.02;
 $AUTHOR=$AUTHOR='J. Stenzel (perl@jochen-stenzel.de), 2003';
 
 
@@ -306,6 +307,7 @@ sub formatText
   # Otherwise guard all non special text paragraphs by backslashes to avoid SDF
   # misinterpretation.
   return '' unless @{$item->{parts}} and grep(defined, @{$item->{parts}});
+
   join('',
        exists $me->{flags}{align} ? qq(N[align="$me->{flags}{align}"]\n) : (defined $item->{parts}[0] and $item->{parts}[0]!~/^(Note|Sign)$/ and $item->{parts}[0]!~/^\{\{/) ? '\\' : '',
        @{$item->{parts}},
@@ -470,6 +472,18 @@ sub formatTag
         # complete the paragraph
         $result.="\n\n";
        }
+    }
+  elsif ($item->{cfg}{data}{name} eq 'INDEXCLOUD')
+    {
+     # scopies
+     my (%index);
+
+     # index: get quick list data structure
+     my $entries=$item->{cfg}{data}{options}{__entries};
+
+     # sort entries by occurence, then by entry, present results as a sorted list
+     my $c=0;
+     $result.=join("\n", map {join(' ', ++$c==1 ? '^' : '+', "$_ ($entries->{$_})")} sort {$entries->{$b} <=> $entries->{$a} || $b cmp $a} keys %$entries);
     }
   elsif ($item->{cfg}{data}{name} eq 'INDEXRELATIONS')
     {

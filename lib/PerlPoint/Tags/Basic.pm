@@ -5,6 +5,7 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.07    |25.04.2006| JSTENZEL | added INDEXCLOUD;
 # 0.06    |05.03.2006| JSTENZEL | FORMAT, HIDE, INDEX, INDEXRELATIONS, LOCALTOC and READY
 #         |          |          | got a "standalone" configuration flag;
 #         |10.03.2006| JSTENZEL | IMAGE now adds an "alt" option ("Image") as default;
@@ -43,7 +44,7 @@ B<PerlPoint::Tags::Basic> - declares basic PerlPoint tags
 
 =head1 VERSION
 
-This manual describes version B<0.06>.
+This manual describes version B<0.07>.
 
 =head1 SYNOPSIS
 
@@ -166,6 +167,127 @@ is up to the converters.
 
 If used as the only contents of a text paragraph the paragraph wrapper
 will be removed from the stream and the tag is streamed standalone.
+
+
+=head2 INDEXCLOUD
+
+Generates a "cloud" of the index entries. The term is inspired by the "tag clouds"
+which became popular in the Internet, but the final formatting might be different,
+as it is up to the converters. Not all target formats might have features to
+present a cloud, but finally one should get a kind of a ranking that shows which
+index entries were used frequently.
+
+If used as the only contents of a text paragraph the paragraph wrapper
+will be removed from the stream and the tag is streamed standalone.
+
+This tag can be configured by options. All options are optional, except where stated.
+
+=over
+
+=item chapterdelimiter
+
+A supplementary option to C<chapters>. Defines the delimiter string used to separate
+multiple chapter names in the C<chapters> value.
+
+Without this parameter the value of C<chapters> is treated as I<one> chapter title.
+
+This option has no effect if C<chapters> is not used.
+
+Example:
+
+  chapterdelimiter="==" chapters="One Chapter==Another Chapter"
+
+
+=item chapters
+
+This mandatory parameter specifies the chapters of which index entries should be
+taken into account, including all their subchapters. A chapter is specified by
+its title, as with C<\REF>. To list more than one chapter, delimit the titles
+by a string that is not contained in them, and declare this delimiter string with
+the C<chapterdelimiter> option.
+
+Example:
+
+  chapterdelimiter="==" chapters="One Chapter==Another Chapter"
+
+
+=item coolestColor
+
+The color that should be used for index entries that have the least references.
+The color is specified the HTML way, hexadecimal with a C<#> prefix.
+
+As colorization strongly depends on the target format, converters I<can> ignore
+this setting.
+
+This parameter is optional. The default value is subject of converter definitions.
+
+Example:
+
+  coolestColor="#ff3c5d"
+
+
+=item hottestColor
+
+This is the color that should be used for index entries that are referenced most.
+It is specified as a hexadecimal RGB value, preceded by C<#> (as in HTML).
+
+As colorization strongly depends on the target format, converters I<can> ignore
+this setting.
+
+This parameter is optional. The default value is subject of converter definitions.
+
+Example:
+
+  hottestColor="#ff3c5d"
+
+
+=item intro
+
+An optional text to be displayed before the cloud. If there are no index entries
+found in the chapters specified, this text will I<not> be displayed.
+
+This parameter is optional.
+
+Example:
+
+  intro="Index entries in this chapter:"
+
+
+=item largestFont
+
+An optional parameter configuring the font size for index entries referenced most,
+in pixels. The default size is up the converters.
+
+Depending on their capabilities converters might ignore this setting.
+
+Example:
+
+  largestFont=40
+
+
+=item smallestFont
+
+This option specifies the minimal font size to be used in the cloud. The default
+value is up to the converters.
+
+Depending on their capabilities converters might ignore this setting.
+
+Example:
+
+  smallestFont=10
+
+
+=item top
+
+Limits the number of index entries visualized by the cloud to the specified
+number of top rated entries.
+
+Example:
+
+  top=20
+
+
+=back
 
 
 =head2 INDEXRELATIONS
@@ -574,7 +696,7 @@ require 5.00503;
 package PerlPoint::Tags::Basic;
 
 # declare package version
-$VERSION=0.06;
+$VERSION=0.07;
 
 # declare base "class"
 use base qw(PerlPoint::Tags);
@@ -706,6 +828,38 @@ my (%seq, %index);
                               PARSING_OK;
                              },
                 },
+
+
+       # index cloud - the implementation here is very similar to INDEX
+       INDEXCLOUD => {
+                      # no body, currently no options
+                      body    => TAGS_DISABLED,
+                      options => TAGS_OPTIONAL,
+
+                      # can be used as a standalone tag
+                      standalone => 1,
+
+                      # activate the finish hook
+                      hook    => sub {PARSING_OK;},
+
+                      # finish hook - provide index data
+                      finish  => sub
+                                  {
+                                   # take parameters
+                                   my ($options, $anchors)=@_;
+
+                                   # preformat an index
+                                   foreach my $entry (sort keys %{$index{anchors}})
+                                    {
+                                     my $group=uc(substr($entry, 0, 1));
+                                     $group='_' if $group=~/[\W\d]/;
+                                     push(@{$options->{__anchors}{$group}}, [$entry, $index{anchors}{$entry}]);
+                                    }
+
+                                   # flag success
+                                   PARSING_OK;
+                                  },
+                     },
 
 
        # index crossref (related chapters according to matching index entries)

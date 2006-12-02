@@ -5,6 +5,7 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.04    |25.04.2006| JSTENZEL | added INDEXCLOUD support;
 # 0.03    |09.04.2006| JSTENZEL | new option -acceptedFormat;
 #         |          | JSTENZEL | file test adapted to new IMPORT: directive;
 #         |22.04.2006| JSTENZEL | new option -version;
@@ -24,7 +25,7 @@ B<PerlPoint::Generator> - generic PerlPoint generator
 
 =head1 VERSION
 
-This manual describes version B<0.03>.
+This manual describes version B<0.04>.
 
 =head1 SYNOPSIS
 
@@ -49,7 +50,7 @@ require 5.00503;
 package PerlPoint::Generator;
 
 # declare package version and author
-$VERSION=0.03;
+$VERSION=0.04;
 $AUTHOR=$AUTHOR='J. Stenzel (perl@jochen-stenzel.de), 2003-2006';
 
 
@@ -1943,6 +1944,74 @@ sub handleTag
            copy($settings->{src}, $me->{options}{imagedir});
           }
        }
+
+     # special operations: filter index cloud entries by chapters, if necessary
+     if ($tag eq 'INDEXCLOUD')
+      {
+       # scopies
+       my (%chapters, %entries);
+
+       # chapters selected?
+       if (exists $settings->{chapters})
+        {
+         # this might be a list, which is indicated by a separator
+         # - store all chapter names
+         foreach my $chapter (exists $settings->{chapterDelimiter} ? split($settings->{chapterDelimiter}, $settings->{chapters}) : $settings->{chapters})
+          {
+           # find the chapter *number* belonging to this title
+           my @data=$me->getChapterByPath($chapter);
+
+           # anything found?
+           next unless $data[0][0];
+
+           # if there are multiple results, take them all and store their page numbers!
+           @chapters{map {$_->[0]} @data}=();
+
+           # now we need to find out all their subchapters, to complete the list of
+           # chapter numbers that are qualified for this cloud
+           foreach my $chapter (keys %chapters)
+            {@chapters{map {$chapter+$_} 1 .. @{$me->{backend}->toc($chapter)}}=();}
+          }
+        }
+       else
+        {
+         # process *all* chapters (or index entries, respectively)
+         @chapters{1 .. $me->{backend}->headlineNr}=();
+        }
+
+       # finally, delete all index entries that were not found on the specified pages
+       foreach my $groupname (keys %{$settings->{__anchors}})
+        {
+         # in this group, handle all entries
+         my $group=$settings->{__anchors}{$groupname};
+         foreach my $entry (@$group)
+          {
+           # for this entry, handle all occurences (we need the complicated loop as the
+           # data structure has a special design, every second entry is a scalar that
+           # belongs to its predecessor), count usage
+           my @buffer;
+           for (my $i=0; $i<$#{$entry->[1]}; $i+=2)
+            {push(@buffer, @{$entry->[1]}[$i, $i+1]), $entries{$entry->[0]}++ if exists $chapters{$entry->[1][$i][1]}}
+           splice(@$entry, 1, 1, @buffer ? \@buffer : ());
+          }
+
+         # delete all entries that became empty
+         @$group=grep {@$_>1} @$group;
+
+         # and delete this group if it is empty now
+         delete $settings->{__anchors}{$groupname} unless @$group;
+        }
+
+       # if there is a limit to the x top rated entries, we can decrease the index hash to these records
+       if (exists $settings->{top})
+        {
+         my @entries=map {[$_ => $entries{$_}]} sort {$entries{$b} cmp $entries{$a}} keys %entries;
+         %entries=map {(@$_)} splice(@entries, 0, $settings->{top});
+        }
+
+       # prepare a mini ranking for quick use: provide the entries and their usage counts
+       $settings->{__entries}=\%entries;
+      }
 
      # stack a new tag object
      $me->stackObject(

@@ -5,6 +5,10 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.02    |30.04.2006| JSTENZEL | bugfixes: module was not adapted to some stream format
+#         |          |          | changes and extensions (page parts after headline
+#         |          |          | wrapped into array, initial main stream entry point
+#         |          |          | marked as well);
 # 0.01    |23.05.2003| JSTENZEL | new.
 # ---------------------------------------------------------------------------------------
 
@@ -16,7 +20,7 @@ B<PerlPoint::Generator::SDF::Default> - default, traditional SDF generator class
 
 =head1 VERSION
 
-This manual describes version B<0.01>.
+This manual describes version B<0.02>.
 
 =head1 SYNOPSIS
 
@@ -41,8 +45,8 @@ require 5.00503;
 package PerlPoint::Generator::SDF::Default;
 
 # declare package version
-$VERSION=0.01;
-$AUTHOR='J. Stenzel (perl@jochen-stenzel.de), 2003';
+$VERSION=0.02;
+$AUTHOR='J. Stenzel (perl@jochen-stenzel.de), 2003-2006';
 
 
 
@@ -199,18 +203,43 @@ sub initBackend
 
 
 # docstream entry formatter
-sub formatDStreamEntrypoint
+{
+ # define a call counter
+ my $dstreamCounter;
+
+ sub formatDStreamEntrypoint
+  {
+   # get and check parameters
+   ((my __PACKAGE__ $me), my ($page, $item))=@_;
+   confess "[BUG] Missing object parameter.\n" unless $me;
+   confess "[BUG] Object parameter is no ", __PACKAGE__, " object.\n" unless ref $me and $me->isa(__PACKAGE__);
+   confess "[BUG] Missing page data parameter.\n" unless $page;
+   confess "[BUG] Missing item parameter.\n" unless $item;
+
+   # provide this part in a simple structure (avoid to use a hash reference),
+   # but skip the stream name if this is the first stream (initial entry point
+   # of the default main stream)
+   [$dstreamCounter++ ? $item->{cfg}{data}{name} : (), join('', @{$item->{parts}})];
+  }
+
+
+# we have an own headline formatter to reset the docstream counter
+sub formatHeadline
  {
   # get and check parameters
-  ((my __PACKAGE__ $me), my ($page, $item))=@_;
+  my ($me, $page, $item)=@_;
   confess "[BUG] Missing object parameter.\n" unless $me;
   confess "[BUG] Object parameter is no ", __PACKAGE__, " object.\n" unless ref $me and $me->isa(__PACKAGE__);
   confess "[BUG] Missing page data parameter.\n" unless $page;
-  confess "[BUG] Missing item parameter.\n" unless $item;
+  confess "[BUG] Missing item parameter.\n" unless defined $item;
 
-  # provide this part in a simple structure (avoid to use a hash reference)
-  [$item->{cfg}{data}{name}, join('', @{$item->{parts}})];
+  # reset docstream counter
+  $dstreamCounter=0;
+
+  # call base method to do the real formatting
+  $me->SUPER::formatHeadline($page, $item);
  }
+}
 
 
 # docstream frame formatter
@@ -251,8 +280,8 @@ sub formatPage
   confess "[BUG] Missing page data parameter.\n" unless $page;
   confess "[BUG] Missing item parameter.\n" unless $item;
 
-  # concatenate the parts
-  my $template=join('', @{$item->{parts}});
+  # concatenate the parts (first part is the headline, further parts are wrapped into an array)
+  my $template=join('', $item->{parts}[0], @{$item->{parts}}>1 ? @{ref($item->{parts}[1]) ? $item->{parts}[1] : $item->{parts}} : ());
 
   # produce a page for every stream we know
   foreach my $stream (sort keys %{$me->{docstreamhandles}})
@@ -310,7 +339,7 @@ as well.
 
 =head1 AUTHOR
 
-Copyright (c) Jochen Stenzel (perl@jochen-stenzel.de), 2003.
+Copyright (c) Jochen Stenzel (perl@jochen-stenzel.de), 2003-2006.
 All rights reserved.
 
 This module is free software, you can redistribute it and/or modify it

@@ -1,4 +1,4 @@
- 
+
 # ATTENTION:
 #
 # This is NO module and NO script, but a GRAMMAR. To build the module,
@@ -14,6 +14,11 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.44    |15.06.2006| JSTENZEL | new type "parsedexample" for \INCLUDE;
+#         |06.08.2006| JSTENZEL | bugfix in parameter check of _evalTagCondition(): using
+#         |          |          | "if defined $par" instead of "if $par";
+#         |27.11.2006| JSTENZEL | better definition of flagSet() etc., old implementation
+#         |          |          | was buggy;
 # 0.43    |09.04.2006| JSTENZEL | slight code optimizations in file embedding;
 #         |          | JSTENZEL | INCLUDE now has an "import" option with module API;
 #         |          | JSTENZEL | included file type and embedded language now have
@@ -90,7 +95,7 @@
 #         |07.03.2003| JSTENZEL | several variable patterns were used explicitly instead
 #         |          |          | if the precompiled ones from %lexerPatterns;
 #         |          | JSTENZEL | bugfix: guarded variables were expanded;
-#         |          | JSTENZEL | now it is documented that list indentation is reset  
+#         |          | JSTENZEL | now it is documented that list indentation is reset
 #         |          |          | automatically by a subsequent non list paragraph;
 #         |26.04.2003| JSTENZEL | added "no utf8" to avoid errors under perl 5.8;
 #         |01.05.2003| JSTENZEL | adding *all* composite anchors for headlines, not only
@@ -246,7 +251,7 @@
 #         |25.03.2001| JSTENZEL | special character activation in tags is now nearer to the
 #         |          |          | related grammatical constructs, so "<" is no longer a
 #         |          |          | special after the tag body is opened;
-#         |          | JSTENZEL | completed tag template interface by checks of mandatory 
+#         |          | JSTENZEL | completed tag template interface by checks of mandatory
 #         |          |          | parts and hooks into the parser to check options and body;
 #         |01.04.2001| JSTENZEL | paragraphs using macros or variables are cached now -
 #         |          |          | they can be reused unless macro/variable settings change;
@@ -536,7 +541,7 @@ B<PerlPoint::Parser> - a PerlPoint Parser
 
 =head1 VERSION
 
-This manual describes version B<0.43>.
+This manual describes version B<0.44>.
 
 =head1 SYNOPSIS
 
@@ -1205,7 +1210,7 @@ PerlPoint authors can declare an I<input filter> to preprocess the
 included file. This is done via option I<ifilter>:
 
   \INCLUDE{type=pp file="source.pod" ifilter="pod2pp()"}
-  
+
 An input filter is a snippet of user defined Perl code, taking the
 included file via C<@main::_ifilterText> and the target type via
 C<$main::_ifilterType>. The original filename can be accessed via
@@ -1231,14 +1236,14 @@ Here are a few examples:
   \INCLUDE{file="source.pod" import=1}
 
   \INCLUDE{file="source.pod" import=pod}
-  
+
   \INCLUDE{file=source import=pod}
 
 Please note that in the last example C<import=1> will not work, as the
 source file has no extension that indicates its format is POD.
 
 If C<ifilter> is used together with C<import>, C<import> is ignored.
-  
+
 
 A PerlPoint file can be included wherever a tag is allowed, but sometimes
 it has to be arranged slightly: if you place the inclusion directive at
@@ -1270,8 +1275,9 @@ results are made part of the input stream to be parsed.
   // execute a perl script and include the results
   \INCLUDE{type=perl file="disk-usage.pl"}
 
-As another option, files may be declared to be of type "example". This makes the
-file placed into the source as a verbatim block, without need to copy its contents
+As another option, files may be declared to be of type "example" or "parsedexample".
+This makes the file placed into the source as a verbatim block (with "example"), or
+a standard block (with "parsedexample"), respectively, without need to copy its contents
 into the source.
 
   // include an external script as an example
@@ -1324,7 +1330,7 @@ PerlPoint authors can declare an I<input filter> to preprocess the
 embedded text. This is done via option I<ifilter>:
 
   \EMBED{lang=pp ifilter="pod2pp()"}
-  
+
   =head1 POD formatted part
 
   This part was written in POD.
@@ -1535,7 +1541,7 @@ B<Example:>
  require 5.00503;
 
  # declare module version
- $PerlPoint::Parser::VERSION=0.43;
+ $PerlPoint::Parser::VERSION=0.44;
  $PerlPoint::Parser::VERSION=$PerlPoint::Parser::VERSION; # to suppress a warning of exclusive usage only;
 
  # pragmata
@@ -2099,7 +2105,7 @@ optional_headline_shortcut : # this makes it optional
                            ;
 
 # condition paragraph
-condition : '?' 
+condition : '?'
               {
                # switch to condition mode
                _stateManager(STATE_CONDITION);
@@ -2949,7 +2955,7 @@ basics : basic        # default action works perfectly
 basic : element
       | table
       | table_separator
-      ;      
+      ;
 
 
 # elements
@@ -3074,7 +3080,7 @@ tag : Tag_name
             || $tagsRef->{$_[1][0]}{__flags__}{__options__};                    # tag with options;
 
         # check options in general if declared mandatory
-        if (    
+        if (
                 not @{$_[3][0]}
             and exists $tagsRef->{$_[1][0]}
             and exists $tagsRef->{$_[1][0]}{options}
@@ -3152,10 +3158,10 @@ tag : Tag_name
               {
                # semantic error?
                ++$_semerr, last if $rc==PARSING_ERROR;
- 
+
                # syntactical error?
                $_[0]->YYAbort, last if $rc==PARSING_FAILED;
- 
+
                # tag to ignore, or even everything covered?
                $ignore=$rc, last if $rc==PARSING_IGNORE or $rc==PARSING_ERASE;
 
@@ -3171,7 +3177,7 @@ tag : Tag_name
                   {
                    # update number of tags to finish in the currently built stream section, if necessary
                    $pendingTags->[1]++;
- 
+
                    # Disable storage of a checksum. (A finish hook makes the paragraph depending
                    # on something potentially outside the paragraph - the paragraph becomes dynamic.)
                    $flags{checksummed}=0;
@@ -3180,10 +3186,10 @@ tag : Tag_name
                  # well done
                  last;
                 }
- 
+
                # or even superb?
                $_[0]->YYAccept, last if $rc==PARSING_COMPLETED;
- 
+
                # something is wrong here
                warn "[Warn] Tags $_[1][0] tag hook replied unexpected result $rc, ignored.\n";
               }
@@ -3408,7 +3414,7 @@ table : Table
           push(@specialStack, $lexerFlags{el});
           $lexerFlags{el}=LEXER_IGNORE;
 
-	  # deactivate boost
+          # deactivate boost
           $flags{noboost}=1;
          }
         used_tagpars
@@ -3431,7 +3437,7 @@ table : Table
              $tagpars{rowseparator}="\n" if $tagpars{rowseparator} eq '\\\\n';
             }
 
-	  # mark table start
+	      # mark table start
           $tableColumns=0-(
 			   exists $tagpars{gracecr} ? $tagpars{gracecr}
                                                     : (not exists $tagpars{rowseparator} or $tagpars{rowseparator} eq "\n") ? 1
@@ -3677,7 +3683,7 @@ embedded : Embed
 
              # did the user exclude files of the language the embedded source is written in?
              my $langExcluded=not (
-                                      not $flags{filter}                        # no general language filter is defined, so all languages are allowed, or 
+                                      not $flags{filter}                        # no general language filter is defined, so all languages are allowed, or
                                    or lc($pars{lang}) eq 'pp'                   # this is a PerlPoint file, or
                                    or (
                                            exists $pars{lang}                   # there is a general language filter,
@@ -3689,7 +3695,7 @@ embedded : Embed
              my $filterSet=_setImportFilter($_[0], \%pars);
 
              # Input filter to call?
-             if (    
+             if (
                      not $langExcluded       # files in the language of the embedded one are not excluded in general
                  and exists $pars{ifilter}   # and there is an import filter
                 )
@@ -3915,7 +3921,7 @@ included : Include
 
                    # did the user exclude files of the language the embedded source is written in?
                    my $typeExcluded=not (
-                                            not $flags{filter}                           # no general language filter is defined, so all languages are allowed, or 
+                                            not $flags{filter}                           # no general language filter is defined, so all languages are allowed, or
                                          or lc($tagpars{type}) eq 'pp'                   # this is a PerlPoint file, or
                                          or (
                                                  exists $tagpars{type}                   # there is a general language filter,
@@ -4077,7 +4083,7 @@ included : Include
                       # we have to supply something, but it should be nothing
                       [[()], $_[3][1]];
                      }
-                   elsif ($flags{filter} and $tagpars{type}!~/^(($flags{filter})|example)$/i)
+                   elsif ($flags{filter} and $tagpars{type}!~/^(($flags{filter})|(?:parsed)?example)$/i)
                      {
                       # this file does not need to be included, nevertheless
                       # we have to supply something - but it should be nothing
@@ -4138,10 +4144,13 @@ included : Include
                       my @included=<$included>;
                       close($included);
 
-                      # in case the file was declared an example, embed its contents as a verbatim block,
+                      # in case the file was declared a (parsed) example, embed its contents as a (verbatim) block,
                       # otherwise, include it as really embedded part (to be processed by a backend)
-                      if ($tagpars{type}=~/^example$/i)
+                      if ($tagpars{type}=~/^(parsed)?example$/i)
                         {
+                         # set paragraph type
+                         my $ptypeDirective=defined($1) ? DIRECTIVE_BLOCK : DIRECTIVE_VERBATIM;
+
                          # indent lines, if requested
                          if (exists $tagpars{indent})
                            {
@@ -4151,7 +4160,7 @@ included : Include
                             else
                               {
                                # all right, indent
-                               my $indentation=' ' x $tagpars{indent}; 
+                               my $indentation=' ' x $tagpars{indent};
                                @included=map {"$indentation$_"} @included;
                               }
                            }
@@ -4160,11 +4169,11 @@ included : Include
                          [
                           [
                            # opener directive
-                           [\%hints, DIRECTIVE_VERBATIM, DIRECTIVE_START],
+                           [\%hints, $ptypeDirective, DIRECTIVE_START],
                            # the list of enclosed literals
                            @included,
                            # final directive
-                           [\%hints, DIRECTIVE_VERBATIM, DIRECTIVE_COMPLETE]
+                           [\%hints, $ptypeDirective, DIRECTIVE_COMPLETE]
                           ],
                           $_[3][1]
                          ];
@@ -4188,7 +4197,7 @@ included : Include
                   }
                 else
                   {
-                   # simply inform user
+                   # file missing, simply inform user
                    $errors++, _semerr($_[0], "$sourceFile, line $_[3][1]: File $tagpars{file} does not exist or cannot be read (current directory: ", cwd(), ").");
 
                    # we have to supply something, but it should be nothing
@@ -4196,7 +4205,7 @@ included : Include
                   }
                }
              else
-               {        
+               {
                 # we have to supply something, but it should be nothing
                 [[()], $_[3][1]];
                }
@@ -4270,7 +4279,7 @@ alias_definition : '+'
                      else
                        {
                         # ok, this is a new definition - get all used parameters
-                        my %pars; 
+                        my %pars;
                         @pars{($macro=~/__([^_\\]+)__/g)}=();
 
                         # store default values of options, if necessary
@@ -4395,7 +4404,7 @@ sub _lexer
     {
      # trace, if necessary
      warn "[Trace] Lexer: Ignored EOL in line $lineNrs{$inHandle}.\n" if $flags{trace} & TRACE_LEXER;
-     
+
      # remove the ignored newline
      $parser->{USER}->{INPUT}=~s/^\n//;
 
@@ -4545,7 +4554,7 @@ sub _lexer
 
        # if we are here, we can leave the skip mode (both condition and docstream one)
        $flags{skipInput}=0;
-     
+
        # we read a new line (or something from stack)
        unshift(@inLine, [length($parser->{USER}->{INPUT})+length('org.: '), "org.: $parser->{USER}->{INPUT}"]);
 
@@ -4636,7 +4645,7 @@ sub _lexer
                {
                 # build checksum (of paragraph *and* headline level offset)
                 my $checksum=sha1_base64(join('+', exists $flags{headlineLevelOffset} ? $flags{headlineLevelOffset} : 0, $paragraph));
-		
+
                 # warn "---> Searching checksum for this paragraph:\n-----\n$paragraph\n- by $checksum --\n";
                 # check paragraph to be known
                 if (
@@ -4669,7 +4678,7 @@ sub _lexer
 
                    # update statistics
                    $statistics{cache}[1]++;
-		   
+
                    # update line counter
                    # warn "----> Old line: $lineNrs{$inHandle}\n";
                    $lineNrs{$inHandle}+=$plines;
@@ -4680,7 +4689,7 @@ sub _lexer
                      foreach keys %{$checksums->{$sourceFile}{$checksum}[5]};
 
                    # The next steps depend - follow the provided hint. We may have to reinvoke
-                   # the parser to restore a state.                   
+                   # the parser to restore a state.
 # perl 5.6 #       unless (exists $checksums->{$sourceFile}{$checksum}[2])
                    unless (defined $checksums->{$sourceFile}{$checksum}[2])
                      {
@@ -4769,7 +4778,7 @@ sub _lexer
      # grab line and chomp if necessary
      my $line=$parser->{USER}->{INPUT};
      chomp($line) unless $parserState==STATE_VERBATIM;
-          
+
      # update input line (restore trailing newline if it will be used to detect paragraph completion)
      $parser->{USER}->{INPUT}=$parserState==STATE_VERBATIM ? '' : "\n";
 
@@ -4852,32 +4861,32 @@ sub _lexer
      $found=$1, s/^\\$1//,
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Table starts in line $lineNrs{$inHandle}.\n")),
      return('Table', [$found, $lineNrs{$inHandle}]) if $specials{tag} and /^$lexerPatterns{table}/;
-     
+
      # reply next token: scan for SPECIAL tagnames: \END_TABLE
      $found=$1, s/^\\$1//,
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Table completed in line $lineNrs{$inHandle}.\n")),
      return('Tabled', [$found, $lineNrs{$inHandle}])  if $specials{tag} and /^$lexerPatterns{endTable}/;
-     
+
      # reply next token: scan for SPECIAL tagnames: \EMBED
      $found=$1, s/^\\$1//,
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Embedding starts in line $lineNrs{$inHandle}.\n")),
      return('Embed', [$found, $lineNrs{$inHandle}]) if $specials{tag} and /^$lexerPatterns{embed}/;
-     
+
      # reply next token: scan for SPECIAL tagnames: \END_EMBED
      $found=$1, s/^\\$1//,
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Embedding completed in line $lineNrs{$inHandle}.\n")),
      return('Embedded', [$found, $lineNrs{$inHandle}]) if $specials{embedded} and /^$lexerPatterns{endEmbed}/;
-     
+
      # reply next token: scan for SPECIAL tagnames: \INCLUDE
      $found=$1, s/^\\$1//,
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Including starts in line $lineNrs{$inHandle}.\n")),
      return('Include', [$found, $lineNrs{$inHandle}]) if $specials{tag} and /^$lexerPatterns{include}/;
-     
+
      # reply next token: scan for tagnames
      $found=$1, s/^\\$1//,
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Tag opener $found in line $lineNrs{$inHandle}.\n")),
      return('Tag_name', [$found, $lineNrs{$inHandle}]) if $specials{tag} and /^$lexerPatterns{tag}/ and (exists $tagsRef->{$1} or exists $macros{$1});
-     
+
      # reply next token: scan for special characters
      $found=$1, s/^\Q$1//,
      (($flags{trace} & TRACE_LEXER) and warn("[Trace] Lexer: Special $found in line $lineNrs{$inHandle}.\n")),
@@ -4967,9 +4976,9 @@ sub _evalTagCondition
  {
   # get parameters
   my ($code, $file, $line)=@_;
-  confess "[BUG] Missing code parameter.\n" unless $code;
-  confess "[BUG] Missing file parameter.\n" unless $file;
-  confess "[BUG] Missing line parameter.\n" unless $line;
+  confess "[BUG] Missing code parameter.\n" unless defined $code;
+  confess "[BUG] Missing file parameter.\n" unless defined $file;
+  confess "[BUG] Missing line parameter.\n" unless defined $line;
 
   # declare variables
   my ($rc);
@@ -5035,7 +5044,7 @@ sub _lineStartResearch
 
         # update input buffer and reply the token (contents is necessary as well)
         my $ils=$1;
-        $parser->{USER}->{INPUT}=~s/^$1//; 
+        $parser->{USER}->{INPUT}=~s/^$1//;
         return(1, 'Ils', [$ils, $lineNrs{$inHandle}]);
        }
      elsif ($lexerFlags{ils}==LEXER_IGNORE)
@@ -5440,7 +5449,7 @@ It is up to a translator author to declare translator specific settings (and to
 document them). The passed values can be as complex as necessary as long as they
 can be duplicated by C<Storable::dclone()>.
 
-Whenever active contents is invoked, the passed hash reference is copied 
+Whenever active contents is invoked, the passed hash reference is copied
 (duplicated by C<Storable::dclone()>) into the Safe objects namespace
 (see I<safe>) as a global variable $PerlPoint. This way, modifications by
 invoked code do not effect subsequently called code snippets, base data are
@@ -5881,7 +5890,7 @@ B<Example:>
               );
 
 =cut
-sub run 
+sub run
  {
   # get parameters
   my ($me, @pars)=@_;
@@ -5984,28 +5993,33 @@ sub run
     {
      my $code=<<'EOC';
 
-  # check if at least one of a set of flags is set
-  sub flagSet
-    {
-     # declare and init variable
-     my $rc=0;
+  unless (defined *main::flagSet{CODE})
+   {
+    # check if at least one of a set of flags is set
+    # - define functions anonymously to avoid redefinition in case the condition is not matched
+    *main::flagSet=sub
+                    {
+                     # declare and init variable
+                     my $rc=0;
 
-     # check flags
-     foreach (@_)
-       {$rc=1, last if exists $PerlPoint->{userSettings}{$_};}
+                     # check flags
+                     foreach (@_)
+                       {$rc=1, last if exists $PerlPoint->{userSettings}{$_};}
 
-     # supply result
-     $rc;
-    }
+                     # supply result
+                     $rc;
+                    };
 
-  # supply variable value
-  sub varValue
-    {${join('::', 'main', $_[0])};}
+    # provide the value of a PerlPoint variable
+    # - define function anonymously to avoid redefinition in case the condition is not matched
+    *main::varValue=sub {${join('::', 'main', $_[0])};};
+   }
 
 # complete compartment code
 EOC
 
-     ref($safeObject) ? $safeObject->reval($code) : eval(join(' ', '{package main; undef &flagSet; undef &varValue; no strict;', $code, '}'));
+     ref($safeObject) ? $safeObject->reval($code) : eval("{package main; no strict; $code}");
+     die "[BUG] Bug in function definition, please inform developer: $@" if $@;
     }
 
   # predeclare variables
@@ -6074,7 +6088,7 @@ EOC
 
   # welcome user
   unless ($flags{display} & DISPLAY_NOINFO)
-   {  
+   {
     print STDERR "[Info] The PerlPoint parser ";
     {
      no strict 'refs';
@@ -6463,7 +6477,6 @@ sub _updateChecksums
 
 
 # --------------------------------------------------------
-
 # Extend all table rows to the number of columns found
 # in the first table line ("table headline"). On request,
 # automatically format the first table line as "headline".
@@ -6546,11 +6559,11 @@ sub _normalizeTableRows
                 [{}, DIRECTIVE_TAG, DIRECTIVE_START, 'TABLE_COL'],
                 [{}, DIRECTIVE_TAG, DIRECTIVE_COMPLETE, 'TABLE_COL'],
                ) for 1 .. ($refColumns-$columns);
-           
+
            # reset column counter
            $columns=0;
           }
-        
+
         # update maximum number of columns, if necessary
         $maxColumns=$columns if $columns>$maxColumns;
 

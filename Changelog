@@ -9,6 +9,44 @@
 // -- end of "preface"
 
 
+=0.44
+
+\ILLT
+
+=Features
+
+* New basic tag \CX<INDEXCLOUD>. The tag collects index entries of a chapter
+  range (and all included subchapters) or the whole document. The stream
+  contains all the tag options. Generator based converters can rely on
+  additional informations, which include a list of all index entries in the
+  chapter range specified, and a quick ranking - a unified list of indexed
+  phrases and their occurence number.
+
+* \CX<PP::Generator::SDF> shows an example implementation for \C<\\INDEXCLOUD>
+  in generator based converters. As SDF cannot paint clouds, the tag
+  is transformed into an ordered  ranking list.
+
+* \C<\\INDEXCLOUD> implementations in traditional backend based converters
+  are more expensive and depend on the converters internal index management
+  and data structures, so they can vary. \C<pp2sdf> shall show one
+  possible implementation in future versions.
+
+* New value for \CX<\\INCLUDE>'s \CX<type> option: \CX<parsedexample> works
+  like \CX<example>, but embeds the file contents as a standard block (which
+  is parsed), instead of as a verbatim block like \C<example>. Parsing an
+  example file is especially handy when working with (highlighting) paragraph
+  filters.
+
+
+=Fixes
+
+* \X<SDF> generator had not been adapted to several of the last stream format
+  updates.
+
+* Code passed to \CX<_cnd_> was not accepted if it evaluated to "false" in Perl.
+  Now the valid "0" is handled correctly.
+	
+	
 =0.43
 
 \ILLT
