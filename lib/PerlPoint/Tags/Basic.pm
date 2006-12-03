@@ -5,6 +5,7 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.08    |03.12.2006| JSTENZEL | INDEXCLOUD POD fix: chapterdelimiter => chapterDelimiter;
 # 0.07    |25.04.2006| JSTENZEL | added INDEXCLOUD;
 # 0.06    |05.03.2006| JSTENZEL | FORMAT, HIDE, INDEX, INDEXRELATIONS, LOCALTOC and READY
 #         |          |          | got a "standalone" configuration flag;
@@ -44,7 +45,7 @@ B<PerlPoint::Tags::Basic> - declares basic PerlPoint tags
 
 =head1 VERSION
 
-This manual describes version B<0.07>.
+This manual describes version B<0.08>.
 
 =head1 SYNOPSIS
 
@@ -184,7 +185,7 @@ This tag can be configured by options. All options are optional, except where st
 
 =over
 
-=item chapterdelimiter
+=item chapterDelimiter
 
 A supplementary option to C<chapters>. Defines the delimiter string used to separate
 multiple chapter names in the C<chapters> value.
@@ -195,7 +196,7 @@ This option has no effect if C<chapters> is not used.
 
 Example:
 
-  chapterdelimiter="==" chapters="One Chapter==Another Chapter"
+  chapterDelimiter="==" chapters="One Chapter==Another Chapter"
 
 
 =item chapters
@@ -204,11 +205,11 @@ This mandatory parameter specifies the chapters of which index entries should be
 taken into account, including all their subchapters. A chapter is specified by
 its title, as with C<\REF>. To list more than one chapter, delimit the titles
 by a string that is not contained in them, and declare this delimiter string with
-the C<chapterdelimiter> option.
+the C<chapterDelimiter> option.
 
 Example:
 
-  chapterdelimiter="==" chapters="One Chapter==Another Chapter"
+  chapterDelimiter="==" chapters="One Chapter==Another Chapter"
 
 
 =item coolestColor
@@ -696,7 +697,7 @@ require 5.00503;
 package PerlPoint::Tags::Basic;
 
 # declare package version
-$VERSION=0.07;
+$VERSION=0.08;
 
 # declare base "class"
 use base qw(PerlPoint::Tags);

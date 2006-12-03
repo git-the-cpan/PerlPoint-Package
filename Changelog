@@ -9,6 +9,13 @@
 // -- end of "preface"
 
 
+=0.45
+
+=Fixes
+
+* The chapter delimiter parameter of the \CX<INDEXCLOUD> tag was documented
+  as \C<chapterdelimiter>, not \C<chapter\B<B>elimiter>.
+	
 =0.44
 
 \ILLT
