@@ -497,6 +497,7 @@ sub _Parse {
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.451   |06.10.2007| JSTENZEL | just for the release;
 # 0.45    |03.12.2006| JSTENZEL | just for the release;
 # 0.44    |15.06.2006| JSTENZEL | new type "parsedexample" for \INCLUDE;
 #         |06.08.2006| JSTENZEL | bugfix in parameter check of _evalTagCondition(): using
@@ -1025,7 +1026,7 @@ B<PerlPoint::Parser> - a PerlPoint Parser
 
 =head1 VERSION
 
-This manual describes version B<0.45>.
+This manual describes version B<0.451>.
 
 =head1 SYNOPSIS
 
@@ -2025,7 +2026,7 @@ B<Example:>
  require 5.00503;
 
  # declare module version
- $PerlPoint::Parser::VERSION=0.45;
+ $PerlPoint::Parser::VERSION=0.451;
  $PerlPoint::Parser::VERSION=$PerlPoint::Parser::VERSION; # to suppress a warning of exclusive usage only;
 
  # pragmata

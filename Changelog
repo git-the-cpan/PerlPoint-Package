@@ -9,6 +9,11 @@
 // -- end of "preface"
 
 
+=0.451
+
+This version is similar to 0.45 in function, it fixes the test suite on UNIX
+systems. Thanks to Andreas König who triggered me to publish this fix.
+
 =0.45
 
 =Fixes
