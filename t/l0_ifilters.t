@@ -5,6 +5,8 @@
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.04    |10.10.2007| JSTENZEL | caller() needs to be declared as safe opcode if using
+#         |          |          | strict under Safe with perl 5.9.5 and higher;
 # 0.03    |19.04.2006| JSTENZEL | added tests for new standard filter API;
 # 0.02    |27.12.2004| JSTENZEL | adapted to new headline path data;
 #         |28.12.2004| JSTENZEL | adapted to dotted texts;
@@ -90,9 +92,9 @@ performChecksFull();
 undef(@results);
 undef(@streamData);
 
-# build a Safe object that is allowed to call require()
+# build a Safe object that is allowed to call require() and caller()
 my $safe=new Safe;
-$safe->permit(qw(require));
+$safe->permit(qw(caller require));    # caller() needs to be added for perl 5.9.5 and higher;
 
 # and call it
 $parser->run(

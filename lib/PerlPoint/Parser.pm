@@ -497,6 +497,7 @@ sub _Parse {
 # ---------------------------------------------------------------------------------------
 # version | date     | author   | changes
 # ---------------------------------------------------------------------------------------
+# 0.452   |10.10.2007| JSTENZEL | just for the release;
 # 0.451   |06.10.2007| JSTENZEL | just for the release;
 # 0.45    |03.12.2006| JSTENZEL | just for the release;
 # 0.44    |15.06.2006| JSTENZEL | new type "parsedexample" for \INCLUDE;

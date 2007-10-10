@@ -9,6 +9,20 @@
 // -- end of "preface"
 
 
+=0.452
+
+It turned out that 0.451 was still untestable under new developer releases
+of \C<perl> (5.9.5) and above because \C<strict> was changed to use \C<caller>.
+
+Many thanks to Andreas König who figured out which exact developer version
+change caused the new behaviour, for starting a dialog with the core team
+and for suggesting a patch to work around the new behaviour of \C<strict>
+under \C<Safe> control.
+
+The suggested patch is applied in this update.
+
+This update affects the test suite \I<only>.
+
 =0.451
 
 This version is similar to 0.45 in function, it fixes the test suite on UNIX
